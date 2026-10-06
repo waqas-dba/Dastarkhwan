@@ -10,8 +10,9 @@ using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Development only: prints the verification token to the console instead of mailing it.
+// Development only: prints the verification token and keeps it for the Postman tests.
 // In a real app, register a sender that emails the link.
+builder.Services.AddSingleton<DevEmailInbox>();
 builder.Services.AddSingleton<IIamEmailSender, ConsoleEmailSender>();
 
 builder.Services.AddIam(builder.Configuration);
@@ -42,5 +43,12 @@ app.MapGet("/demo/needs-login", () => "You are signed in.")
 
 app.MapGet("/demo/needs-users-read", () => "You hold the users.read permission.")
    .RequirePermission(IamPermissionNames.UsersRead);
+
+// DEVELOPMENT ONLY: lets the Postman collection read the token that was "emailed".
+if (app.Environment.IsDevelopment())
+{
+    app.MapGet("/dev/verification-token", (string email, DevEmailInbox inbox) =>
+        inbox.Get(email) is { } token ? Results.Ok(new { token }) : Results.NotFound());
+}
 
 app.Run();

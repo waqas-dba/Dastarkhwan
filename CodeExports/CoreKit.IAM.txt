@@ -1,10 +1,52 @@
 ﻿
 
 ==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\GlobalUsings.cs
+==================================================
+
+global using System.Security.Claims;
+global using System.Text;
+global using System.Threading.RateLimiting;
+global using Microsoft.AspNetCore.Authentication.JwtBearer;
+global using Microsoft.AspNetCore.Authorization;
+global using Microsoft.AspNetCore.Http;
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.Extensions.Configuration;
+global using Microsoft.Extensions.DependencyInjection;
+global using Microsoft.Extensions.DependencyInjection.Extensions;
+global using Microsoft.Extensions.Options;
+global using Microsoft.IdentityModel.Tokens;
+global using Microsoft.AspNetCore.Builder;
+
+
+global using CoreKit.IAM.Common;
+global using CoreKit.IAM.Constants;
+global using CoreKit.IAM.Entities;
+global using CoreKit.IAM.Interfaces;
+global using CoreKit.IAM.Models;
+global using CoreKit.IAM.Normalization;
+global using CoreKit.IAM.Persistence;
+global using CoreKit.IAM.Security;
+global using CoreKit.IAM.Services;
+global using CoreKit.IAM.Settings;
+global using CoreKit.IAM.Validation;
+
+global using Microsoft.AspNetCore.WebUtilities;
+global using Microsoft.IdentityModel.JsonWebTokens;
+global using System.Security.Cryptography;
+global using System.Text.Json;
+global using Microsoft.AspNetCore.Identity;
+
+global using CoreKit.IAM.Authorization;
+global using CoreKit.IAM.Hooks;
+global using CoreKit.IAM.Seeding;
+
+
+
+==================================================
 FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Authorization\EndpointPermissionExtensions.cs
 ==================================================
 
-using Microsoft.AspNetCore.Builder;
 
 namespace CoreKit.IAM.Authorization;
 
@@ -90,11 +132,6 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
 FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Authorization\PermissionPolicyProvider.cs
 ==================================================
 
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.Extensions.Options;
-
-
 
 namespace CoreKit.IAM.Authorization;
 
@@ -109,7 +146,7 @@ public sealed class PermissionPolicyProvider : DefaultAuthorizationPolicyProvide
     {
     }
 
-    public override async Task<AuthorizationPolicy?> GetPolicyAsync(string policyName)
+    public override async Task<Microsoft.AspNetCore.Authorization.AuthorizationPolicy?> GetPolicyAsync(string policyName)
     {
         if (IamPolicies.TryGetPermission(policyName, out var permission))
         {
@@ -590,6 +627,196 @@ public static class IamRoleNames
 
 
 ==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Endpoints\IamEndpointExtensions.cs
+==================================================
+
+using Microsoft.AspNetCore.Routing;
+
+namespace CoreKit.IAM.Endpoints;
+
+public static class IamEndpointExtensions
+{
+    /// <summary>
+    /// Maps the IAM HTTP API under a prefix (default "/iam"). Optional: an app that wants
+    /// its own routes can skip this and call the services directly.
+    /// </summary>
+    public static IEndpointRouteBuilder MapIam(this IEndpointRouteBuilder app, string prefix = "/iam")
+    {
+        prefix = NormalizePrefix(prefix);
+
+        var iam = app.MapGroup(prefix).WithTags("IAM");
+
+        MapAuth(iam.MapGroup("/auth"));
+        MapUsers(iam.MapGroup("/users"), $"{prefix}/users");
+        MapRoles(iam.MapGroup("/roles"), $"{prefix}/roles");
+        MapPermissions(iam.MapGroup("/permissions"));
+
+        return app;
+    }
+
+    /// <summary>"iam", "/iam/" and "/iam" all become "/iam". An empty prefix stays empty.</summary>
+    private static string NormalizePrefix(string? prefix)
+    {
+        var trimmed = (prefix ?? string.Empty).Trim().TrimEnd('/');
+
+        return trimmed.Length == 0 || trimmed.StartsWith('/') ? trimmed : "/" + trimmed;
+    }
+
+    private static void MapAuth(RouteGroupBuilder auth)
+    {
+        auth.MapGet("/me", async (IAuthService s, CancellationToken ct) =>
+                (await s.GetCurrentUserAsync(ct)).ToHttpResult())
+            .RequireAuthorization();
+
+        var limited = auth.MapGroup("").RequireRateLimiting(IamRateLimiting.AuthPolicy);
+
+        limited.MapPost("/login", async (LoginRequest r, IAuthService s, CancellationToken ct) =>
+                (await s.LoginAsync(r, ct)).ToHttpResult())
+            .AllowAnonymous();
+
+        limited.MapPost("/refresh", async (RefreshTokenRequest r, IAuthService s, CancellationToken ct) =>
+                (await s.RefreshAsync(r, ct)).ToHttpResult())
+            .AllowAnonymous();
+
+        limited.MapPost("/logout", async (RefreshTokenRequest r, IAuthService s, CancellationToken ct) =>
+                (await s.LogoutAsync(r, ct)).ToHttpResult())
+            .AllowAnonymous();
+
+        limited.MapPost("/change-password", async (ChangePasswordRequest r, IAuthService s, CancellationToken ct) =>
+                (await s.ChangePasswordAsync(r, ct)).ToHttpResult())
+            .RequireAuthorization();
+    }
+
+    private static void MapUsers(RouteGroupBuilder users, string basePath)
+    {
+        users.MapGet("/", async (
+                string? search,
+                bool? isActive,
+                int? page,
+                int? pageSize,
+                IUserService s,
+                CancellationToken ct) =>
+        {
+            var query = new UserListQuery
+            {
+                Search = search,
+                IsActive = isActive,
+                Page = page ?? 1,
+                PageSize = pageSize ?? 20
+            };
+
+            return (await s.ListAsync(query, ct)).ToHttpResult();
+        })
+            .RequirePermission(IamPermissionNames.UsersRead);
+
+        users.MapGet("/{id:guid}", async (Guid id, IUserService s, CancellationToken ct) =>
+                (await s.GetAsync(id, ct)).ToHttpResult())
+            .RequirePermission(IamPermissionNames.UsersRead);
+
+        users.MapPost("/", async (CreateUserRequest r, IUserService s, CancellationToken ct) =>
+        {
+            var result = await s.CreateAsync(r, ct);
+
+            return result.IsSuccess
+                ? Results.Created($"{basePath}/{result.Value.Id}", result.Value)
+                : result.ToHttpResult();
+        })
+            .RequirePermission(IamPermissionNames.UsersCreate);
+
+        users.MapPut("/{id:guid}", async (Guid id, UpdateUserRequest r, IUserService s, CancellationToken ct) =>
+                (await s.UpdateAsync(id, r, ct)).ToHttpResult())
+            .RequirePermission(IamPermissionNames.UsersUpdate);
+
+        users.MapPut("/{id:guid}/roles", async (Guid id, SetUserRolesRequest r, IUserService s, CancellationToken ct) =>
+                (await s.SetRolesAsync(id, r, ct)).ToHttpResult())
+            .RequirePermission(IamPermissionNames.UsersUpdate);
+
+        users.MapDelete("/{id:guid}", async (Guid id, IUserService s, CancellationToken ct) =>
+                (await s.DeleteAsync(id, ct)).ToHttpResult())
+            .RequirePermission(IamPermissionNames.UsersDelete);
+    }
+
+    private static void MapRoles(RouteGroupBuilder roles, string basePath)
+    {
+        roles.MapGet("/", async (IRoleService s, CancellationToken ct) =>
+                (await s.ListAsync(ct)).ToHttpResult())
+            .RequirePermission(IamPermissionNames.RolesRead);
+
+        roles.MapGet("/{id:guid}", async (Guid id, IRoleService s, CancellationToken ct) =>
+                (await s.GetAsync(id, ct)).ToHttpResult())
+            .RequirePermission(IamPermissionNames.RolesRead);
+
+        roles.MapPost("/", async (CreateRoleRequest r, IRoleService s, CancellationToken ct) =>
+        {
+            var result = await s.CreateAsync(r, ct);
+
+            return result.IsSuccess
+                ? Results.Created($"{basePath}/{result.Value.Id}", result.Value)
+                : result.ToHttpResult();
+        })
+            .RequirePermission(IamPermissionNames.RolesCreate);
+
+        roles.MapPut("/{id:guid}", async (Guid id, UpdateRoleRequest r, IRoleService s, CancellationToken ct) =>
+                (await s.UpdateAsync(id, r, ct)).ToHttpResult())
+            .RequirePermission(IamPermissionNames.RolesUpdate);
+
+        roles.MapPut("/{id:guid}/permissions", async (Guid id, SetRolePermissionsRequest r, IRoleService s, CancellationToken ct) =>
+                (await s.SetPermissionsAsync(id, r, ct)).ToHttpResult())
+            .RequirePermission(IamPermissionNames.RolesUpdate);
+
+        roles.MapDelete("/{id:guid}", async (Guid id, IRoleService s, CancellationToken ct) =>
+                (await s.DeleteAsync(id, ct)).ToHttpResult())
+            .RequirePermission(IamPermissionNames.RolesDelete);
+    }
+
+    private static void MapPermissions(RouteGroupBuilder permissions)
+    {
+        permissions.MapGet("/", async (IPermissionService s, CancellationToken ct) =>
+                (await s.ListAsync(ct)).ToHttpResult())
+            .RequirePermission(IamPermissionNames.PermissionsRead);
+
+        permissions.MapGet("/{id:guid}", async (Guid id, IPermissionService s, CancellationToken ct) =>
+                (await s.GetAsync(id, ct)).ToHttpResult())
+            .RequirePermission(IamPermissionNames.PermissionsRead);
+    }
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Endpoints\IamResultExtensions.cs
+==================================================
+
+namespace CoreKit.IAM.Endpoints;
+
+/// <summary>The one place that turns an IamError into an HTTP status code.</summary>
+public static class IamResultExtensions
+{
+    public static IResult ToHttpResult(this IamResult result, Func<IResult>? onSuccess = null)
+        => result.IsSuccess ? (onSuccess?.Invoke() ?? Results.NoContent()) : Problem(result.Error!);
+
+    public static IResult ToHttpResult<T>(this IamResult<T> result)
+        => result.IsSuccess ? Results.Ok(result.Value) : Problem(result.Error!);
+
+    private static IResult Problem(IamError error)
+    {
+        var status = error.Kind switch
+        {
+            IamErrorKind.Validation => StatusCodes.Status400BadRequest,
+            IamErrorKind.Unauthorized => StatusCodes.Status401Unauthorized,
+            IamErrorKind.Forbidden => StatusCodes.Status403Forbidden,
+            IamErrorKind.NotFound => StatusCodes.Status404NotFound,
+            IamErrorKind.Conflict => StatusCodes.Status409Conflict,
+            _ => StatusCodes.Status500InternalServerError
+        };
+
+        return Results.Json(new { code = error.Code, message = error.Message }, statusCode: status);
+    }
+}
+
+
+
+==================================================
 FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Entities\Permission.cs
 ==================================================
 
@@ -798,12 +1025,6 @@ public static class IamApplicationBuilderExtensions
 FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Extensions\ServiceCollectionExtensions.cs
 ==================================================
 
-
-using CoreKit.IAM.Interfaces;
-using CoreKit.IAM.Services;
-using CoreKit.IAM.Settings;
-
-
 namespace CoreKit.IAM.Extensions;
 
 public static class ServiceCollectionExtensions
@@ -814,7 +1035,7 @@ public static class ServiceCollectionExtensions
     /// The smallest registration: the IAM database, a clock and the password hasher.
     /// Tools such as the seeder use this and nothing else.
     /// </summary>
-    public static IServiceCollection AddDaskhawaIamPersistence(
+    public static IServiceCollection AddIamPersistence(
         this IServiceCollection services,
         IConfiguration configuration,
         Action<DbContextOptionsBuilder>? configureDatabase = null)
@@ -855,7 +1076,7 @@ public static class ServiceCollectionExtensions
         IConfiguration configuration,
         Action<DbContextOptionsBuilder>? configureDatabase = null)
     {
-        services.AddDaskhawaIamPersistence(configuration, configureDatabase);
+        services.AddIamPersistence(configuration, configureDatabase);
 
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection(JwtOptions.SectionName))
@@ -936,6 +1157,24 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Hooks\IAccessTokenClaimsContributor.cs
+==================================================
+
+namespace CoreKit.IAM.Hooks;
+
+/// <summary>
+/// Lets another module add claims to the access token without IAM knowing about it.
+/// Register with services.AddScoped&lt;IAccessTokenClaimsContributor, YourContributor&gt;().
+/// Claims named sub, jti, email, name, role or permission are ignored: only IAM sets those.
+/// </summary>
+public interface IAccessTokenClaimsContributor
+{
+    Task<IReadOnlyCollection<Claim>> GetClaimsAsync(User user, CancellationToken ct = default);
 }
 
 
@@ -1061,9 +1300,10 @@ public sealed record GeneratedRefreshToken(string RawToken, string TokenHash, Da
 public interface ITokenService
 {
     AccessTokenResult CreateAccessToken(
-        User user,
-        IReadOnlyCollection<string> roles,
-        IReadOnlyCollection<string> permissions);
+    User user,
+    IReadOnlyCollection<string> roles,
+    IReadOnlyCollection<string> permissions,
+    IEnumerable<Claim>? extraClaims = null);
 
     /// <summary>Creates a random token. RawToken goes to the client; only TokenHash is stored.</summary>
     GeneratedRefreshToken CreateRefreshToken();
@@ -1470,35 +1710,28 @@ public sealed class IamDbContextFactory : IDesignTimeDbContextFactory<IamDbConte
 FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Security\PasswordHasher.cs
 ==================================================
 
-using CoreKit.IAM.Interfaces;
-
 namespace CoreKit.IAM.Security;
 
-
 /// <summary>
-/// Wraps ASP.NET Core's built-in hasher (PBKDF2 with HMAC-SHA512, a random salt for every hash,
-/// and the settings stored inside the hash). We do not invent any cryptography.
+/// Wraps ASP.NET Core's built-in hasher (PBKDF2 with HMAC-SHA512, random salt per hash,
+/// settings stored inside the hash). We do not invent any cryptography.
 /// </summary>
-public sealed class PasswordHasher : IPasswordHasher
+public sealed class PasswordHasher : Interfaces.IPasswordHasher
 {
     /// <summary>OWASP's recommended minimum for PBKDF2 with HMAC-SHA512.</summary>
     public const int DefaultIterationCount = 210_000;
 
-    private sealed class HashSubject
-    {
-    }
+    private sealed class HashSubject { }
 
     private static readonly HashSubject Subject = new();
 
-    private readonly PasswordHasher<HashSubject> _inner;
+    private readonly Microsoft.AspNetCore.Identity.PasswordHasher<HashSubject> _inner;
 
-    public PasswordHasher() : this(DefaultIterationCount)
-    {
-    }
+    public PasswordHasher() : this(DefaultIterationCount) { }
 
     public PasswordHasher(int iterationCount)
     {
-        _inner = new PasswordHasher<HashSubject>(
+        _inner = new Microsoft.AspNetCore.Identity.PasswordHasher<HashSubject>(
             Options.Create(new PasswordHasherOptions { IterationCount = iterationCount }));
     }
 
@@ -1564,6 +1797,278 @@ public static class PasswordPolicy
 
 
 ==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Seeding\IamSeeder.cs
+==================================================
+
+using Microsoft.Extensions.Logging;
+
+namespace CoreKit.IAM.Seeding;
+
+/// <summary>
+/// Safe to run on every startup. It creates what is missing and never removes anything:
+/// permissions, the default roles, and the first admin user.
+/// </summary>
+public sealed class IamSeeder
+{
+    // Roles besides Administrator. Created once with these permissions; an administrator owns them afterwards.
+    private static readonly (string Name, string Description, string[] Permissions)[] DefaultRoles =
+    {
+        (IamRoleNames.Manager, "Manages users and can read roles.",
+            new[]
+            {
+                IamPermissionNames.UsersRead,
+                IamPermissionNames.UsersCreate,
+                IamPermissionNames.UsersUpdate,
+                IamPermissionNames.RolesRead,
+                IamPermissionNames.PermissionsRead
+            }),
+
+        (IamRoleNames.Staff, "Basic read access.",
+            new[] { IamPermissionNames.UsersRead })
+    };
+
+    private readonly IamDbContext _db;
+    private readonly IPasswordHasher _hasher;
+    private readonly TimeProvider _time;
+    private readonly IamSeedOptions _options;
+    private readonly ILogger<IamSeeder> _logger;
+
+    public IamSeeder(
+        IamDbContext db,
+        IPasswordHasher hasher,
+        TimeProvider time,
+        IOptions<IamSeedOptions> options,
+        ILogger<IamSeeder> logger)
+    {
+        _db = db;
+        _hasher = hasher;
+        _time = time;
+        _options = options.Value;
+        _logger = logger;
+    }
+
+    /// <param name="modulePermissions">Permissions that other modules define for themselves.</param>
+    public async Task SeedAsync(IEnumerable<PermissionSeed>? modulePermissions = null, CancellationToken ct = default)
+    {
+        var permissions = await SeedPermissionsAsync(modulePermissions, ct);
+        var admin = await SeedAdministratorRoleAsync(permissions, ct);
+        await SeedDefaultRolesAsync(permissions, ct);
+
+        await _db.SaveChangesAsync(ct);
+
+        await SeedFirstAdministratorAsync(admin, ct);
+    }
+
+    private async Task<List<Permission>> SeedPermissionsAsync(
+        IEnumerable<PermissionSeed>? modulePermissions, CancellationToken ct)
+    {
+        var wanted = IamPermissionNames.All
+            .Concat(modulePermissions ?? Enumerable.Empty<PermissionSeed>())
+            .Select(p => new PermissionSeed(p.Name.Trim().ToLowerInvariant(), p.Description))
+            .DistinctBy(p => p.Name)
+            .ToList();
+
+        var existing = await _db.Permissions.ToListAsync(ct);
+
+        foreach (var seed in wanted)
+        {
+            var permission = existing.FirstOrDefault(p => p.Name == seed.Name);
+
+            if (permission is null)
+            {
+                permission = new Permission
+                {
+                    Id = Guid.NewGuid(),
+                    Name = seed.Name,
+                    Description = seed.Description,
+                    IsActive = true
+                };
+
+                _db.Permissions.Add(permission);
+                existing.Add(permission);
+            }
+            else if (permission.Description != seed.Description)
+            {
+                permission.Description = seed.Description;
+            }
+        }
+
+        return existing;
+    }
+
+    private async Task<Role> SeedAdministratorRoleAsync(List<Permission> permissions, CancellationToken ct)
+    {
+        var normalized = IamNormalizer.NormalizeName(IamRoleNames.Administrator);
+
+        var admin = await _db.Roles
+            .Include(r => r.RolePermissions)
+            .FirstOrDefaultAsync(r => r.NormalizedName == normalized, ct);
+
+        if (admin is null)
+        {
+            admin = new Role
+            {
+                Id = Guid.NewGuid(),
+                Name = IamRoleNames.Administrator,
+                NormalizedName = normalized,
+                Description = "Full access. Cannot be changed or deleted.",
+                IsActive = true
+            };
+
+            _db.Roles.Add(admin);
+        }
+        else if (!admin.IsActive)
+        {
+            admin.IsActive = true;
+        }
+
+        // Administrator always holds every permission, including ones added by newer modules.
+        var linked = admin.RolePermissions.Select(rp => rp.PermissionId).ToHashSet();
+
+        foreach (var permission in permissions.Where(p => !linked.Contains(p.Id)))
+            admin.RolePermissions.Add(new RolePermission { RoleId = admin.Id, PermissionId = permission.Id });
+
+        return admin;
+    }
+
+    private async Task SeedDefaultRolesAsync(List<Permission> permissions, CancellationToken ct)
+    {
+        foreach (var (name, description, permissionNames) in DefaultRoles)
+        {
+            var normalized = IamNormalizer.NormalizeName(name);
+
+            // Already there? Leave it alone: an administrator may have changed it on purpose.
+            if (await _db.Roles.AnyAsync(r => r.NormalizedName == normalized, ct))
+                continue;
+
+            var role = new Role
+            {
+                Id = Guid.NewGuid(),
+                Name = name,
+                NormalizedName = normalized,
+                Description = description,
+                IsActive = true
+            };
+
+            foreach (var permissionName in permissionNames)
+            {
+                var permission = permissions.FirstOrDefault(p => p.Name == permissionName);
+
+                if (permission is not null)
+                    role.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permission.Id });
+            }
+
+            _db.Roles.Add(role);
+        }
+    }
+
+    private async Task SeedFirstAdministratorAsync(Role admin, CancellationToken ct)
+    {
+        if (await _db.UserRoles.AnyAsync(ur => ur.RoleId == admin.Id, ct))
+            return;
+
+        var email = _options.AdminEmail?.Trim();
+        var password = _options.AdminPassword;
+
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrEmpty(password))
+        {
+            _logger.LogWarning(
+                "IAM has no administrator yet. Set Iam:Seed:AdminEmail and Iam:Seed:AdminPassword to create one.");
+            return;
+        }
+
+        if (!EmailValidator.IsValid(email))
+            throw new InvalidOperationException("Iam:Seed:AdminEmail is not a valid email address.");
+
+        var passwordError = PasswordPolicy.Validate(password, email);
+
+        if (passwordError is not null)
+            throw new InvalidOperationException($"Iam:Seed:AdminPassword is not acceptable. {passwordError}");
+
+        var normalizedEmail = IamNormalizer.NormalizeEmail(email);
+
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail, ct);
+
+        if (user is null)
+        {
+            user = new User
+            {
+                Id = Guid.NewGuid(),
+                Email = email,
+                NormalizedEmail = normalizedEmail,
+                PasswordHash = _hasher.Hash(password),
+                DisplayName = _options.AdminDisplayName,
+                IsActive = true,
+                EmailConfirmed = true,
+                CreatedAt = _time.GetUtcNow().UtcDateTime
+            };
+
+            _db.Users.Add(user);
+        }
+
+        _db.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = admin.Id });
+
+        await _db.SaveChangesAsync(ct);
+
+        _logger.LogInformation("The first IAM administrator {UserId} was created.", user.Id);
+    }
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Seeding\IamSeedOptions.cs
+==================================================
+
+namespace CoreKit.IAM.Seeding;
+
+/// <summary>
+/// The first administrator. Keep AdminPassword out of source control
+/// (user-secrets or the Iam__Seed__AdminPassword environment variable).
+/// </summary>
+public sealed class IamSeedOptions
+{
+    public const string SectionName = "Iam:Seed";
+
+    public string? AdminEmail { get; set; }
+
+    public string? AdminPassword { get; set; }
+
+    public string? AdminDisplayName { get; set; } = "Administrator";
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Seeding\SeedingExtensions.cs
+==================================================
+
+namespace CoreKit.IAM.Seeding;
+
+public static class SeedingExtensions
+{
+    /// <summary>Registers the seeder. Reads "Iam:Seed" from configuration.</summary>
+    public static IServiceCollection AddIamSeeding(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<IamSeedOptions>().Bind(configuration.GetSection(IamSeedOptions.SectionName));
+        services.AddScoped<IamSeeder>();
+        return services;
+    }
+
+    /// <summary>Runs the seeder once. Call after migrations, before the app starts serving.</summary>
+    public static async Task SeedIamAsync(
+        this IServiceProvider provider,
+        IEnumerable<PermissionSeed>? modulePermissions = null,
+        CancellationToken ct = default)
+    {
+        using var scope = provider.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IamSeeder>().SeedAsync(modulePermissions, ct);
+    }
+}
+
+
+
+==================================================
 FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Services\AdministratorGuard.cs
 ==================================================
 
@@ -1608,6 +2113,7 @@ using CoreKit.IAM.Models;
 using CoreKit.IAM.Persistence;
 using CoreKit.IAM.Security;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 
 namespace CoreKit.IAM.Services;
@@ -1624,12 +2130,14 @@ public sealed class AuthService : IAuthService
     private readonly ICurrentUserService _currentUser;
     private readonly TimeProvider _time;
     private readonly ILogger<AuthService> _logger;
+    private readonly IEnumerable<IAccessTokenClaimsContributor> _contributors;
 
     public AuthService(
         IamDbContext db,
         IPasswordHasher hasher,
         ITokenService tokens,
         ICurrentUserService currentUser,
+        IEnumerable<IAccessTokenClaimsContributor> contributors,
         TimeProvider time,
         ILogger<AuthService> logger)
     {
@@ -1637,6 +2145,7 @@ public sealed class AuthService : IAuthService
         _hasher = hasher;
         _tokens = tokens;
         _currentUser = currentUser;
+        _contributors = contributors;
         _time = time;
         _logger = logger;
     }
@@ -1805,7 +2314,11 @@ public sealed class AuthService : IAuthService
     {
         var (roles, permissions) = await IamMapper.ResolveAccessAsync(_db, user, ct);
 
-        var accessToken = _tokens.CreateAccessToken(user, roles, permissions);
+        var extra = new List<Claim>();
+        foreach (var contributor in _contributors)
+            extra.AddRange(await contributor.GetClaimsAsync(user, ct));
+
+        var accessToken = _tokens.CreateAccessToken(user, roles, permissions, extra);
         var refreshToken = _tokens.CreateRefreshToken();
 
         _db.RefreshTokens.Add(new RefreshToken
@@ -1828,7 +2341,6 @@ public sealed class AuthService : IAuthService
             User = IamMapper.ToDto(user, permissions)
         };
     }
-
     private DateTime Now() => _time.GetUtcNow().UtcDateTime;
 }
 
@@ -2304,24 +2816,25 @@ public sealed class RoleService : IRoleService
 FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Services\TokenService.cs
 ==================================================
 
+using System.Security.Cryptography;
+using System.Text.Json;
 using CoreKit.IAM.Constants;
 using CoreKit.IAM.Entities;
 using CoreKit.IAM.Interfaces;
-
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
-using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
-
 
 namespace CoreKit.IAM.Services;
 
-
 public sealed class TokenService : ITokenService
 {
+    private static readonly HashSet<string> ReservedClaims = new(StringComparer.Ordinal)
+    {
+        "sub", "jti", "email", "name", "role", "permission", "iss", "aud", "exp", "nbf", "iat"
+    };
+
     private readonly JwtOptions _options;
     private readonly TimeProvider _time;
     private readonly SigningCredentials _signingCredentials;
@@ -2339,36 +2852,37 @@ public sealed class TokenService : ITokenService
     public AccessTokenResult CreateAccessToken(
         User user,
         IReadOnlyCollection<string> roles,
-        IReadOnlyCollection<string> permissions)
+        IReadOnlyCollection<string> permissions,
+        IEnumerable<Claim>? extraClaims = null)
     {
         var now = _time.GetUtcNow().UtcDateTime;
         var expires = now.AddMinutes(_options.AccessTokenMinutes);
 
-        var claims = new List<Claim>
+        var payload = new Dictionary<string, object>
         {
-            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-            new(JwtRegisteredClaimNames.Email, user.Email)
+            [JwtRegisteredClaimNames.Sub] = user.Id.ToString(),
+            [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString(),
+            [JwtRegisteredClaimNames.Email] = user.Email,
+            [JwtRegisteredClaimNames.Iss] = _options.Issuer,
+            [JwtRegisteredClaimNames.Aud] = _options.Audience,
+            [JwtRegisteredClaimNames.Iat] = new DateTimeOffset(now).ToUnixTimeSeconds(),
+            [JwtRegisteredClaimNames.Nbf] = new DateTimeOffset(now).ToUnixTimeSeconds(),
+            [JwtRegisteredClaimNames.Exp] = new DateTimeOffset(expires).ToUnixTimeSeconds(),
+            [IamClaimTypes.Role] = roles.ToArray(),
+            [IamClaimTypes.Permission] = permissions.ToArray()
         };
 
         if (!string.IsNullOrWhiteSpace(user.DisplayName))
-            claims.Add(new Claim(IamClaimTypes.Name, user.DisplayName));
+            payload[IamClaimTypes.Name] = user.DisplayName;
 
-        claims.AddRange(roles.Select(role => new Claim(IamClaimTypes.Role, role)));
-        claims.AddRange(permissions.Select(permission => new Claim(IamClaimTypes.Permission, permission)));
+        // Other modules may add claims, but never overwrite the ones IAM owns.
+        if (extraClaims is not null)
+            foreach (var claim in extraClaims.Where(c => !ReservedClaims.Contains(c.Type)))
+                payload[claim.Type] = claim.Value;
 
-        var descriptor = new SecurityTokenDescriptor
-        {
-            Subject = new ClaimsIdentity(claims),
-            Issuer = _options.Issuer,
-            Audience = _options.Audience,
-            IssuedAt = now,
-            NotBefore = now,
-            Expires = expires,
-            SigningCredentials = _signingCredentials
-        };
+        var token = _handler.CreateToken(JsonSerializer.Serialize(payload), _signingCredentials);
 
-        return new AccessTokenResult(_handler.CreateToken(descriptor), expires);
+        return new AccessTokenResult(token, expires);
     }
 
     public GeneratedRefreshToken CreateRefreshToken()
@@ -2744,6 +3258,25 @@ public sealed class IamRateLimitOptions
     public int PermitLimit { get; set; } = 10;
 
     public int WindowSeconds { get; set; } = 60;
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Settings\JwtOptions.cs
+==================================================
+
+namespace CoreKit.IAM.Settings;
+
+public sealed class JwtOptions
+{
+    public const string SectionName = "Iam:Jwt";
+
+    public string SigningKey { get; set; } = string.Empty;
+    public string Issuer { get; set; } = string.Empty;
+    public string Audience { get; set; } = string.Empty;
+    public int AccessTokenMinutes { get; set; } = 15;
+    public int RefreshTokenDays { get; set; } = 14;
 }
 
 

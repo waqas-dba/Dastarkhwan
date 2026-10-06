@@ -4,10 +4,27 @@ namespace CoreKit.IAM.Seeding;
 
 /// <summary>
 /// Safe to run on every startup. It creates what is missing and never removes anything:
-/// permissions, the Administrator role (holding every permission), and the first admin user.
+/// permissions, the default roles, and the first admin user.
 /// </summary>
 public sealed class IamSeeder
 {
+    // Roles besides Administrator. Created once with these permissions; an administrator owns them afterwards.
+    private static readonly (string Name, string Description, string[] Permissions)[] DefaultRoles =
+    {
+        (IamRoleNames.Manager, "Manages users and can read roles.",
+            new[]
+            {
+                IamPermissionNames.UsersRead,
+                IamPermissionNames.UsersCreate,
+                IamPermissionNames.UsersUpdate,
+                IamPermissionNames.RolesRead,
+                IamPermissionNames.PermissionsRead
+            }),
+
+        (IamRoleNames.Staff, "Basic read access.",
+            new[] { IamPermissionNames.UsersRead })
+    };
+
     private readonly IamDbContext _db;
     private readonly IPasswordHasher _hasher;
     private readonly TimeProvider _time;
@@ -33,6 +50,7 @@ public sealed class IamSeeder
     {
         var permissions = await SeedPermissionsAsync(modulePermissions, ct);
         var admin = await SeedAdministratorRoleAsync(permissions, ct);
+        await SeedDefaultRolesAsync(permissions, ct);
 
         await _db.SaveChangesAsync(ct);
 
@@ -109,6 +127,37 @@ public sealed class IamSeeder
             admin.RolePermissions.Add(new RolePermission { RoleId = admin.Id, PermissionId = permission.Id });
 
         return admin;
+    }
+
+    private async Task SeedDefaultRolesAsync(List<Permission> permissions, CancellationToken ct)
+    {
+        foreach (var (name, description, permissionNames) in DefaultRoles)
+        {
+            var normalized = IamNormalizer.NormalizeName(name);
+
+            // Already there? Leave it alone: an administrator may have changed it on purpose.
+            if (await _db.Roles.AnyAsync(r => r.NormalizedName == normalized, ct))
+                continue;
+
+            var role = new Role
+            {
+                Id = Guid.NewGuid(),
+                Name = name,
+                NormalizedName = normalized,
+                Description = description,
+                IsActive = true
+            };
+
+            foreach (var permissionName in permissionNames)
+            {
+                var permission = permissions.FirstOrDefault(p => p.Name == permissionName);
+
+                if (permission is not null)
+                    role.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permission.Id });
+            }
+
+            _db.Roles.Add(role);
+        }
     }
 
     private async Task SeedFirstAdministratorAsync(Role admin, CancellationToken ct)

@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 // The whole module is these two lines.
-builder.Services.AddDaskhawaIam(builder.Configuration);
+builder.Services.AddIam(builder.Configuration);
 builder.Services.AddIamSeeding(builder.Configuration);
 
 var app = builder.Build();

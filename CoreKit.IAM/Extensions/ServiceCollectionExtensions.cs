@@ -44,7 +44,7 @@ public static class ServiceCollectionExtensions
     /// <param name="configureDatabase">
     /// Optional. Replaces the PostgreSQL setup, which is how tests plug in an in-memory database.
     /// </param>
-    public static IServiceCollection AddDaskhawaIam(
+    public static IServiceCollection AddIam(
         this IServiceCollection services,
         IConfiguration configuration,
         Action<DbContextOptionsBuilder>? configureDatabase = null)

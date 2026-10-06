@@ -1,5 +1,4 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Routing;
+﻿using Microsoft.AspNetCore.Routing;
 
 namespace CoreKit.IAM.Endpoints;
 
@@ -11,14 +10,24 @@ public static class IamEndpointExtensions
     /// </summary>
     public static IEndpointRouteBuilder MapIam(this IEndpointRouteBuilder app, string prefix = "/iam")
     {
+        prefix = NormalizePrefix(prefix);
+
         var iam = app.MapGroup(prefix).WithTags("IAM");
 
         MapAuth(iam.MapGroup("/auth"));
-        MapUsers(iam.MapGroup("/users"));
-        MapRoles(iam.MapGroup("/roles"));
+        MapUsers(iam.MapGroup("/users"), $"{prefix}/users");
+        MapRoles(iam.MapGroup("/roles"), $"{prefix}/roles");
         MapPermissions(iam.MapGroup("/permissions"));
 
         return app;
+    }
+
+    /// <summary>"iam", "/iam/" and "/iam" all become "/iam". An empty prefix stays empty.</summary>
+    private static string NormalizePrefix(string? prefix)
+    {
+        var trimmed = (prefix ?? string.Empty).Trim().TrimEnd('/');
+
+        return trimmed.Length == 0 || trimmed.StartsWith('/') ? trimmed : "/" + trimmed;
     }
 
     private static void MapAuth(RouteGroupBuilder auth)
@@ -46,15 +55,15 @@ public static class IamEndpointExtensions
             .RequireAuthorization();
     }
 
-    private static void MapUsers(RouteGroupBuilder users)
+    private static void MapUsers(RouteGroupBuilder users, string basePath)
     {
         users.MapGet("/", async (
-         string? search,
-         bool? isActive,
-         int? page,
-         int? pageSize,
-         IUserService s,
-         CancellationToken ct) =>
+                string? search,
+                bool? isActive,
+                int? page,
+                int? pageSize,
+                IUserService s,
+                CancellationToken ct) =>
         {
             var query = new UserListQuery
             {
@@ -66,7 +75,7 @@ public static class IamEndpointExtensions
 
             return (await s.ListAsync(query, ct)).ToHttpResult();
         })
-     .RequirePermission(IamPermissionNames.UsersRead);
+            .RequirePermission(IamPermissionNames.UsersRead);
 
         users.MapGet("/{id:guid}", async (Guid id, IUserService s, CancellationToken ct) =>
                 (await s.GetAsync(id, ct)).ToHttpResult())
@@ -75,7 +84,10 @@ public static class IamEndpointExtensions
         users.MapPost("/", async (CreateUserRequest r, IUserService s, CancellationToken ct) =>
         {
             var result = await s.CreateAsync(r, ct);
-            return result.IsSuccess ? Results.Created($"/users/{result.Value.Id}", result.Value) : result.ToHttpResult();
+
+            return result.IsSuccess
+                ? Results.Created($"{basePath}/{result.Value.Id}", result.Value)
+                : result.ToHttpResult();
         })
             .RequirePermission(IamPermissionNames.UsersCreate);
 
@@ -92,7 +104,7 @@ public static class IamEndpointExtensions
             .RequirePermission(IamPermissionNames.UsersDelete);
     }
 
-    private static void MapRoles(RouteGroupBuilder roles)
+    private static void MapRoles(RouteGroupBuilder roles, string basePath)
     {
         roles.MapGet("/", async (IRoleService s, CancellationToken ct) =>
                 (await s.ListAsync(ct)).ToHttpResult())
@@ -105,7 +117,10 @@ public static class IamEndpointExtensions
         roles.MapPost("/", async (CreateRoleRequest r, IRoleService s, CancellationToken ct) =>
         {
             var result = await s.CreateAsync(r, ct);
-            return result.IsSuccess ? Results.Created($"/roles/{result.Value.Id}", result.Value) : result.ToHttpResult();
+
+            return result.IsSuccess
+                ? Results.Created($"{basePath}/{result.Value.Id}", result.Value)
+                : result.ToHttpResult();
         })
             .RequirePermission(IamPermissionNames.RolesCreate);
 

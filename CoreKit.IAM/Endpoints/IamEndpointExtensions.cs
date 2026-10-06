@@ -29,7 +29,6 @@ public static class IamEndpointExtensions
 
         return trimmed.Length == 0 || trimmed.StartsWith('/') ? trimmed : "/" + trimmed;
     }
-
     private static void MapAuth(RouteGroupBuilder auth)
     {
         auth.MapGet("/me", async (IAuthService s, CancellationToken ct) =>
@@ -53,6 +52,19 @@ public static class IamEndpointExtensions
         limited.MapPost("/change-password", async (ChangePasswordRequest r, IAuthService s, CancellationToken ct) =>
                 (await s.ChangePasswordAsync(r, ct)).ToHttpResult())
             .RequireAuthorization();
+
+        // Email verification
+        limited.MapPost("/verify-email", async (VerifyEmailRequest r, IEmailVerificationService s, CancellationToken ct) =>
+                (await s.VerifyAsync(r, ct)).ToHttpResult())
+            .AllowAnonymous();
+
+        limited.MapPost("/send-verification", async (IEmailVerificationService s, CancellationToken ct) =>
+                (await s.SendToCurrentUserAsync(ct)).ToHttpResult())
+            .RequireAuthorization();
+
+        limited.MapPost("/resend-verification", async (ResendVerificationRequest r, IEmailVerificationService s, CancellationToken ct) =>
+                (await s.ResendByEmailAsync(r, ct)).ToHttpResult())
+            .AllowAnonymous();
     }
 
     private static void MapUsers(RouteGroupBuilder users, string basePath)

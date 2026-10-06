@@ -75,6 +75,14 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<IPermissionService, PermissionService>();
 
+        services.AddOptions<IamEmailVerificationOptions>()
+    .Bind(configuration.GetSection(IamEmailVerificationOptions.SectionName))
+    .Validate(o => o.TokenHours is >= 1 and <= 168 && o.ResendCooldownSeconds >= 0,
+        "Iam:EmailVerification values are out of range.");
+
+        services.TryAddSingleton<IIamEmailSender, NullIamEmailSender>();
+        services.AddScoped<IEmailVerificationService, EmailVerificationService>();
+
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer();
 

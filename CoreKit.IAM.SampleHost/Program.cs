@@ -2,13 +2,18 @@ using CoreKit.IAM.Authorization;
 using CoreKit.IAM.Constants;
 using CoreKit.IAM.Endpoints;
 using CoreKit.IAM.Extensions;
+using CoreKit.IAM.Interfaces;
 using CoreKit.IAM.Persistence;
+using CoreKit.IAM.SampleHost;
 using CoreKit.IAM.Seeding;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// The whole module is these two lines.
+// Development only: prints the verification token to the console instead of mailing it.
+// In a real app, register a sender that emails the link.
+builder.Services.AddSingleton<IIamEmailSender, ConsoleEmailSender>();
+
 builder.Services.AddIam(builder.Configuration);
 builder.Services.AddIamSeeding(builder.Configuration);
 

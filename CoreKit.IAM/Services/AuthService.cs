@@ -24,14 +24,18 @@ public sealed class AuthService : IAuthService
     private readonly ILogger<AuthService> _logger;
     private readonly IEnumerable<IAccessTokenClaimsContributor> _contributors;
 
+    private readonly IamEmailVerificationOptions _emailOptions;
+
     public AuthService(
         IamDbContext db,
         IPasswordHasher hasher,
         ITokenService tokens,
         ICurrentUserService currentUser,
         IEnumerable<IAccessTokenClaimsContributor> contributors,
+        IOptions<IamEmailVerificationOptions> emailOptions,
         TimeProvider time,
         ILogger<AuthService> logger)
+   
     {
         _db = db;
         _hasher = hasher;
@@ -39,6 +43,7 @@ public sealed class AuthService : IAuthService
         _currentUser = currentUser;
         _contributors = contributors;
         _time = time;
+        _emailOptions = emailOptions.Value;
         _logger = logger;
     }
 
@@ -71,6 +76,13 @@ public sealed class AuthService : IAuthService
         {
             _logger.LogInformation("Login failed for user {UserId}.", user.Id);
             return IamErrors.InvalidCredentials;
+        }
+
+        // Only reached with the right password, so this message cannot be used to discover accounts.
+        if (_emailOptions.RequireConfirmedEmail && !user.EmailConfirmed)
+        {
+            _logger.LogInformation("Login blocked for user {UserId}: email not confirmed.", user.Id);
+            return IamEmailErrors.EmailNotConfirmed;
         }
 
         if (check == PasswordCheckResult.SuccessRehashNeeded)
@@ -119,6 +131,12 @@ public sealed class AuthService : IAuthService
         {
             await RefreshTokenRevocation.RevokeAllForUserAsync(_db, token.UserId, now, ct);
             return IamErrors.InvalidRefreshToken;
+        }
+
+        if (_emailOptions.RequireConfirmedEmail && !token.User.EmailConfirmed)
+        {
+            await RefreshTokenRevocation.RevokeAllForUserAsync(_db, token.UserId, now, ct);
+            return IamEmailErrors.EmailNotConfirmed;
         }
 
         // Atomic: of two requests using the same token at the same moment, only one changes a row.

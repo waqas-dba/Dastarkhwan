@@ -1,0 +1,68 @@
+﻿@host = https://localhost:7001
+
+### 1. Login as the seeded admin
+# @name login
+POST {{host}}/iam/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@example.com",
+  "password": "a-long-test-password"
+}
+
+### 2. Who am I
+GET {{host}}/iam/auth/me
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### 3. List users (needs users.read)
+GET {{host}}/iam/users
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### 4. List roles
+GET {{host}}/iam/roles
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### 5. List permissions
+GET {{host}}/iam/permissions
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### 6. Demo routes
+GET {{host}}/demo/public
+
+###
+GET {{host}}/demo/needs-login
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+###
+GET {{host}}/demo/needs-users-read
+Authorization: Bearer {{login.response.body.$.accessToken}}
+
+### 7. Refresh tokens
+# @name refresh
+POST {{host}}/iam/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{login.response.body.$.refreshToken}}"
+}
+
+### 8. Create a user with no roles (log in as them, then request 3 should be 403)
+POST {{host}}/iam/users
+Authorization: Bearer {{login.response.body.$.accessToken}}
+Content-Type: application/json
+
+{
+  "email": "staff@example.com",
+  "password": "another-long-password",
+  "displayName": "Test Staff",
+  "roleIds": []
+}
+
+### 9. Login as that user
+POST {{host}}/iam/auth/login
+Content-Type: application/json
+
+{
+  "email": "staff@example.com",
+  "password": "another-long-password"
+}

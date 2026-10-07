@@ -210,6 +210,44 @@ public sealed class RequirePermissionAttribute : AuthorizeAttribute
 
 
 ==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Common\AdministratorRole.cs
+==================================================
+
+using CoreKit.IAM.Constants;
+using CoreKit.IAM.Entities;
+using CoreKit.IAM.Normalization;
+
+namespace CoreKit.IAM.Common;
+
+/// <summary>The one place that knows which role is the protected Administrator role.</summary>
+internal static class AdministratorRole
+{
+    public static readonly string NormalizedName = IamNormalizer.NormalizeName(IamRoleNames.Administrator);
+
+    public static bool Is(Role role) => role.NormalizedName == NormalizedName;
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Common\IamEmailErrors.cs
+==================================================
+
+namespace CoreKit.IAM.Common;
+
+public static class IamEmailErrors
+{
+    // 403, not 401: the password was right, so the client should offer "resend the email",
+    // not "wrong password" or "your session ended".
+    public static readonly IamError EmailNotConfirmed = new(
+        IamErrorKind.Forbidden,
+        "auth.email_not_confirmed",
+        "Please confirm your email address before signing in.");
+}
+
+
+
+==================================================
 FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Common\IamErrors.cs
 ==================================================
 
@@ -310,6 +348,42 @@ public sealed class IamResult<T> : IamResult
     public static implicit operator IamResult<T>(IamError error) => Failure<T>(error);
 }
 
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Configuration\EmailVerificationTokenConfiguration.cs
+==================================================
+
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
+
+namespace CoreKit.IAM.Configuration;
+
+public sealed class EmailVerificationTokenConfiguration : IEntityTypeConfiguration<EmailVerificationToken>
+{
+    public void Configure(EntityTypeBuilder<EmailVerificationToken> builder)
+    {
+        builder.ToTable("IAM_EmailVerificationTokens");
+
+        builder.HasKey(x => x.Id);
+        builder.Property(x => x.Id).ValueGeneratedNever();
+
+        builder.Property(x => x.TokenHash).IsRequired().HasMaxLength(128);
+        builder.Property(x => x.NormalizedEmail).IsRequired().HasMaxLength(320);
+
+        builder.HasOne(x => x.User)
+            .WithMany()
+            .HasForeignKey(x => x.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(x => x.TokenHash)
+            .IsUnique()
+            .HasDatabaseName("UX_IAM_EmailVerificationTokens_TokenHash");
+
+        builder.HasIndex(x => x.UserId);
+        builder.HasIndex(x => x.ExpiresAt); // for deleting old tokens
+    }
+}
 
 
 
@@ -661,7 +735,6 @@ public static class IamEndpointExtensions
 
         return trimmed.Length == 0 || trimmed.StartsWith('/') ? trimmed : "/" + trimmed;
     }
-
     private static void MapAuth(RouteGroupBuilder auth)
     {
         auth.MapGet("/me", async (IAuthService s, CancellationToken ct) =>
@@ -685,6 +758,19 @@ public static class IamEndpointExtensions
         limited.MapPost("/change-password", async (ChangePasswordRequest r, IAuthService s, CancellationToken ct) =>
                 (await s.ChangePasswordAsync(r, ct)).ToHttpResult())
             .RequireAuthorization();
+
+        // Email verification
+        limited.MapPost("/verify-email", async (VerifyEmailRequest r, IEmailVerificationService s, CancellationToken ct) =>
+                (await s.VerifyAsync(r, ct)).ToHttpResult())
+            .AllowAnonymous();
+
+        limited.MapPost("/send-verification", async (IEmailVerificationService s, CancellationToken ct) =>
+                (await s.SendToCurrentUserAsync(ct)).ToHttpResult())
+            .RequireAuthorization();
+
+        limited.MapPost("/resend-verification", async (ResendVerificationRequest r, IEmailVerificationService s, CancellationToken ct) =>
+                (await s.ResendByEmailAsync(r, ct)).ToHttpResult())
+            .AllowAnonymous();
     }
 
     private static void MapUsers(RouteGroupBuilder users, string basePath)
@@ -812,6 +898,38 @@ public static class IamResultExtensions
 
         return Results.Json(new { code = error.Code, message = error.Message }, statusCode: status);
     }
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Entities\EmailVerificationToken.cs
+==================================================
+
+namespace CoreKit.IAM.Entities;
+
+public sealed class EmailVerificationToken
+{
+    public Guid Id { get; set; }
+
+    public Guid UserId { get; set; }
+
+    /// <summary>Hash of the token. The raw token is only ever sent to the user's mailbox.</summary>
+    public string TokenHash { get; set; } = null!;
+
+    /// <summary>
+    /// The address this token confirms, copied from the user when the token was issued.
+    /// If the user's email changes afterwards, the token stops working.
+    /// </summary>
+    public string NormalizedEmail { get; set; } = null!;
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime ExpiresAt { get; set; }
+
+    public DateTime? UsedAt { get; set; }
+
+    public User User { get; set; } = null!;
 }
 
 
@@ -1025,6 +1143,8 @@ public static class IamApplicationBuilderExtensions
 FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Extensions\ServiceCollectionExtensions.cs
 ==================================================
 
+using CoreKit.IAM.Repositories;
+
 namespace CoreKit.IAM.Extensions;
 
 public static class ServiceCollectionExtensions
@@ -1064,14 +1184,14 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Registers all of IAM for a web app: database, services, JWT authentication,
+    /// Registers all of IAM for a web app: database, repositories, services, JWT authentication,
     /// permission-based authorization and rate limiting.
     /// Reads "ConnectionStrings:Iam", "Iam:Jwt" and "Iam:RateLimit" from configuration.
     /// </summary>
     /// <param name="configureDatabase">
     /// Optional. Replaces the PostgreSQL setup, which is how tests plug in an in-memory database.
     /// </param>
-    public static IServiceCollection AddDaskhawaIam(
+    public static IServiceCollection AddIam(
         this IServiceCollection services,
         IConfiguration configuration,
         Action<DbContextOptionsBuilder>? configureDatabase = null)
@@ -1094,13 +1214,35 @@ public static class ServiceCollectionExtensions
             .Bind(configuration.GetSection(IamRateLimitOptions.SectionName))
             .Validate(o => o.PermitLimit >= 1 && o.WindowSeconds >= 1, "Iam:RateLimit values must be positive.");
 
+        services.AddOptions<IamEmailVerificationOptions>()
+            .Bind(configuration.GetSection(IamEmailVerificationOptions.SectionName))
+            .Validate(o => o.TokenHours is >= 1 and <= 168 && o.ResendCooldownSeconds >= 0,
+                "Iam:EmailVerification values are out of range.");
+
         services.AddHttpContextAccessor();
+
+        // Persistence: the only code that touches the DbContext.
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IRoleRepository, RoleRepository>();
+        services.AddScoped<IPermissionRepository, PermissionRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
+
+        // Focused collaborators.
+        services.AddScoped<IAccessResolver, AccessResolver>();
+        services.AddScoped<IAdministratorGuard, AdministratorGuard>();
+        services.AddScoped<ISessionIssuer, SessionIssuer>();
         services.AddSingleton<ITokenService, TokenService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
+
+        // Business services.
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<IPermissionService, PermissionService>();
+
+        services.TryAddSingleton<IIamEmailSender, NullIamEmailSender>();
+        services.AddScoped<IEmailVerificationService, EmailVerificationService>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer();
@@ -1180,6 +1322,42 @@ public interface IAccessTokenClaimsContributor
 
 
 ==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Interfaces\IAccessResolver.cs
+==================================================
+
+using CoreKit.IAM.Entities;
+
+namespace CoreKit.IAM.Interfaces;
+
+/// <summary>What a user may actually do right now.</summary>
+public sealed record UserAccess(IReadOnlyList<string> Roles, IReadOnlyList<string> Permissions);
+
+public interface IAccessResolver
+{
+    /// <summary>The user must be loaded with UserRoles and each UserRole's Role.</summary>
+    Task<UserAccess> ResolveAsync(User user, CancellationToken ct = default);
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Interfaces\IAdministratorGuard.cs
+==================================================
+
+namespace CoreKit.IAM.Interfaces;
+
+/// <summary>
+/// Prevents the one mistake that locks everybody out: removing, deactivating or deleting
+/// the last administrator.
+/// </summary>
+public interface IAdministratorGuard
+{
+    Task<bool> IsLastActiveAdministratorAsync(Guid userId, CancellationToken ct = default);
+}
+
+
+
+==================================================
 FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Interfaces\IAuthService.cs
 ==================================================
 
@@ -1201,6 +1379,84 @@ public interface IAuthService
 
     /// <summary>Changes the signed-in user's own password and ends all of their sessions.</summary>
     Task<IamResult> ChangePasswordAsync(ChangePasswordRequest request, CancellationToken ct = default);
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Interfaces\IEmailVerificationService.cs
+==================================================
+
+namespace CoreKit.IAM.Interfaces;
+
+public interface IEmailVerificationService
+{
+    /// <summary>Sends a verification email to the signed-in user. Respects the resend cooldown.</summary>
+    Task<IamResult> SendToCurrentUserAsync(CancellationToken ct = default);
+
+    /// <summary>Sends a verification email to a given user (for administrators or the host app). No cooldown.</summary>
+    Task<IamResult> SendAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// For someone who cannot sign in yet because the email is unconfirmed. Always succeeds, whether or not
+    /// the address has an account, so the response never reveals which emails are registered.
+    /// </summary>
+    Task<IamResult> ResendByEmailAsync(ResendVerificationRequest request, CancellationToken ct = default);
+
+    /// <summary>Confirms the email address that the token was issued for.</summary>
+    Task<IamResult> VerifyAsync(VerifyEmailRequest request, CancellationToken ct = default);
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Interfaces\IEmailVerificationTokenRepository.cs
+==================================================
+
+using CoreKit.IAM.Entities;
+
+namespace CoreKit.IAM.Interfaces;
+
+public interface IEmailVerificationTokenRepository
+{
+    /// <summary>Read-only, with the user.</summary>
+    Task<EmailVerificationToken?> FindByHashWithUserAsync(string tokenHash, CancellationToken ct = default);
+
+    Task<bool> HasCreatedSinceAsync(Guid userId, DateTime cutoff, CancellationToken ct = default);
+
+    /// <summary>Closes the user's unused tokens and stores the new one, in one transaction.</summary>
+    Task ReplaceOpenTokensAsync(EmailVerificationToken newToken, DateTime now, CancellationToken ct = default);
+
+    /// <summary>
+    /// Marks the token used and the user's email confirmed, in one transaction.
+    /// Returns false when someone else already used the token.
+    /// </summary>
+    Task<bool> ConfirmEmailAsync(Guid tokenId, Guid userId, DateTime now, CancellationToken ct = default);
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Interfaces\IIamEmailSender.cs
+==================================================
+
+namespace CoreKit.IAM.Interfaces;
+
+/// <summary>What the host needs to build and send the verification email.</summary>
+public sealed record EmailVerificationMessage(
+    Guid UserId,
+    string Email,
+    string? DisplayName,
+    string Token,
+    DateTime ExpiresAt);
+
+/// <summary>
+/// IAM never sends email itself. The host app implements this with its own provider
+/// (SMTP, SendGrid, ...) and builds the link, for example https://app/verify-email?token={Token}.
+/// </summary>
+public interface IIamEmailSender
+{
+    Task SendEmailVerificationAsync(EmailVerificationMessage message, CancellationToken ct = default);
 }
 
 
@@ -1235,6 +1491,30 @@ public interface IPasswordHasher
 
 
 ==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Interfaces\IPermissionRepository.cs
+==================================================
+
+using CoreKit.IAM.Models;
+
+namespace CoreKit.IAM.Interfaces;
+
+public interface IPermissionRepository
+{
+    Task<IReadOnlyList<PermissionDto>> ListAsync(CancellationToken ct = default);
+
+    Task<PermissionDto?> FindAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>True when every id exists (an empty list is true).</summary>
+    Task<bool> AllExistAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default);
+
+    /// <summary>Names of the active permissions granted by the given roles.</summary>
+    Task<IReadOnlyList<string>> GetActiveNamesForRolesAsync(
+        IReadOnlyCollection<Guid> roleIds, CancellationToken ct = default);
+}
+
+
+
+==================================================
 FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Interfaces\IPermissionService.cs
 ==================================================
 
@@ -1251,6 +1531,77 @@ public interface IPermissionService
     Task<IamResult<IReadOnlyList<PermissionDto>>> ListAsync(CancellationToken ct = default);
 
     Task<IamResult<PermissionDto>> GetAsync(Guid id, CancellationToken ct = default);
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Interfaces\IRefreshTokenRepository.cs
+==================================================
+
+using CoreKit.IAM.Entities;
+
+namespace CoreKit.IAM.Interfaces;
+
+public interface IRefreshTokenRepository
+{
+    /// <summary>Read-only, with the user, the user's roles and each role.</summary>
+    Task<RefreshToken?> FindByHashWithUserAsync(string tokenHash, CancellationToken ct = default);
+
+    Task AddAsync(RefreshToken token, CancellationToken ct = default);
+
+    /// <summary>
+    /// Atomic. Of two requests using the same token at the same moment, only one gets true.
+    /// </summary>
+    Task<bool> TryRevokeAsync(Guid tokenId, DateTime now, CancellationToken ct = default);
+
+    /// <summary>Revoking an unknown or already revoked token is not an error.</summary>
+    Task RevokeByHashAsync(string tokenHash, DateTime now, CancellationToken ct = default);
+
+    /// <summary>Ends every session of a user in one statement.</summary>
+    Task<int> RevokeAllForUserAsync(Guid userId, DateTime now, CancellationToken ct = default);
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Interfaces\IRoleRepository.cs
+==================================================
+
+using CoreKit.IAM.Entities;
+using CoreKit.IAM.Models;
+
+namespace CoreKit.IAM.Interfaces;
+
+public interface IRoleRepository
+{
+    Task<IReadOnlyList<RoleDto>> ListAsync(CancellationToken ct = default);
+
+    Task<RoleDto?> GetDetailsAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>Tracked.</summary>
+    Task<Role?> FindByIdAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>Tracked, with its permission links.</summary>
+    Task<Role?> FindByIdWithPermissionsAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>Read-only. Ids that do not exist are simply missing from the result.</summary>
+    Task<IReadOnlyList<Role>> FindByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default);
+
+    Task<bool> NameExistsAsync(string normalizedName, Guid? excludingRoleId = null, CancellationToken ct = default);
+
+    Task<int> CountUsersAsync(Guid roleId, CancellationToken ct = default);
+
+    /// <summary>Returns false when another role already has the same normalized name.</summary>
+    Task<bool> CreateAsync(Role role, CancellationToken ct = default);
+
+    /// <summary>Saves changes made to a tracked role. Returns false on a duplicate name.</summary>
+    Task<bool> UpdateAsync(Role role, CancellationToken ct = default);
+
+    Task DeleteAsync(Role role, CancellationToken ct = default);
+
+    /// <summary>Makes the role's permission links match exactly the given permission ids.</summary>
+    Task ReplacePermissionsAsync(Role role, IReadOnlyCollection<Guid> permissionIds, CancellationToken ct = default);
 }
 
 
@@ -1277,6 +1628,24 @@ public interface IRoleService
 
     /// <summary>Replaces the role's permissions with exactly the given set.</summary>
     Task<IamResult<RoleDto>> SetPermissionsAsync(Guid id, SetRolePermissionsRequest request, CancellationToken ct = default);
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Interfaces\ISessionIssuer.cs
+==================================================
+
+using CoreKit.IAM.Entities;
+using CoreKit.IAM.Models;
+
+namespace CoreKit.IAM.Interfaces;
+
+/// <summary>Creates the access token and a new stored refresh token for a user who has just been authenticated.</summary>
+public interface ISessionIssuer
+{
+    /// <summary>The user must be loaded with UserRoles and each UserRole's Role.</summary>
+    Task<LoginResponse> IssueAsync(User user, CancellationToken ct = default);
 }
 
 
@@ -1311,6 +1680,56 @@ public interface ITokenService
     string HashRefreshToken(string rawToken);
 }
 
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Interfaces\IUserRepository.cs
+==================================================
+
+using CoreKit.IAM.Entities;
+
+namespace CoreKit.IAM.Interfaces;
+
+/// <summary>Persistence for users. Nothing outside the repositories should touch the DbContext.</summary>
+public interface IUserRepository
+{
+    /// <summary>Read-only, without roles.</summary>
+    Task<User?> FindByIdAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>Read-only, with roles.</summary>
+    Task<User?> FindByIdWithRolesAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>Tracked, with roles. Use it when the caller will change the user and call UpdateAsync.</summary>
+    Task<User?> FindForUpdateAsync(Guid id, CancellationToken ct = default);
+
+    /// <summary>Read-only, with roles.</summary>
+    Task<User?> FindByNormalizedEmailWithRolesAsync(string normalizedEmail, CancellationToken ct = default);
+
+    /// <summary>The id of an active user with this email whose address is not confirmed yet.</summary>
+    Task<Guid?> FindUnconfirmedActiveIdByEmailAsync(string normalizedEmail, CancellationToken ct = default);
+
+    Task<bool> EmailExistsAsync(string normalizedEmail, Guid? excludingUserId = null, CancellationToken ct = default);
+
+    Task<(IReadOnlyList<User> Items, int TotalCount)> ListAsync(
+        string? search, bool? isActive, int page, int pageSize, CancellationToken ct = default);
+
+    /// <summary>Ids of active users holding the given active role.</summary>
+    Task<IReadOnlyList<Guid>> GetActiveUserIdsInRoleAsync(string normalizedRoleName, CancellationToken ct = default);
+
+    /// <summary>Returns false when another user already has the same normalized email.</summary>
+    Task<bool> CreateAsync(User user, CancellationToken ct = default);
+
+    /// <summary>Saves changes made to a tracked user. Returns false on a duplicate email.</summary>
+    Task<bool> UpdateAsync(User user, CancellationToken ct = default);
+
+    Task SetPasswordHashAsync(Guid userId, string passwordHash, DateTime now, CancellationToken ct = default);
+
+    /// <summary>Makes the user's role links match exactly the given role ids.</summary>
+    Task ReplaceRolesAsync(User user, IReadOnlyCollection<Guid> roleIds, CancellationToken ct = default);
+
+    Task DeleteAsync(User user, CancellationToken ct = default);
+}
 
 
 
@@ -1573,6 +1992,24 @@ public sealed class ChangePasswordRequest
 
 
 ==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Models\VerifyEmailRequest.cs
+==================================================
+
+namespace CoreKit.IAM.Models;
+
+public sealed class VerifyEmailRequest
+{
+    public string Token { get; set; } = string.Empty;
+}
+
+public sealed class ResendVerificationRequest
+{
+    public string Email { get; set; } = string.Empty;
+}
+
+
+
+==================================================
 FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Normalization\IamNormalizer.cs
 ==================================================
 
@@ -1629,7 +2066,7 @@ public sealed class IamDbContext : DbContext
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
-
+    public DbSet<EmailVerificationToken> EmailVerificationTokens => Set<EmailVerificationToken>();
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(IamDbContext).Assembly);
@@ -1703,6 +2140,483 @@ public sealed class IamDbContextFactory : IDesignTimeDbContextFactory<IamDbConte
     }
 }
 
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Repositories\EmailVerificationTokenRepository.cs
+==================================================
+
+using CoreKit.IAM.Entities;
+using CoreKit.IAM.Interfaces;
+using CoreKit.IAM.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace CoreKit.IAM.Repositories;
+
+internal sealed class EmailVerificationTokenRepository : IEmailVerificationTokenRepository
+{
+    private readonly IamDbContext _db;
+
+    public EmailVerificationTokenRepository(IamDbContext db) => _db = db;
+
+    public Task<EmailVerificationToken?> FindByHashWithUserAsync(string tokenHash, CancellationToken ct = default)
+        => _db.EmailVerificationTokens
+            .AsNoTracking()
+            .Include(t => t.User)
+            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
+
+    public Task<bool> HasCreatedSinceAsync(Guid userId, DateTime cutoff, CancellationToken ct = default)
+        => _db.EmailVerificationTokens.AnyAsync(t => t.UserId == userId && t.CreatedAt > cutoff, ct);
+
+    public async Task ReplaceOpenTokensAsync(EmailVerificationToken newToken, DateTime now, CancellationToken ct = default)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+
+        // Only the newest link works: earlier unused ones are closed.
+        await _db.EmailVerificationTokens
+            .Where(t => t.UserId == newToken.UserId && t.UsedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, (DateTime?)now), ct);
+
+        _db.EmailVerificationTokens.Add(newToken);
+        await _db.SaveChangesAsync(ct);
+
+        await transaction.CommitAsync(ct);
+    }
+
+    public async Task<bool> ConfirmEmailAsync(Guid tokenId, Guid userId, DateTime now, CancellationToken ct = default)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+
+        // Atomic: if the link is opened twice at the same moment, only one request gets the token.
+        var claimed = await _db.EmailVerificationTokens
+            .Where(t => t.Id == tokenId && t.UsedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, (DateTime?)now), ct);
+
+        if (claimed == 0)
+            return false;
+
+        await _db.Users
+            .Where(u => u.Id == userId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.EmailConfirmed, true)
+                .SetProperty(u => u.UpdatedAt, (DateTime?)now), ct);
+
+        await transaction.CommitAsync(ct);
+
+        return true;
+    }
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Repositories\PermissionRepository.cs
+==================================================
+
+using CoreKit.IAM.Interfaces;
+using CoreKit.IAM.Models;
+using CoreKit.IAM.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace CoreKit.IAM.Repositories;
+
+internal sealed class PermissionRepository : IPermissionRepository
+{
+    private readonly IamDbContext _db;
+
+    public PermissionRepository(IamDbContext db) => _db = db;
+
+    public async Task<IReadOnlyList<PermissionDto>> ListAsync(CancellationToken ct = default)
+        => await _db.Permissions
+            .AsNoTracking()
+            .OrderBy(p => p.Name)
+            .Select(p => new PermissionDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Description = p.Description,
+                IsActive = p.IsActive
+            })
+            .ToListAsync(ct);
+
+    public Task<PermissionDto?> FindAsync(Guid id, CancellationToken ct = default)
+        => _db.Permissions
+            .AsNoTracking()
+            .Where(p => p.Id == id)
+            .Select(p => new PermissionDto
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Description = p.Description,
+                IsActive = p.IsActive
+            })
+            .FirstOrDefaultAsync(ct);
+
+    public async Task<bool> AllExistAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default)
+        => ids.Count == 0 ||
+           await _db.Permissions.CountAsync(p => ids.Contains(p.Id), ct) == ids.Count;
+
+    public async Task<IReadOnlyList<string>> GetActiveNamesForRolesAsync(
+        IReadOnlyCollection<Guid> roleIds, CancellationToken ct = default)
+        => await _db.RolePermissions
+            .Where(rp => roleIds.Contains(rp.RoleId) && rp.Permission.IsActive)
+            .Select(rp => rp.Permission.Name)
+            .Distinct()
+            .OrderBy(name => name)
+            .ToListAsync(ct);
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Repositories\RefreshTokenRepository.cs
+==================================================
+
+using CoreKit.IAM.Entities;
+using CoreKit.IAM.Interfaces;
+using CoreKit.IAM.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace CoreKit.IAM.Repositories;
+
+internal sealed class RefreshTokenRepository : IRefreshTokenRepository
+{
+    private readonly IamDbContext _db;
+
+    public RefreshTokenRepository(IamDbContext db) => _db = db;
+
+    public Task<RefreshToken?> FindByHashWithUserAsync(string tokenHash, CancellationToken ct = default)
+        => _db.RefreshTokens
+            .AsNoTracking()
+            .Include(t => t.User).ThenInclude(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
+
+    public async Task AddAsync(RefreshToken token, CancellationToken ct = default)
+    {
+        _db.RefreshTokens.Add(token);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task<bool> TryRevokeAsync(Guid tokenId, DateTime now, CancellationToken ct = default)
+    {
+        var changed = await _db.RefreshTokens
+            .Where(t => t.Id == tokenId && t.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, (DateTime?)now), ct);
+
+        return changed > 0;
+    }
+
+    public async Task RevokeByHashAsync(string tokenHash, DateTime now, CancellationToken ct = default)
+    {
+        await _db.RefreshTokens
+            .Where(t => t.TokenHash == tokenHash && t.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, (DateTime?)now), ct);
+    }
+
+    public Task<int> RevokeAllForUserAsync(Guid userId, DateTime now, CancellationToken ct = default)
+        => _db.RefreshTokens
+            .Where(t => t.UserId == userId && t.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, (DateTime?)now), ct);
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Repositories\RoleRepository.cs
+==================================================
+
+using CoreKit.IAM.Common;
+using CoreKit.IAM.Entities;
+using CoreKit.IAM.Interfaces;
+using CoreKit.IAM.Models;
+using CoreKit.IAM.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace CoreKit.IAM.Repositories;
+
+internal sealed class RoleRepository : IRoleRepository
+{
+    private readonly IamDbContext _db;
+
+    public RoleRepository(IamDbContext db) => _db = db;
+
+    public async Task<IReadOnlyList<RoleDto>> ListAsync(CancellationToken ct = default)
+        => await ToDtos(_db.Roles.OrderBy(r => r.Name)).ToListAsync(ct);
+
+    public Task<RoleDto?> GetDetailsAsync(Guid id, CancellationToken ct = default)
+        => ToDtos(_db.Roles.Where(r => r.Id == id)).FirstOrDefaultAsync(ct);
+
+    public Task<Role?> FindByIdAsync(Guid id, CancellationToken ct = default)
+        => _db.Roles.FirstOrDefaultAsync(r => r.Id == id, ct);
+
+    public Task<Role?> FindByIdWithPermissionsAsync(Guid id, CancellationToken ct = default)
+        => _db.Roles
+            .Include(r => r.RolePermissions)
+            .FirstOrDefaultAsync(r => r.Id == id, ct);
+
+    public async Task<IReadOnlyList<Role>> FindByIdsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct = default)
+    {
+        if (ids.Count == 0)
+            return new List<Role>();
+
+        return await _db.Roles
+            .AsNoTracking()
+            .Where(r => ids.Contains(r.Id))
+            .ToListAsync(ct);
+    }
+
+    public Task<bool> NameExistsAsync(string normalizedName, Guid? excludingRoleId = null, CancellationToken ct = default)
+        => _db.Roles.AnyAsync(
+            r => r.NormalizedName == normalizedName &&
+                 (excludingRoleId == null || r.Id != excludingRoleId.Value),
+            ct);
+
+    public Task<int> CountUsersAsync(Guid roleId, CancellationToken ct = default)
+        => _db.UserRoles.CountAsync(ur => ur.RoleId == roleId, ct);
+
+    public async Task<bool> CreateAsync(Role role, CancellationToken ct = default)
+    {
+        _db.Roles.Add(role);
+        return await TrySaveAsync(role, ct);
+    }
+
+    public Task<bool> UpdateAsync(Role role, CancellationToken ct = default)
+        => TrySaveAsync(role, ct);
+
+    public async Task DeleteAsync(Role role, CancellationToken ct = default)
+    {
+        _db.Roles.Remove(role); // its permission links are removed by the database (cascade)
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task ReplacePermissionsAsync(
+        Role role, IReadOnlyCollection<Guid> permissionIds, CancellationToken ct = default)
+    {
+        foreach (var link in role.RolePermissions.Where(rp => !permissionIds.Contains(rp.PermissionId)).ToList())
+            _db.RolePermissions.Remove(link);
+
+        var current = role.RolePermissions.Select(rp => rp.PermissionId).ToHashSet();
+
+        foreach (var permissionId in permissionIds.Where(p => !current.Contains(p)))
+            _db.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permissionId });
+
+        await _db.SaveChangesAsync(ct);
+    }
+
+    private static IQueryable<RoleDto> ToDtos(IQueryable<Role> roles) => roles
+        .AsNoTracking()
+        .Select(r => new RoleDto
+        {
+            Id = r.Id,
+            Name = r.Name,
+            Description = r.Description,
+            IsActive = r.IsActive,
+            IsProtected = r.NormalizedName == AdministratorRole.NormalizedName,
+            UserCount = r.UserRoles.Count(),
+            Permissions = r.RolePermissions.Select(rp => rp.Permission.Name).OrderBy(n => n).ToList()
+        });
+
+    private async Task<bool> TrySaveAsync(Role role, CancellationToken ct)
+    {
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            return true;
+        }
+        catch (DbUpdateException)
+        {
+            var normalizedName = role.NormalizedName;
+            var roleId = role.Id;
+
+            _db.ChangeTracker.Clear();
+
+            if (await _db.Roles.AnyAsync(r => r.NormalizedName == normalizedName && r.Id != roleId, ct))
+                return false;
+
+            throw;
+        }
+    }
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Repositories\UserRepository.cs
+==================================================
+
+
+
+namespace CoreKit.IAM.Repositories;
+
+internal sealed class UserRepository : IUserRepository
+{
+    private readonly IamDbContext _db;
+
+    public UserRepository(IamDbContext db) => _db = db;
+
+    public Task<User?> FindByIdAsync(Guid id, CancellationToken ct = default)
+        => _db.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == id, ct);
+
+    public Task<User?> FindByIdWithRolesAsync(Guid id, CancellationToken ct = default)
+        => _db.Users
+            .AsNoTracking()
+            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(u => u.Id == id, ct);
+
+    public Task<User?> FindForUpdateAsync(Guid id, CancellationToken ct = default)
+        => _db.Users
+            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(u => u.Id == id, ct);
+
+    public Task<User?> FindByNormalizedEmailWithRolesAsync(string normalizedEmail, CancellationToken ct = default)
+        => _db.Users
+            .AsNoTracking()
+            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail, ct);
+
+    public Task<Guid?> FindUnconfirmedActiveIdByEmailAsync(string normalizedEmail, CancellationToken ct = default)
+        => _db.Users
+            .AsNoTracking()
+            .Where(u => u.NormalizedEmail == normalizedEmail && u.IsActive && !u.EmailConfirmed)
+            .Select(u => (Guid?)u.Id)
+            .FirstOrDefaultAsync(ct);
+
+    public Task<bool> EmailExistsAsync(
+        string normalizedEmail, Guid? excludingUserId = null, CancellationToken ct = default)
+        => _db.Users.AnyAsync(
+            u => u.NormalizedEmail == normalizedEmail &&
+                 (excludingUserId == null || u.Id != excludingUserId.Value),
+            ct);
+
+    public async Task<(IReadOnlyList<User> Items, int TotalCount)> ListAsync(
+        string? search, bool? isActive, int page, int pageSize, CancellationToken ct = default)
+    {
+        var users = _db.Users.AsNoTracking().AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToUpperInvariant();
+
+            users = users.Where(u =>
+                u.NormalizedEmail.Contains(term) ||
+                (u.DisplayName != null && u.DisplayName.ToUpper().Contains(term)));
+        }
+
+        if (isActive.HasValue)
+            users = users.Where(u => u.IsActive == isActive.Value);
+
+        var totalCount = await users.CountAsync(ct);
+
+        var items = await users
+            .OrderBy(u => u.NormalizedEmail)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .ToListAsync(ct);
+
+        return (items, totalCount);
+    }
+
+    public async Task<IReadOnlyList<Guid>> GetActiveUserIdsInRoleAsync(
+        string normalizedRoleName, CancellationToken ct = default)
+        => await _db.UserRoles
+            .Where(ur => ur.Role.NormalizedName == normalizedRoleName && ur.Role.IsActive && ur.User.IsActive)
+            .Select(ur => ur.UserId)
+            .Distinct()
+            .ToListAsync(ct);
+
+    public async Task<bool> CreateAsync(User user, CancellationToken ct = default)
+    {
+        _db.Users.Add(user);
+        return await TrySaveAsync(user, ct);
+    }
+
+    public Task<bool> UpdateAsync(User user, CancellationToken ct = default)
+        => TrySaveAsync(user, ct);
+
+    public async Task SetPasswordHashAsync(
+        Guid userId, string passwordHash, DateTime now, CancellationToken ct = default)
+    {
+        await _db.Users
+            .Where(u => u.Id == userId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.PasswordHash, passwordHash)
+                .SetProperty(u => u.UpdatedAt, (DateTime?)now), ct);
+    }
+
+    public async Task ReplaceRolesAsync(User user, IReadOnlyCollection<Guid> roleIds, CancellationToken ct = default)
+    {
+        foreach (var link in user.UserRoles.Where(ur => !roleIds.Contains(ur.RoleId)).ToList())
+            _db.UserRoles.Remove(link);
+
+        var current = user.UserRoles.Select(ur => ur.RoleId).ToHashSet();
+
+        foreach (var roleId in roleIds.Where(r => !current.Contains(r)))
+            _db.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = roleId });
+
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task DeleteAsync(User user, CancellationToken ct = default)
+    {
+        _db.Users.Remove(user); // role links and refresh tokens are removed by the database (cascade)
+        await _db.SaveChangesAsync(ct);
+    }
+
+    /// <summary>
+    /// Two requests can both pass an "email is free" check. The unique index then rejects the second
+    /// one, and this turns that database error into a plain false.
+    /// </summary>
+    private async Task<bool> TrySaveAsync(User user, CancellationToken ct)
+    {
+        try
+        {
+            await _db.SaveChangesAsync(ct);
+            return true;
+        }
+        catch (DbUpdateException)
+        {
+            var normalizedEmail = user.NormalizedEmail;
+            var userId = user.Id;
+
+            _db.ChangeTracker.Clear();
+
+            if (await _db.Users.AnyAsync(u => u.NormalizedEmail == normalizedEmail && u.Id != userId, ct))
+                return false;
+
+            throw;
+        }
+    }
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Security\OpaqueToken.cs
+==================================================
+
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.AspNetCore.WebUtilities;
+
+namespace CoreKit.IAM.Security;
+
+/// <summary>
+/// Random, single-use tokens (refresh tokens, email verification links).
+/// A plain SHA-256 is enough to store them: the value is random bytes, so there is nothing to guess.
+/// Passwords are different: humans choose them, so they need a slow, salted hash.
+/// </summary>
+internal static class OpaqueToken
+{
+    public static string Generate(int byteCount)
+        => WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(byteCount));
+
+    public static string Hash(string rawToken)
+        => Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
+}
 
 
 
@@ -2069,31 +2983,61 @@ public static class SeedingExtensions
 
 
 ==================================================
-FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Services\AdministratorGuard.cs
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Services\AccessResolver.cs
 ==================================================
 
-using CoreKit.IAM.Normalization;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using CoreKit.IAM.Entities;
+using CoreKit.IAM.Interfaces;
 
 namespace CoreKit.IAM.Services;
 
 /// <summary>
-/// Prevents the one mistake that locks everybody out: removing, deactivating or deleting
-/// the last administrator.
+/// What the user may actually do right now: the names of their active roles and the active
+/// permissions of those roles. Inactive roles and permissions grant nothing.
 /// </summary>
-internal static class AdministratorGuard
+internal sealed class AccessResolver : IAccessResolver
 {
-    public static async Task<bool> IsLastActiveAdministratorAsync(IamDbContext db, Guid userId, CancellationToken ct)
-    {
-        var administrator = IamNormalizer.NormalizeName(IamRoleNames.Administrator);
+    private readonly IPermissionRepository _permissionRepository;
 
-        var activeAdministratorIds = await db.UserRoles
-            .Where(ur => ur.Role.NormalizedName == administrator && ur.Role.IsActive && ur.User.IsActive)
-            .Select(ur => ur.UserId)
-            .Distinct()
-            .ToListAsync(ct);
+    public AccessResolver(IPermissionRepository permissionRepository)
+        => _permissionRepository = permissionRepository;
+
+    public async Task<UserAccess> ResolveAsync(User user, CancellationToken ct = default)
+    {
+        var activeRoles = user.UserRoles.Where(ur => ur.Role.IsActive).ToList();
+        var roleNames = activeRoles.Select(ur => ur.Role.Name).Distinct().OrderBy(name => name).ToList();
+        var roleIds = activeRoles.Select(ur => ur.RoleId).ToList();
+
+        if (roleIds.Count == 0)
+            return new UserAccess(roleNames, new List<string>());
+
+        var permissionNames = await _permissionRepository.GetActiveNamesForRolesAsync(roleIds, ct);
+
+        return new UserAccess(roleNames, permissionNames);
+    }
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Services\AdministratorGuard.cs
+==================================================
+
+using CoreKit.IAM.Common;
+using CoreKit.IAM.Interfaces;
+
+namespace CoreKit.IAM.Services;
+
+internal sealed class AdministratorGuard : IAdministratorGuard
+{
+    private readonly IUserRepository _userRepository;
+
+    public AdministratorGuard(IUserRepository userRepository) => _userRepository = userRepository;
+
+    public async Task<bool> IsLastActiveAdministratorAsync(Guid userId, CancellationToken ct = default)
+    {
+        var activeAdministratorIds =
+            await _userRepository.GetActiveUserIdsInRoleAsync(AdministratorRole.NormalizedName, ct);
 
         return activeAdministratorIds.Count == 1 && activeAdministratorIds[0] == userId;
     }
@@ -2101,51 +3045,57 @@ internal static class AdministratorGuard
 
 
 
-
 ==================================================
 FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Services\AuthService.cs
 ==================================================
 
-
 using CoreKit.IAM.Common;
 using CoreKit.IAM.Interfaces;
 using CoreKit.IAM.Models;
-using CoreKit.IAM.Persistence;
+using CoreKit.IAM.Normalization;
 using CoreKit.IAM.Security;
+using CoreKit.IAM.Settings;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
-
+using Microsoft.Extensions.Options;
 
 namespace CoreKit.IAM.Services;
-
 
 public sealed class AuthService : IAuthService
 {
     // Longer input is never a real login, and hashing huge strings would be an easy way to slow the server down.
     private const int MaxEmailLength = 320;
 
-    private readonly IamDbContext _db;
+    private readonly IUserRepository _userRepository;
+    private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IPasswordHasher _hasher;
     private readonly ITokenService _tokens;
+    private readonly ISessionIssuer _sessions;
+    private readonly IAccessResolver _accessResolver;
     private readonly ICurrentUserService _currentUser;
+    private readonly IamEmailVerificationOptions _emailOptions;
     private readonly TimeProvider _time;
     private readonly ILogger<AuthService> _logger;
-    private readonly IEnumerable<IAccessTokenClaimsContributor> _contributors;
 
     public AuthService(
-        IamDbContext db,
+        IUserRepository userRepository,
+        IRefreshTokenRepository refreshTokenRepository,
         IPasswordHasher hasher,
         ITokenService tokens,
+        ISessionIssuer sessions,
+        IAccessResolver accessResolver,
         ICurrentUserService currentUser,
-        IEnumerable<IAccessTokenClaimsContributor> contributors,
+        IOptions<IamEmailVerificationOptions> emailOptions,
         TimeProvider time,
         ILogger<AuthService> logger)
     {
-        _db = db;
+        _userRepository = userRepository;
+        _refreshTokenRepository = refreshTokenRepository;
         _hasher = hasher;
         _tokens = tokens;
+        _sessions = sessions;
+        _accessResolver = accessResolver;
         _currentUser = currentUser;
-        _contributors = contributors;
+        _emailOptions = emailOptions.Value;
         _time = time;
         _logger = logger;
     }
@@ -2161,9 +3111,7 @@ public sealed class AuthService : IAuthService
 
         var normalizedEmail = IamNormalizer.NormalizeEmail(email);
 
-        var user = await _db.Users
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail, ct);
+        var user = await _userRepository.FindByNormalizedEmailWithRolesAsync(normalizedEmail, ct);
 
         if (user is null)
         {
@@ -2181,13 +3129,17 @@ public sealed class AuthService : IAuthService
             return IamErrors.InvalidCredentials;
         }
 
-        if (check == PasswordCheckResult.SuccessRehashNeeded)
+        // Only reached with the right password, so this message cannot be used to discover accounts.
+        if (_emailOptions.RequireConfirmedEmail && !user.EmailConfirmed)
         {
-            user.PasswordHash = _hasher.Hash(password);
-            user.UpdatedAt = Now();
+            _logger.LogInformation("Login blocked for user {UserId}: email not confirmed.", user.Id);
+            return IamEmailErrors.EmailNotConfirmed;
         }
 
-        return IamResult.Success(await IssueTokensAsync(user, ct));
+        if (check == PasswordCheckResult.SuccessRehashNeeded)
+            await _userRepository.SetPasswordHashAsync(user.Id, _hasher.Hash(password), Now(), ct);
+
+        return IamResult.Success(await _sessions.IssueAsync(user, ct));
     }
 
     public async Task<IamResult<LoginResponse>> RefreshAsync(RefreshTokenRequest request, CancellationToken ct = default)
@@ -2199,9 +3151,7 @@ public sealed class AuthService : IAuthService
 
         var tokenHash = _tokens.HashRefreshToken(rawToken.Trim());
 
-        var token = await _db.RefreshTokens
-            .Include(t => t.User).ThenInclude(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
+        var token = await _refreshTokenRepository.FindByHashWithUserAsync(tokenHash, ct);
 
         if (token is null)
             return IamErrors.InvalidRefreshToken;
@@ -2216,7 +3166,7 @@ public sealed class AuthService : IAuthService
                 "A revoked refresh token was presented for user {UserId}. Revoking all of the user's refresh tokens.",
                 token.UserId);
 
-            await RefreshTokenRevocation.RevokeAllForUserAsync(_db, token.UserId, now, ct);
+            await _refreshTokenRepository.RevokeAllForUserAsync(token.UserId, now, ct);
             return IamErrors.InvalidRefreshToken;
         }
 
@@ -2225,19 +3175,21 @@ public sealed class AuthService : IAuthService
 
         if (!token.User.IsActive)
         {
-            await RefreshTokenRevocation.RevokeAllForUserAsync(_db, token.UserId, now, ct);
+            await _refreshTokenRepository.RevokeAllForUserAsync(token.UserId, now, ct);
             return IamErrors.InvalidRefreshToken;
         }
 
-        // Atomic: of two requests using the same token at the same moment, only one changes a row.
-        var revoked = await _db.RefreshTokens
-            .Where(t => t.Id == token.Id && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, (DateTime?)now), ct);
+        if (_emailOptions.RequireConfirmedEmail && !token.User.EmailConfirmed)
+        {
+            await _refreshTokenRepository.RevokeAllForUserAsync(token.UserId, now, ct);
+            return IamEmailErrors.EmailNotConfirmed;
+        }
 
-        if (revoked == 0)
+        // Atomic: of two requests using the same token at the same moment, only one wins.
+        if (!await _refreshTokenRepository.TryRevokeAsync(token.Id, now, ct))
             return IamErrors.InvalidRefreshToken;
 
-        return IamResult.Success(await IssueTokensAsync(token.User, ct));
+        return IamResult.Success(await _sessions.IssueAsync(token.User, ct));
     }
 
     public async Task<IamResult> LogoutAsync(RefreshTokenRequest request, CancellationToken ct = default)
@@ -2246,12 +3198,9 @@ public sealed class AuthService : IAuthService
             return IamResult.Success();
 
         var tokenHash = _tokens.HashRefreshToken(request.RefreshToken.Trim());
-        var now = Now();
 
         // Signing out twice, or with an unknown token, is not an error.
-        await _db.RefreshTokens
-            .Where(t => t.TokenHash == tokenHash && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, (DateTime?)now), ct);
+        await _refreshTokenRepository.RevokeByHashAsync(tokenHash, Now(), ct);
 
         return IamResult.Success();
     }
@@ -2261,17 +3210,14 @@ public sealed class AuthService : IAuthService
         if (_currentUser.UserId is not { } userId)
             return IamErrors.NotAuthenticated;
 
-        var user = await _db.Users
-            .AsNoTracking()
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .FirstOrDefaultAsync(u => u.Id == userId, ct);
+        var user = await _userRepository.FindByIdWithRolesAsync(userId, ct);
 
         if (user is null || !user.IsActive)
             return IamErrors.NotAuthenticated;
 
-        var (_, permissions) = await IamMapper.ResolveAccessAsync(_db, user, ct);
+        var access = await _accessResolver.ResolveAsync(user, ct);
 
-        return IamResult.Success(IamMapper.ToDto(user, permissions));
+        return IamResult.Success(IamMapper.ToDto(user, access.Permissions));
     }
 
     public async Task<IamResult> ChangePasswordAsync(ChangePasswordRequest request, CancellationToken ct = default)
@@ -2279,7 +3225,7 @@ public sealed class AuthService : IAuthService
         if (_currentUser.UserId is not { } userId)
             return IamErrors.NotAuthenticated;
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+        var user = await _userRepository.FindByIdAsync(userId, ct);
 
         if (user is null || !user.IsActive)
             return IamErrors.NotAuthenticated;
@@ -2300,47 +3246,14 @@ public sealed class AuthService : IAuthService
 
         var now = Now();
 
-        user.PasswordHash = _hasher.Hash(request.NewPassword);
-        user.UpdatedAt = now;
-        await _db.SaveChangesAsync(ct);
+        await _userRepository.SetPasswordHashAsync(userId, _hasher.Hash(request.NewPassword), now, ct);
 
         // Every device must sign in again with the new password.
-        await RefreshTokenRevocation.RevokeAllForUserAsync(_db, userId, now, ct);
+        await _refreshTokenRepository.RevokeAllForUserAsync(userId, now, ct);
 
         return IamResult.Success();
     }
 
-    private async Task<LoginResponse> IssueTokensAsync(User user, CancellationToken ct)
-    {
-        var (roles, permissions) = await IamMapper.ResolveAccessAsync(_db, user, ct);
-
-        var extra = new List<Claim>();
-        foreach (var contributor in _contributors)
-            extra.AddRange(await contributor.GetClaimsAsync(user, ct));
-
-        var accessToken = _tokens.CreateAccessToken(user, roles, permissions, extra);
-        var refreshToken = _tokens.CreateRefreshToken();
-
-        _db.RefreshTokens.Add(new RefreshToken
-        {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
-            TokenHash = refreshToken.TokenHash,
-            CreatedAt = Now(),
-            ExpiresAt = refreshToken.ExpiresAt
-        });
-
-        await _db.SaveChangesAsync(ct);
-
-        return new LoginResponse
-        {
-            AccessToken = accessToken.Token,
-            AccessTokenExpiresAt = accessToken.ExpiresAt,
-            RefreshToken = refreshToken.RawToken,
-            RefreshTokenExpiresAt = refreshToken.ExpiresAt,
-            User = IamMapper.ToDto(user, permissions)
-        };
-    }
     private DateTime Now() => _time.GetUtcNow().UtcDateTime;
 }
 
@@ -2397,17 +3310,169 @@ public sealed class CurrentUserService : ICurrentUserService
 
 
 ==================================================
-FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Services\IamMapper.cs
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Services\EmailVerificationService.cs
 ==================================================
 
-
+using CoreKit.IAM.Common;
 using CoreKit.IAM.Entities;
+using CoreKit.IAM.Interfaces;
 using CoreKit.IAM.Models;
-using CoreKit.IAM.Persistence;
-
+using CoreKit.IAM.Normalization;
+using CoreKit.IAM.Security;
+using CoreKit.IAM.Settings;
+using CoreKit.IAM.Validation;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace CoreKit.IAM.Services;
 
+public sealed class EmailVerificationService : IEmailVerificationService
+{
+    // One message for every failure, so the response never says which part was wrong.
+    private static readonly IamError InvalidToken = new(
+        IamErrorKind.Validation,
+        "email.invalid_verification_token",
+        "The verification link is invalid or has expired.");
+
+    private readonly IUserRepository _userRepository;
+    private readonly IEmailVerificationTokenRepository _tokenRepository;
+    private readonly ICurrentUserService _currentUser;
+    private readonly IIamEmailSender _sender;
+    private readonly IamEmailVerificationOptions _options;
+    private readonly TimeProvider _time;
+    private readonly ILogger<EmailVerificationService> _logger;
+
+    public EmailVerificationService(
+        IUserRepository userRepository,
+        IEmailVerificationTokenRepository tokenRepository,
+        ICurrentUserService currentUser,
+        IIamEmailSender sender,
+        IOptions<IamEmailVerificationOptions> options,
+        TimeProvider time,
+        ILogger<EmailVerificationService> logger)
+    {
+        _userRepository = userRepository;
+        _tokenRepository = tokenRepository;
+        _currentUser = currentUser;
+        _sender = sender;
+        _options = options.Value;
+        _time = time;
+        _logger = logger;
+    }
+
+    public async Task<IamResult> SendToCurrentUserAsync(CancellationToken ct = default)
+    {
+        if (_currentUser.UserId is not { } userId)
+            return IamErrors.NotAuthenticated;
+
+        return await SendCoreAsync(userId, enforceCooldown: true, ct);
+    }
+
+    public Task<IamResult> SendAsync(Guid userId, CancellationToken ct = default)
+        => SendCoreAsync(userId, enforceCooldown: false, ct);
+
+    public async Task<IamResult> ResendByEmailAsync(ResendVerificationRequest request, CancellationToken ct = default)
+    {
+        var email = request.Email?.Trim();
+
+        // Every path below returns success: the caller learns nothing about which emails have accounts.
+        if (string.IsNullOrWhiteSpace(email) || email.Length > EmailValidator.MaxLength)
+            return IamResult.Success();
+
+        var normalized = IamNormalizer.NormalizeEmail(email);
+
+        var userId = await _userRepository.FindUnconfirmedActiveIdByEmailAsync(normalized, ct);
+
+        if (userId is { } id)
+        {
+            try
+            {
+                await SendCoreAsync(id, enforceCooldown: true, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // A mail-provider outage must not turn into an error that reveals the account exists.
+                _logger.LogError(ex, "Sending the verification email for user {UserId} failed.", id);
+            }
+        }
+
+        return IamResult.Success();
+    }
+
+    public async Task<IamResult> VerifyAsync(VerifyEmailRequest request, CancellationToken ct = default)
+    {
+        var rawToken = request.Token?.Trim();
+
+        if (string.IsNullOrEmpty(rawToken) || rawToken.Length > 200)
+            return InvalidToken;
+
+        var token = await _tokenRepository.FindByHashWithUserAsync(OpaqueToken.Hash(rawToken), ct);
+
+        var now = Now();
+
+        if (token is null ||
+            token.UsedAt is not null ||
+            token.ExpiresAt <= now ||
+            !token.User.IsActive ||
+            token.NormalizedEmail != token.User.NormalizedEmail) // the address changed after the token was issued
+            return InvalidToken;
+
+        if (!await _tokenRepository.ConfirmEmailAsync(token.Id, token.UserId, now, ct))
+            return InvalidToken;
+
+        _logger.LogInformation("Email confirmed for user {UserId}.", token.UserId);
+
+        return IamResult.Success();
+    }
+
+    private async Task<IamResult> SendCoreAsync(Guid userId, bool enforceCooldown, CancellationToken ct)
+    {
+        var user = await _userRepository.FindByIdAsync(userId, ct);
+
+        if (user is null || !user.IsActive)
+            return IamErrors.NotFound("User");
+
+        if (user.EmailConfirmed)
+            return IamErrors.Conflict("The email address is already confirmed.");
+
+        var now = Now();
+
+        if (enforceCooldown &&
+            await _tokenRepository.HasCreatedSinceAsync(userId, now.AddSeconds(-_options.ResendCooldownSeconds), ct))
+            return IamErrors.Validation("A verification email was sent a moment ago. Please wait before asking again.");
+
+        var rawToken = OpaqueToken.Generate(32);
+        var expiresAt = now.AddHours(_options.TokenHours);
+
+        await _tokenRepository.ReplaceOpenTokensAsync(new EmailVerificationToken
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            TokenHash = OpaqueToken.Hash(rawToken),
+            NormalizedEmail = user.NormalizedEmail,
+            CreatedAt = now,
+            ExpiresAt = expiresAt
+        }, now, ct);
+
+        await _sender.SendEmailVerificationAsync(
+            new EmailVerificationMessage(user.Id, user.Email, user.DisplayName, rawToken, expiresAt), ct);
+
+        return IamResult.Success();
+    }
+
+    private DateTime Now() => _time.GetUtcNow().UtcDateTime;
+}
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Services\IamMapper.cs
+==================================================
+
+using CoreKit.IAM.Entities;
+using CoreKit.IAM.Models;
+
+namespace CoreKit.IAM.Services;
 
 internal static class IamMapper
 {
@@ -2424,30 +3489,6 @@ internal static class IamMapper
         Roles = user.UserRoles.Select(ur => ur.Role.Name).OrderBy(name => name).ToList(),
         Permissions = permissions?.ToList() ?? new List<string>()
     };
-
-    /// <summary>
-    /// What the user may actually do right now: the names of their active roles and the active
-    /// permissions of those roles. Inactive roles and permissions grant nothing.
-    /// </summary>
-    public static async Task<(List<string> Roles, List<string> Permissions)> ResolveAccessAsync(
-        IamDbContext db, User user, CancellationToken ct)
-    {
-        var activeRoles = user.UserRoles.Where(ur => ur.Role.IsActive).ToList();
-        var roleNames = activeRoles.Select(ur => ur.Role.Name).Distinct().OrderBy(name => name).ToList();
-        var roleIds = activeRoles.Select(ur => ur.RoleId).ToList();
-
-        if (roleIds.Count == 0)
-            return (roleNames, new List<string>());
-
-        var permissionNames = await db.RolePermissions
-            .Where(rp => roleIds.Contains(rp.RoleId) && rp.Permission.IsActive)
-            .Select(rp => rp.Permission.Name)
-            .Distinct()
-            .OrderBy(name => name)
-            .ToListAsync(ct);
-
-        return (roleNames, permissionNames);
-    }
 }
 
 
@@ -2483,6 +3524,33 @@ public interface ICurrentUserService
 
 
 ==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Services\NullIamEmailSender.cs
+==================================================
+
+using Microsoft.Extensions.Logging;
+
+namespace CoreKit.IAM.Services;
+
+/// <summary>Used until the host registers a real sender. It sends nothing and says so in the log.</summary>
+public sealed class NullIamEmailSender : IIamEmailSender
+{
+    private readonly ILogger<NullIamEmailSender> _logger;
+
+    public NullIamEmailSender(ILogger<NullIamEmailSender> logger) => _logger = logger;
+
+    public Task SendEmailVerificationAsync(EmailVerificationMessage message, CancellationToken ct = default)
+    {
+        _logger.LogWarning(
+            "No IIamEmailSender is registered, so the verification email for user {UserId} was not sent.",
+            message.UserId);
+
+        return Task.CompletedTask;
+    }
+}
+
+
+
+==================================================
 FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Services\PermissionService.cs
 ==================================================
 
@@ -2490,50 +3558,25 @@ using CoreKit.IAM.Common;
 using CoreKit.IAM.Interfaces;
 using CoreKit.IAM.Models;
 
-
 namespace CoreKit.IAM.Services;
 
 public sealed class PermissionService : IPermissionService
 {
-    private readonly IamDbContext _db;
+    private readonly IPermissionRepository _permissionRepository;
 
-    public PermissionService(IamDbContext db) => _db = db;
+    public PermissionService(IPermissionRepository permissionRepository)
+        => _permissionRepository = permissionRepository;
 
     public async Task<IamResult<IReadOnlyList<PermissionDto>>> ListAsync(CancellationToken ct = default)
-    {
-        var permissions = await _db.Permissions
-            .AsNoTracking()
-            .OrderBy(p => p.Name)
-            .Select(p => new PermissionDto
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Description = p.Description,
-                IsActive = p.IsActive
-            })
-            .ToListAsync(ct);
-
-        return IamResult.Success<IReadOnlyList<PermissionDto>>(permissions);
-    }
+        => IamResult.Success(await _permissionRepository.ListAsync(ct));
 
     public async Task<IamResult<PermissionDto>> GetAsync(Guid id, CancellationToken ct = default)
     {
-        var permission = await _db.Permissions
-            .AsNoTracking()
-            .Where(p => p.Id == id)
-            .Select(p => new PermissionDto
-            {
-                Id = p.Id,
-                Name = p.Name,
-                Description = p.Description,
-                IsActive = p.IsActive
-            })
-            .FirstOrDefaultAsync(ct);
+        var permission = await _permissionRepository.FindAsync(id, ct);
 
         return permission is null ? IamErrors.NotFound("Permission") : IamResult.Success(permission);
     }
 }
-
 
 
 
@@ -2566,61 +3609,55 @@ FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Services\RoleService.cs
 ==================================================
 
 using CoreKit.IAM.Common;
+using CoreKit.IAM.Entities;
 using CoreKit.IAM.Interfaces;
 using CoreKit.IAM.Models;
-
-using System.Data;
-
+using CoreKit.IAM.Normalization;
+using CoreKit.IAM.Validation;
 
 namespace CoreKit.IAM.Services;
 
-
-
 public sealed class RoleService : IRoleService
 {
-    private const int MaxNameLength = 100;
-    private const int MaxDescriptionLength = 500;
+    private readonly IRoleRepository _roleRepository;
+    private readonly IPermissionRepository _permissionRepository;
 
-    private static readonly string AdministratorNormalized = IamNormalizer.NormalizeName(IamRoleNames.Administrator);
-
-    private readonly IamDbContext _db;
-
-    public RoleService(IamDbContext db) => _db = db;
+    public RoleService(IRoleRepository roleRepository, IPermissionRepository permissionRepository)
+    {
+        _roleRepository = roleRepository;
+        _permissionRepository = permissionRepository;
+    }
 
     public async Task<IamResult<IReadOnlyList<RoleDto>>> ListAsync(CancellationToken ct = default)
-    {
-        var roles = await ToDtos(_db.Roles.OrderBy(r => r.Name)).ToListAsync(ct);
-
-        return IamResult.Success<IReadOnlyList<RoleDto>>(roles);
-    }
+        => IamResult.Success(await _roleRepository.ListAsync(ct));
 
     public async Task<IamResult<RoleDto>> GetAsync(Guid id, CancellationToken ct = default)
     {
-        var role = await ToDtos(_db.Roles.Where(r => r.Id == id)).FirstOrDefaultAsync(ct);
+        var role = await _roleRepository.GetDetailsAsync(id, ct);
 
         return role is null ? IamErrors.NotFound("Role") : IamResult.Success(role);
     }
 
     public async Task<IamResult<RoleDto>> CreateAsync(CreateRoleRequest request, CancellationToken ct = default)
     {
-        var nameError = ValidateName(request.Name, out var name);
+        var nameError = RoleInputValidator.ValidateName(request.Name, out var name);
 
         if (nameError is not null)
             return nameError;
 
-        var descriptionError = ValidateDescription(request.Description, out var description);
+        var descriptionError = RoleInputValidator.ValidateDescription(request.Description, out var description);
 
         if (descriptionError is not null)
             return descriptionError;
 
         var permissionIds = (request.PermissionIds ?? new List<Guid>()).Distinct().ToList();
 
-        if (!await AllPermissionsExistAsync(permissionIds, ct))
+        if (!await _permissionRepository.AllExistAsync(permissionIds, ct))
             return IamErrors.Validation("One or more permissions do not exist.");
 
         var normalizedName = IamNormalizer.NormalizeName(name!);
 
-        if (await _db.Roles.AnyAsync(r => r.NormalizedName == normalizedName, ct))
+        if (await _roleRepository.NameExistsAsync(normalizedName, ct: ct))
             return IamErrors.Conflict("A role with this name already exists.");
 
         var role = new Role
@@ -2635,31 +3672,25 @@ public sealed class RoleService : IRoleService
         foreach (var permissionId in permissionIds)
             role.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permissionId });
 
-        _db.Roles.Add(role);
-
-        var saveError = await TrySaveAsync(normalizedName, ct);
-
-        if (saveError is not null)
-            return saveError;
+        if (!await _roleRepository.CreateAsync(role, ct))
+            return IamErrors.Conflict("A role with this name already exists.");
 
         return await GetAsync(role.Id, ct);
     }
 
     public async Task<IamResult<RoleDto>> UpdateAsync(Guid id, UpdateRoleRequest request, CancellationToken ct = default)
     {
-        var role = await _db.Roles.FirstOrDefaultAsync(r => r.Id == id, ct);
+        var role = await _roleRepository.FindByIdAsync(id, ct);
 
         if (role is null)
             return IamErrors.NotFound("Role");
 
-        if (IsProtected(role))
+        if (AdministratorRole.Is(role))
             return IamErrors.Forbidden("The Administrator role cannot be changed.");
-
-        string? changedName = null;
 
         if (request.Name is not null)
         {
-            var nameError = ValidateName(request.Name, out var name);
+            var nameError = RoleInputValidator.ValidateName(request.Name, out var name);
 
             if (nameError is not null)
                 return nameError;
@@ -2668,11 +3699,10 @@ public sealed class RoleService : IRoleService
 
             if (normalized != role.NormalizedName)
             {
-                if (await _db.Roles.AnyAsync(r => r.NormalizedName == normalized && r.Id != id, ct))
+                if (await _roleRepository.NameExistsAsync(normalized, id, ct))
                     return IamErrors.Conflict("A role with this name already exists.");
 
                 role.NormalizedName = normalized;
-                changedName = normalized;
             }
 
             role.Name = name!;
@@ -2680,7 +3710,7 @@ public sealed class RoleService : IRoleService
 
         if (request.Description is not null)
         {
-            var descriptionError = ValidateDescription(request.Description, out var description);
+            var descriptionError = RoleInputValidator.ValidateDescription(request.Description, out var description);
 
             if (descriptionError is not null)
                 return descriptionError;
@@ -2691,31 +3721,28 @@ public sealed class RoleService : IRoleService
         if (request.IsActive.HasValue)
             role.IsActive = request.IsActive.Value;
 
-        var saveError = await TrySaveAsync(changedName, ct);
-
-        if (saveError is not null)
-            return saveError;
+        if (!await _roleRepository.UpdateAsync(role, ct))
+            return IamErrors.Conflict("A role with this name already exists.");
 
         return await GetAsync(id, ct);
     }
 
     public async Task<IamResult> DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var role = await _db.Roles.FirstOrDefaultAsync(r => r.Id == id, ct);
+        var role = await _roleRepository.FindByIdAsync(id, ct);
 
         if (role is null)
             return IamErrors.NotFound("Role");
 
-        if (IsProtected(role))
+        if (AdministratorRole.Is(role))
             return IamErrors.Forbidden("The Administrator role cannot be deleted.");
 
-        var userCount = await _db.UserRoles.CountAsync(ur => ur.RoleId == id, ct);
+        var userCount = await _roleRepository.CountUsersAsync(id, ct);
 
         if (userCount > 0)
             return IamErrors.Conflict($"The role is assigned to {userCount} user(s). Remove it from them first.");
 
-        _db.Roles.Remove(role); // its permission links are removed by the database (cascade)
-        await _db.SaveChangesAsync(ct);
+        await _roleRepository.DeleteAsync(role, ct);
 
         return IamResult.Success();
     }
@@ -2723,90 +3750,89 @@ public sealed class RoleService : IRoleService
     public async Task<IamResult<RoleDto>> SetPermissionsAsync(
         Guid id, SetRolePermissionsRequest request, CancellationToken ct = default)
     {
-        var role = await _db.Roles
-            .Include(r => r.RolePermissions)
-            .FirstOrDefaultAsync(r => r.Id == id, ct);
+        var role = await _roleRepository.FindByIdWithPermissionsAsync(id, ct);
 
         if (role is null)
             return IamErrors.NotFound("Role");
 
-        if (IsProtected(role))
+        if (AdministratorRole.Is(role))
             return IamErrors.Forbidden("The Administrator role always has every permission.");
 
         var wanted = (request.PermissionIds ?? new List<Guid>()).Distinct().ToList();
 
-        if (!await AllPermissionsExistAsync(wanted, ct))
+        if (!await _permissionRepository.AllExistAsync(wanted, ct))
             return IamErrors.Validation("One or more permissions do not exist.");
 
-        foreach (var link in role.RolePermissions.Where(rp => !wanted.Contains(rp.PermissionId)).ToList())
-            _db.RolePermissions.Remove(link);
-
-        var current = role.RolePermissions.Select(rp => rp.PermissionId).ToHashSet();
-
-        foreach (var permissionId in wanted.Where(p => !current.Contains(p)))
-            _db.RolePermissions.Add(new RolePermission { RoleId = id, PermissionId = permissionId });
-
-        await _db.SaveChangesAsync(ct);
+        await _roleRepository.ReplacePermissionsAsync(role, wanted, ct);
 
         return await GetAsync(id, ct);
     }
+}
 
-    private static bool IsProtected(Role role) => role.NormalizedName == AdministratorNormalized;
 
-    private static IQueryable<RoleDto> ToDtos(IQueryable<Role> roles) => roles
-        .AsNoTracking()
-        .Select(r => new RoleDto
-        {
-            Id = r.Id,
-            Name = r.Name,
-            Description = r.Description,
-            IsActive = r.IsActive,
-            IsProtected = r.NormalizedName == AdministratorNormalized,
-            UserCount = r.UserRoles.Count(),
-            Permissions = r.RolePermissions.Select(rp => rp.Permission.Name).OrderBy(n => n).ToList()
-        });
 
-    private async Task<bool> AllPermissionsExistAsync(List<Guid> permissionIds, CancellationToken ct)
-        => permissionIds.Count == 0 ||
-           await _db.Permissions.CountAsync(p => permissionIds.Contains(p.Id), ct) == permissionIds.Count;
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Services\SessionIssuer.cs
+==================================================
 
-    private static IamError? ValidateName(string? input, out string? cleaned)
+using System.Security.Claims;
+using CoreKit.IAM.Entities;
+using CoreKit.IAM.Hooks;
+using CoreKit.IAM.Interfaces;
+using CoreKit.IAM.Models;
+
+namespace CoreKit.IAM.Services;
+
+internal sealed class SessionIssuer : ISessionIssuer
+{
+    private readonly IAccessResolver _accessResolver;
+    private readonly ITokenService _tokens;
+    private readonly IRefreshTokenRepository _refreshTokenRepository;
+    private readonly IEnumerable<IAccessTokenClaimsContributor> _contributors;
+    private readonly TimeProvider _time;
+
+    public SessionIssuer(
+        IAccessResolver accessResolver,
+        ITokenService tokens,
+        IRefreshTokenRepository refreshTokenRepository,
+        IEnumerable<IAccessTokenClaimsContributor> contributors,
+        TimeProvider time)
     {
-        cleaned = input?.Trim();
-
-        if (string.IsNullOrEmpty(cleaned))
-            return IamErrors.Validation("A role name is required.");
-
-        return cleaned.Length > MaxNameLength
-            ? IamErrors.Validation($"The role name is too long (max {MaxNameLength} characters).")
-            : null;
+        _accessResolver = accessResolver;
+        _tokens = tokens;
+        _refreshTokenRepository = refreshTokenRepository;
+        _contributors = contributors;
+        _time = time;
     }
 
-    private static IamError? ValidateDescription(string? input, out string? cleaned)
+    public async Task<LoginResponse> IssueAsync(User user, CancellationToken ct = default)
     {
-        cleaned = string.IsNullOrWhiteSpace(input) ? null : input.Trim();
+        var access = await _accessResolver.ResolveAsync(user, ct);
 
-        return cleaned is { Length: > MaxDescriptionLength }
-            ? IamErrors.Validation($"The description is too long (max {MaxDescriptionLength} characters).")
-            : null;
-    }
+        var extraClaims = new List<Claim>();
+        foreach (var contributor in _contributors)
+            extraClaims.AddRange(await contributor.GetClaimsAsync(user, ct));
 
-    private async Task<IamError?> TrySaveAsync(string? nameToCheck, CancellationToken ct)
-    {
-        try
+        var accessToken = _tokens.CreateAccessToken(user, access.Roles, access.Permissions, extraClaims);
+        var refreshToken = _tokens.CreateRefreshToken();
+
+        await _refreshTokenRepository.AddAsync(new RefreshToken
         {
-            await _db.SaveChangesAsync(ct);
-            return null;
-        }
-        catch (DbUpdateException) when (nameToCheck is not null)
+            Id = Guid.NewGuid(),
+            UserId = user.Id,
+            TokenHash = refreshToken.TokenHash,
+            CreatedAt = _time.GetUtcNow().UtcDateTime,
+            ExpiresAt = refreshToken.ExpiresAt
+        }, ct);
+
+        return new LoginResponse
         {
-            _db.ChangeTracker.Clear();
-
-            if (await _db.Roles.AnyAsync(r => r.NormalizedName == nameToCheck, ct))
-                return IamErrors.Conflict("A role with this name already exists.");
-
-            throw;
-        }
+            AccessToken = accessToken.Token,
+            AccessTokenExpiresAt = accessToken.ExpiresAt,
+            RefreshToken = refreshToken.RawToken,
+            RefreshTokenExpiresAt = refreshToken.ExpiresAt,
+            User = IamMapper.ToDto(user, access.Permissions)
+        };
     }
 }
 
@@ -2816,12 +3842,11 @@ public sealed class RoleService : IRoleService
 FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Services\TokenService.cs
 ==================================================
 
-using System.Security.Cryptography;
 using System.Text.Json;
 using CoreKit.IAM.Constants;
 using CoreKit.IAM.Entities;
 using CoreKit.IAM.Interfaces;
-using Microsoft.AspNetCore.WebUtilities;
+using CoreKit.IAM.Security;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
@@ -2887,18 +3912,13 @@ public sealed class TokenService : ITokenService
 
     public GeneratedRefreshToken CreateRefreshToken()
     {
-        var rawToken = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(64));
+        var rawToken = OpaqueToken.Generate(64);
         var expires = _time.GetUtcNow().UtcDateTime.AddDays(_options.RefreshTokenDays);
 
         return new GeneratedRefreshToken(rawToken, HashRefreshToken(rawToken), expires);
     }
 
-    /// <summary>
-    /// A plain SHA-256 is enough here: the token is 64 random bytes, so there is nothing to guess.
-    /// (Passwords are different: humans choose them, so they need a slow, salted hash.)
-    /// </summary>
-    public string HashRefreshToken(string rawToken)
-        => Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
+    public string HashRefreshToken(string rawToken) => OpaqueToken.Hash(rawToken);
 }
 
 
@@ -2907,37 +3927,42 @@ public sealed class TokenService : ITokenService
 FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Services\UserService.cs
 ==================================================
 
-
 using CoreKit.IAM.Common;
-using CoreKit.IAM.Constants;
 using CoreKit.IAM.Entities;
 using CoreKit.IAM.Interfaces;
 using CoreKit.IAM.Models;
 using CoreKit.IAM.Normalization;
-using CoreKit.IAM.Persistence;
 using CoreKit.IAM.Security;
 using CoreKit.IAM.Validation;
-using Microsoft.EntityFrameworkCore;
-using System.Data;
 
 namespace CoreKit.IAM.Services;
 
 public sealed class UserService : IUserService
 {
-    private const int MaxDisplayNameLength = 200;
-
-    private readonly IamDbContext _db;
+    private readonly IUserRepository _userRepository;
+    private readonly IRoleRepository _roleRepository;
+    private readonly IRefreshTokenRepository _refreshTokenRepository;
+    private readonly IAccessResolver _accessResolver;
+    private readonly IAdministratorGuard _administratorGuard;
     private readonly IPasswordHasher _hasher;
     private readonly ICurrentUserService _currentUser;
     private readonly TimeProvider _time;
 
     public UserService(
-        IamDbContext db,
+        IUserRepository userRepository,
+        IRoleRepository roleRepository,
+        IRefreshTokenRepository refreshTokenRepository,
+        IAccessResolver accessResolver,
+        IAdministratorGuard administratorGuard,
         IPasswordHasher hasher,
         ICurrentUserService currentUser,
         TimeProvider time)
     {
-        _db = db;
+        _userRepository = userRepository;
+        _roleRepository = roleRepository;
+        _refreshTokenRepository = refreshTokenRepository;
+        _accessResolver = accessResolver;
+        _administratorGuard = administratorGuard;
         _hasher = hasher;
         _currentUser = currentUser;
         _time = time;
@@ -2948,28 +3973,7 @@ public sealed class UserService : IUserService
         var page = Math.Max(query.Page, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
 
-        var users = _db.Users.AsNoTracking().AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(query.Search))
-        {
-            var term = query.Search.Trim().ToUpperInvariant();
-
-            users = users.Where(u =>
-                u.NormalizedEmail.Contains(term) ||
-                (u.DisplayName != null && u.DisplayName.ToUpper().Contains(term)));
-        }
-
-        if (query.IsActive.HasValue)
-            users = users.Where(u => u.IsActive == query.IsActive.Value);
-
-        var totalCount = await users.CountAsync(ct);
-
-        var items = await users
-            .OrderBy(u => u.NormalizedEmail)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .ToListAsync(ct);
+        var (items, totalCount) = await _userRepository.ListAsync(query.Search, query.IsActive, page, pageSize, ct);
 
         return IamResult.Success(new PagedResult<UserDto>
         {
@@ -2982,17 +3986,14 @@ public sealed class UserService : IUserService
 
     public async Task<IamResult<UserDto>> GetAsync(Guid id, CancellationToken ct = default)
     {
-        var user = await _db.Users
-            .AsNoTracking()
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .FirstOrDefaultAsync(u => u.Id == id, ct);
+        var user = await _userRepository.FindByIdWithRolesAsync(id, ct);
 
         if (user is null)
             return IamErrors.NotFound("User");
 
-        var (_, permissions) = await IamMapper.ResolveAccessAsync(_db, user, ct);
+        var access = await _accessResolver.ResolveAsync(user, ct);
 
-        return IamResult.Success(IamMapper.ToDto(user, permissions));
+        return IamResult.Success(IamMapper.ToDto(user, access.Permissions));
     }
 
     public async Task<IamResult<UserDto>> CreateAsync(CreateUserRequest request, CancellationToken ct = default)
@@ -3007,23 +4008,20 @@ public sealed class UserService : IUserService
         if (passwordError is not null)
             return IamErrors.Validation(passwordError);
 
-        var nameError = ValidateDisplayName(request.DisplayName, out var displayName);
+        var nameError = DisplayNameValidator.Validate(request.DisplayName, out var displayName);
 
         if (nameError is not null)
             return nameError;
 
         var roleIds = (request.RoleIds ?? new List<Guid>()).Distinct().ToList();
-
-        var roles = roleIds.Count == 0
-            ? new List<Role>()
-            : await _db.Roles.Where(r => roleIds.Contains(r.Id)).ToListAsync(ct);
+        var roles = await _roleRepository.FindByIdsAsync(roleIds, ct);
 
         if (roles.Count != roleIds.Count)
             return IamErrors.Validation("One or more roles do not exist.");
 
         var normalizedEmail = IamNormalizer.NormalizeEmail(email);
 
-        if (await _db.Users.AnyAsync(u => u.NormalizedEmail == normalizedEmail, ct))
+        if (await _userRepository.EmailExistsAsync(normalizedEmail, ct: ct))
             return IamErrors.Conflict("A user with this email already exists.");
 
         var user = new User
@@ -3041,27 +4039,20 @@ public sealed class UserService : IUserService
         foreach (var role in roles)
             user.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = role.Id });
 
-        _db.Users.Add(user);
-
-        var saveError = await TrySaveAsync(normalizedEmail, ct);
-
-        if (saveError is not null)
-            return saveError;
+        if (!await _userRepository.CreateAsync(user, ct))
+            return IamErrors.Conflict("A user with this email already exists.");
 
         return await GetAsync(user.Id, ct);
     }
 
     public async Task<IamResult<UserDto>> UpdateAsync(Guid id, UpdateUserRequest request, CancellationToken ct = default)
     {
-        var user = await _db.Users
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .FirstOrDefaultAsync(u => u.Id == id, ct);
+        var user = await _userRepository.FindForUpdateAsync(id, ct);
 
         if (user is null)
             return IamErrors.NotFound("User");
 
         var now = Now();
-        string? changedEmail = null;
         var endSessions = false;
 
         if (request.Email is not null)
@@ -3075,12 +4066,11 @@ public sealed class UserService : IUserService
 
             if (normalized != user.NormalizedEmail)
             {
-                if (await _db.Users.AnyAsync(u => u.NormalizedEmail == normalized && u.Id != id, ct))
+                if (await _userRepository.EmailExistsAsync(normalized, id, ct))
                     return IamErrors.Conflict("A user with this email already exists.");
 
                 user.NormalizedEmail = normalized;
                 user.EmailConfirmed = false; // a new address has not been confirmed yet
-                changedEmail = normalized;
             }
 
             user.Email = email;
@@ -3088,7 +4078,7 @@ public sealed class UserService : IUserService
 
         if (request.DisplayName is not null)
         {
-            var nameError = ValidateDisplayName(request.DisplayName, out var displayName);
+            var nameError = DisplayNameValidator.Validate(request.DisplayName, out var displayName);
 
             if (nameError is not null)
                 return nameError;
@@ -3103,7 +4093,7 @@ public sealed class UserService : IUserService
                 if (_currentUser.UserId == id)
                     return IamErrors.Forbidden("You cannot deactivate your own account.");
 
-                if (await AdministratorGuard.IsLastActiveAdministratorAsync(_db, id, ct))
+                if (await _administratorGuard.IsLastActiveAdministratorAsync(id, ct))
                     return IamErrors.Conflict("The last active administrator cannot be deactivated.");
 
                 endSessions = true;
@@ -3125,13 +4115,11 @@ public sealed class UserService : IUserService
 
         user.UpdatedAt = now;
 
-        var saveError = await TrySaveAsync(changedEmail, ct);
-
-        if (saveError is not null)
-            return saveError;
+        if (!await _userRepository.UpdateAsync(user, ct))
+            return IamErrors.Conflict("A user with this email already exists.");
 
         if (endSessions)
-            await RefreshTokenRevocation.RevokeAllForUserAsync(_db, id, now, ct);
+            await _refreshTokenRepository.RevokeAllForUserAsync(id, now, ct);
 
         return await GetAsync(id, ct);
     }
@@ -3141,93 +4129,73 @@ public sealed class UserService : IUserService
         if (_currentUser.UserId == id)
             return IamErrors.Forbidden("You cannot delete your own account.");
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
+        var user = await _userRepository.FindForUpdateAsync(id, ct);
 
         if (user is null)
             return IamErrors.NotFound("User");
 
-        if (await AdministratorGuard.IsLastActiveAdministratorAsync(_db, id, ct))
+        if (await _administratorGuard.IsLastActiveAdministratorAsync(id, ct))
             return IamErrors.Conflict("The last active administrator cannot be deleted.");
 
-        _db.Users.Remove(user); // role links and refresh tokens are removed by the database (cascade)
-        await _db.SaveChangesAsync(ct);
+        await _userRepository.DeleteAsync(user, ct);
 
         return IamResult.Success();
     }
 
     public async Task<IamResult<UserDto>> SetRolesAsync(Guid id, SetUserRolesRequest request, CancellationToken ct = default)
     {
-        var user = await _db.Users
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .FirstOrDefaultAsync(u => u.Id == id, ct);
+        var user = await _userRepository.FindForUpdateAsync(id, ct);
 
         if (user is null)
             return IamErrors.NotFound("User");
 
         var wanted = (request.RoleIds ?? new List<Guid>()).Distinct().ToList();
-
-        var roles = wanted.Count == 0
-            ? new List<Role>()
-            : await _db.Roles.Where(r => wanted.Contains(r.Id)).ToListAsync(ct);
+        var roles = await _roleRepository.FindByIdsAsync(wanted, ct);
 
         if (roles.Count != wanted.Count)
             return IamErrors.Validation("One or more roles do not exist.");
 
-        var administrator = IamNormalizer.NormalizeName(IamRoleNames.Administrator);
-
         var losesAdministrator =
-            user.UserRoles.Any(ur => ur.Role.NormalizedName == administrator) &&
-            roles.All(r => r.NormalizedName != administrator);
+            user.UserRoles.Any(ur => AdministratorRole.Is(ur.Role)) &&
+            roles.All(r => !AdministratorRole.Is(r));
 
-        if (losesAdministrator && await AdministratorGuard.IsLastActiveAdministratorAsync(_db, id, ct))
+        if (losesAdministrator && await _administratorGuard.IsLastActiveAdministratorAsync(id, ct))
             return IamErrors.Conflict("The last active administrator cannot lose the Administrator role.");
 
-        foreach (var link in user.UserRoles.Where(ur => !wanted.Contains(ur.RoleId)).ToList())
-            _db.UserRoles.Remove(link);
-
-        var current = user.UserRoles.Select(ur => ur.RoleId).ToHashSet();
-
-        foreach (var role in roles.Where(r => !current.Contains(r.Id)))
-            _db.UserRoles.Add(new UserRole { UserId = id, RoleId = role.Id });
-
         user.UpdatedAt = Now();
-        await _db.SaveChangesAsync(ct);
+
+        await _userRepository.ReplaceRolesAsync(user, wanted, ct);
 
         return await GetAsync(id, ct);
     }
 
-    private static IamError? ValidateDisplayName(string? input, out string? cleaned)
-    {
-        cleaned = string.IsNullOrWhiteSpace(input) ? null : input.Trim();
+    private DateTime Now() => _time.GetUtcNow().UtcDateTime;
+}
 
-        return cleaned is { Length: > MaxDisplayNameLength }
-            ? IamErrors.Validation($"The display name is too long (max {MaxDisplayNameLength} characters).")
-            : null;
-    }
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Settings\IamEmailVerificationOptions.cs
+==================================================
+
+namespace CoreKit.IAM.Settings;
+
+public sealed class IamEmailVerificationOptions
+{
+    public const string SectionName = "Iam:EmailVerification";
 
     /// <summary>
-    /// Two requests can both pass the "email is free" check. The unique index then rejects the second
-    /// one, and this turns that database error into a clear Conflict.
+    /// When true, a user whose email is not confirmed cannot sign in or refresh a session.
+    /// Off by default: turn it on for apps where people register themselves, leave it off
+    /// where an administrator creates the accounts.
     /// </summary>
-    private async Task<IamError?> TrySaveAsync(string? emailToCheck, CancellationToken ct)
-    {
-        try
-        {
-            await _db.SaveChangesAsync(ct);
-            return null;
-        }
-        catch (DbUpdateException) when (emailToCheck is not null)
-        {
-            _db.ChangeTracker.Clear();
+    public bool RequireConfirmedEmail { get; set; } = false;
 
-            if (await _db.Users.AnyAsync(u => u.NormalizedEmail == emailToCheck, ct))
-                return IamErrors.Conflict("A user with this email already exists.");
+    /// <summary>How long a verification token stays valid.</summary>
+    public int TokenHours { get; set; } = 24;
 
-            throw;
-        }
-    }
-
-    private DateTime Now() => _time.GetUtcNow().UtcDateTime;
+    /// <summary>Minimum wait before the same user may ask for another email.</summary>
+    public int ResendCooldownSeconds { get; set; } = 60;
 }
 
 
@@ -3282,6 +4250,30 @@ public sealed class JwtOptions
 
 
 ==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Validation\DisplayNameValidator.cs
+==================================================
+
+using CoreKit.IAM.Common;
+
+namespace CoreKit.IAM.Validation;
+
+internal static class DisplayNameValidator
+{
+    public const int MaxLength = 200;
+
+    public static IamError? Validate(string? input, out string? cleaned)
+    {
+        cleaned = string.IsNullOrWhiteSpace(input) ? null : input.Trim();
+
+        return cleaned is { Length: > MaxLength }
+            ? IamErrors.Validation($"The display name is too long (max {MaxLength} characters).")
+            : null;
+    }
+}
+
+
+
+==================================================
 FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Validation\EmailValidator.cs
 ==================================================
 
@@ -3309,5 +4301,42 @@ public static class EmailValidator
     }
 }
 
+
+
+
+==================================================
+FILE: D:\waqas-dba\Dastarkhwan\CoreKit.IAM\Validation\RoleInputValidator.cs
+==================================================
+
+using CoreKit.IAM.Common;
+
+namespace CoreKit.IAM.Validation;
+
+internal static class RoleInputValidator
+{
+    public const int MaxNameLength = 100;
+    public const int MaxDescriptionLength = 500;
+
+    public static IamError? ValidateName(string? input, out string? cleaned)
+    {
+        cleaned = input?.Trim();
+
+        if (string.IsNullOrEmpty(cleaned))
+            return IamErrors.Validation("A role name is required.");
+
+        return cleaned.Length > MaxNameLength
+            ? IamErrors.Validation($"The role name is too long (max {MaxNameLength} characters).")
+            : null;
+    }
+
+    public static IamError? ValidateDescription(string? input, out string? cleaned)
+    {
+        cleaned = string.IsNullOrWhiteSpace(input) ? null : input.Trim();
+
+        return cleaned is { Length: > MaxDescriptionLength }
+            ? IamErrors.Validation($"The description is too long (max {MaxDescriptionLength} characters).")
+            : null;
+    }
+}
 
 

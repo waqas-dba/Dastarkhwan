@@ -1,49 +1,51 @@
-﻿
-using CoreKit.IAM.Common;
+﻿using CoreKit.IAM.Common;
 using CoreKit.IAM.Interfaces;
 using CoreKit.IAM.Models;
-using CoreKit.IAM.Persistence;
+using CoreKit.IAM.Normalization;
 using CoreKit.IAM.Security;
+using CoreKit.IAM.Settings;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
-
+using Microsoft.Extensions.Options;
 
 namespace CoreKit.IAM.Services;
-
 
 public sealed class AuthService : IAuthService
 {
     // Longer input is never a real login, and hashing huge strings would be an easy way to slow the server down.
     private const int MaxEmailLength = 320;
 
-    private readonly IamDbContext _db;
+    private readonly IUserRepository _userRepository;
+    private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IPasswordHasher _hasher;
     private readonly ITokenService _tokens;
+    private readonly ISessionIssuer _sessions;
+    private readonly IAccessResolver _accessResolver;
     private readonly ICurrentUserService _currentUser;
+    private readonly IamEmailVerificationOptions _emailOptions;
     private readonly TimeProvider _time;
     private readonly ILogger<AuthService> _logger;
-    private readonly IEnumerable<IAccessTokenClaimsContributor> _contributors;
-
-    private readonly IamEmailVerificationOptions _emailOptions;
 
     public AuthService(
-        IamDbContext db,
+        IUserRepository userRepository,
+        IRefreshTokenRepository refreshTokenRepository,
         IPasswordHasher hasher,
         ITokenService tokens,
+        ISessionIssuer sessions,
+        IAccessResolver accessResolver,
         ICurrentUserService currentUser,
-        IEnumerable<IAccessTokenClaimsContributor> contributors,
         IOptions<IamEmailVerificationOptions> emailOptions,
         TimeProvider time,
         ILogger<AuthService> logger)
-   
     {
-        _db = db;
+        _userRepository = userRepository;
+        _refreshTokenRepository = refreshTokenRepository;
         _hasher = hasher;
         _tokens = tokens;
+        _sessions = sessions;
+        _accessResolver = accessResolver;
         _currentUser = currentUser;
-        _contributors = contributors;
-        _time = time;
         _emailOptions = emailOptions.Value;
+        _time = time;
         _logger = logger;
     }
 
@@ -58,9 +60,7 @@ public sealed class AuthService : IAuthService
 
         var normalizedEmail = IamNormalizer.NormalizeEmail(email);
 
-        var user = await _db.Users
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail, ct);
+        var user = await _userRepository.FindByNormalizedEmailWithRolesAsync(normalizedEmail, ct);
 
         if (user is null)
         {
@@ -86,12 +86,9 @@ public sealed class AuthService : IAuthService
         }
 
         if (check == PasswordCheckResult.SuccessRehashNeeded)
-        {
-            user.PasswordHash = _hasher.Hash(password);
-            user.UpdatedAt = Now();
-        }
+            await _userRepository.SetPasswordHashAsync(user.Id, _hasher.Hash(password), Now(), ct);
 
-        return IamResult.Success(await IssueTokensAsync(user, ct));
+        return IamResult.Success(await _sessions.IssueAsync(user, ct));
     }
 
     public async Task<IamResult<LoginResponse>> RefreshAsync(RefreshTokenRequest request, CancellationToken ct = default)
@@ -103,9 +100,7 @@ public sealed class AuthService : IAuthService
 
         var tokenHash = _tokens.HashRefreshToken(rawToken.Trim());
 
-        var token = await _db.RefreshTokens
-            .Include(t => t.User).ThenInclude(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
+        var token = await _refreshTokenRepository.FindByHashWithUserAsync(tokenHash, ct);
 
         if (token is null)
             return IamErrors.InvalidRefreshToken;
@@ -120,7 +115,7 @@ public sealed class AuthService : IAuthService
                 "A revoked refresh token was presented for user {UserId}. Revoking all of the user's refresh tokens.",
                 token.UserId);
 
-            await RefreshTokenRevocation.RevokeAllForUserAsync(_db, token.UserId, now, ct);
+            await _refreshTokenRepository.RevokeAllForUserAsync(token.UserId, now, ct);
             return IamErrors.InvalidRefreshToken;
         }
 
@@ -129,25 +124,21 @@ public sealed class AuthService : IAuthService
 
         if (!token.User.IsActive)
         {
-            await RefreshTokenRevocation.RevokeAllForUserAsync(_db, token.UserId, now, ct);
+            await _refreshTokenRepository.RevokeAllForUserAsync(token.UserId, now, ct);
             return IamErrors.InvalidRefreshToken;
         }
 
         if (_emailOptions.RequireConfirmedEmail && !token.User.EmailConfirmed)
         {
-            await RefreshTokenRevocation.RevokeAllForUserAsync(_db, token.UserId, now, ct);
+            await _refreshTokenRepository.RevokeAllForUserAsync(token.UserId, now, ct);
             return IamEmailErrors.EmailNotConfirmed;
         }
 
-        // Atomic: of two requests using the same token at the same moment, only one changes a row.
-        var revoked = await _db.RefreshTokens
-            .Where(t => t.Id == token.Id && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, (DateTime?)now), ct);
-
-        if (revoked == 0)
+        // Atomic: of two requests using the same token at the same moment, only one wins.
+        if (!await _refreshTokenRepository.TryRevokeAsync(token.Id, now, ct))
             return IamErrors.InvalidRefreshToken;
 
-        return IamResult.Success(await IssueTokensAsync(token.User, ct));
+        return IamResult.Success(await _sessions.IssueAsync(token.User, ct));
     }
 
     public async Task<IamResult> LogoutAsync(RefreshTokenRequest request, CancellationToken ct = default)
@@ -156,12 +147,9 @@ public sealed class AuthService : IAuthService
             return IamResult.Success();
 
         var tokenHash = _tokens.HashRefreshToken(request.RefreshToken.Trim());
-        var now = Now();
 
         // Signing out twice, or with an unknown token, is not an error.
-        await _db.RefreshTokens
-            .Where(t => t.TokenHash == tokenHash && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, (DateTime?)now), ct);
+        await _refreshTokenRepository.RevokeByHashAsync(tokenHash, Now(), ct);
 
         return IamResult.Success();
     }
@@ -171,17 +159,14 @@ public sealed class AuthService : IAuthService
         if (_currentUser.UserId is not { } userId)
             return IamErrors.NotAuthenticated;
 
-        var user = await _db.Users
-            .AsNoTracking()
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .FirstOrDefaultAsync(u => u.Id == userId, ct);
+        var user = await _userRepository.FindByIdWithRolesAsync(userId, ct);
 
         if (user is null || !user.IsActive)
             return IamErrors.NotAuthenticated;
 
-        var (_, permissions) = await IamMapper.ResolveAccessAsync(_db, user, ct);
+        var access = await _accessResolver.ResolveAsync(user, ct);
 
-        return IamResult.Success(IamMapper.ToDto(user, permissions));
+        return IamResult.Success(IamMapper.ToDto(user, access.Permissions));
     }
 
     public async Task<IamResult> ChangePasswordAsync(ChangePasswordRequest request, CancellationToken ct = default)
@@ -189,7 +174,7 @@ public sealed class AuthService : IAuthService
         if (_currentUser.UserId is not { } userId)
             return IamErrors.NotAuthenticated;
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId, ct);
+        var user = await _userRepository.FindByIdAsync(userId, ct);
 
         if (user is null || !user.IsActive)
             return IamErrors.NotAuthenticated;
@@ -210,46 +195,13 @@ public sealed class AuthService : IAuthService
 
         var now = Now();
 
-        user.PasswordHash = _hasher.Hash(request.NewPassword);
-        user.UpdatedAt = now;
-        await _db.SaveChangesAsync(ct);
+        await _userRepository.SetPasswordHashAsync(userId, _hasher.Hash(request.NewPassword), now, ct);
 
         // Every device must sign in again with the new password.
-        await RefreshTokenRevocation.RevokeAllForUserAsync(_db, userId, now, ct);
+        await _refreshTokenRepository.RevokeAllForUserAsync(userId, now, ct);
 
         return IamResult.Success();
     }
 
-    private async Task<LoginResponse> IssueTokensAsync(User user, CancellationToken ct)
-    {
-        var (roles, permissions) = await IamMapper.ResolveAccessAsync(_db, user, ct);
-
-        var extra = new List<Claim>();
-        foreach (var contributor in _contributors)
-            extra.AddRange(await contributor.GetClaimsAsync(user, ct));
-
-        var accessToken = _tokens.CreateAccessToken(user, roles, permissions, extra);
-        var refreshToken = _tokens.CreateRefreshToken();
-
-        _db.RefreshTokens.Add(new RefreshToken
-        {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
-            TokenHash = refreshToken.TokenHash,
-            CreatedAt = Now(),
-            ExpiresAt = refreshToken.ExpiresAt
-        });
-
-        await _db.SaveChangesAsync(ct);
-
-        return new LoginResponse
-        {
-            AccessToken = accessToken.Token,
-            AccessTokenExpiresAt = accessToken.ExpiresAt,
-            RefreshToken = refreshToken.RawToken,
-            RefreshTokenExpiresAt = refreshToken.ExpiresAt,
-            User = IamMapper.ToDto(user, permissions)
-        };
-    }
     private DateTime Now() => _time.GetUtcNow().UtcDateTime;
 }

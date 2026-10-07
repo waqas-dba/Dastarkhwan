@@ -1,4 +1,13 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using CoreKit.IAM.Common;
+using CoreKit.IAM.Entities;
+using CoreKit.IAM.Interfaces;
+using CoreKit.IAM.Models;
+using CoreKit.IAM.Normalization;
+using CoreKit.IAM.Security;
+using CoreKit.IAM.Settings;
+using CoreKit.IAM.Validation;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace CoreKit.IAM.Services;
 
@@ -10,7 +19,8 @@ public sealed class EmailVerificationService : IEmailVerificationService
         "email.invalid_verification_token",
         "The verification link is invalid or has expired.");
 
-    private readonly IamDbContext _db;
+    private readonly IUserRepository _userRepository;
+    private readonly IEmailVerificationTokenRepository _tokenRepository;
     private readonly ICurrentUserService _currentUser;
     private readonly IIamEmailSender _sender;
     private readonly IamEmailVerificationOptions _options;
@@ -18,14 +28,16 @@ public sealed class EmailVerificationService : IEmailVerificationService
     private readonly ILogger<EmailVerificationService> _logger;
 
     public EmailVerificationService(
-        IamDbContext db,
+        IUserRepository userRepository,
+        IEmailVerificationTokenRepository tokenRepository,
         ICurrentUserService currentUser,
         IIamEmailSender sender,
         IOptions<IamEmailVerificationOptions> options,
         TimeProvider time,
         ILogger<EmailVerificationService> logger)
     {
-        _db = db;
+        _userRepository = userRepository;
+        _tokenRepository = tokenRepository;
         _currentUser = currentUser;
         _sender = sender;
         _options = options.Value;
@@ -54,11 +66,7 @@ public sealed class EmailVerificationService : IEmailVerificationService
 
         var normalized = IamNormalizer.NormalizeEmail(email);
 
-        var userId = await _db.Users
-            .AsNoTracking()
-            .Where(u => u.NormalizedEmail == normalized && u.IsActive && !u.EmailConfirmed)
-            .Select(u => (Guid?)u.Id)
-            .FirstOrDefaultAsync(ct);
+        var userId = await _userRepository.FindUnconfirmedActiveIdByEmailAsync(normalized, ct);
 
         if (userId is { } id)
         {
@@ -83,12 +91,7 @@ public sealed class EmailVerificationService : IEmailVerificationService
         if (string.IsNullOrEmpty(rawToken) || rawToken.Length > 200)
             return InvalidToken;
 
-        var tokenHash = Hash(rawToken);
-
-        var token = await _db.EmailVerificationTokens
-            .AsNoTracking()
-            .Include(t => t.User)
-            .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
+        var token = await _tokenRepository.FindByHashWithUserAsync(OpaqueToken.Hash(rawToken), ct);
 
         var now = Now();
 
@@ -99,23 +102,8 @@ public sealed class EmailVerificationService : IEmailVerificationService
             token.NormalizedEmail != token.User.NormalizedEmail) // the address changed after the token was issued
             return InvalidToken;
 
-        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
-
-        // Atomic: if the link is opened twice at the same moment, only one request gets the token.
-        var claimed = await _db.EmailVerificationTokens
-            .Where(t => t.Id == token.Id && t.UsedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, (DateTime?)now), ct);
-
-        if (claimed == 0)
+        if (!await _tokenRepository.ConfirmEmailAsync(token.Id, token.UserId, now, ct))
             return InvalidToken;
-
-        await _db.Users
-            .Where(u => u.Id == token.UserId)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(u => u.EmailConfirmed, true)
-                .SetProperty(u => u.UpdatedAt, (DateTime?)now), ct);
-
-        await transaction.CommitAsync(ct);
 
         _logger.LogInformation("Email confirmed for user {UserId}.", token.UserId);
 
@@ -124,7 +112,7 @@ public sealed class EmailVerificationService : IEmailVerificationService
 
     private async Task<IamResult> SendCoreAsync(Guid userId, bool enforceCooldown, CancellationToken ct)
     {
-        var user = await _db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId, ct);
+        var user = await _userRepository.FindByIdAsync(userId, ct);
 
         if (user is null || !user.IsActive)
             return IamErrors.NotFound("User");
@@ -134,43 +122,28 @@ public sealed class EmailVerificationService : IEmailVerificationService
 
         var now = Now();
 
-        if (enforceCooldown)
-        {
-            var cutoff = now.AddSeconds(-_options.ResendCooldownSeconds);
+        if (enforceCooldown &&
+            await _tokenRepository.HasCreatedSinceAsync(userId, now.AddSeconds(-_options.ResendCooldownSeconds), ct))
+            return IamErrors.Validation("A verification email was sent a moment ago. Please wait before asking again.");
 
-            if (await _db.EmailVerificationTokens.AnyAsync(t => t.UserId == userId && t.CreatedAt > cutoff, ct))
-                return IamErrors.Validation("A verification email was sent a moment ago. Please wait before asking again.");
-        }
-
-        // Only the newest link works: earlier unused ones are closed.
-        await _db.EmailVerificationTokens
-            .Where(t => t.UserId == userId && t.UsedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, (DateTime?)now), ct);
-
-        var rawToken = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
+        var rawToken = OpaqueToken.Generate(32);
         var expiresAt = now.AddHours(_options.TokenHours);
 
-        _db.EmailVerificationTokens.Add(new EmailVerificationToken
+        await _tokenRepository.ReplaceOpenTokensAsync(new EmailVerificationToken
         {
             Id = Guid.NewGuid(),
             UserId = userId,
-            TokenHash = Hash(rawToken),
+            TokenHash = OpaqueToken.Hash(rawToken),
             NormalizedEmail = user.NormalizedEmail,
             CreatedAt = now,
             ExpiresAt = expiresAt
-        });
-
-        await _db.SaveChangesAsync(ct);
+        }, now, ct);
 
         await _sender.SendEmailVerificationAsync(
             new EmailVerificationMessage(user.Id, user.Email, user.DisplayName, rawToken, expiresAt), ct);
 
         return IamResult.Success();
     }
-
-    /// <summary>The token is 32 random bytes, so a plain SHA-256 is enough (same reasoning as refresh tokens).</summary>
-    private static string Hash(string rawToken)
-        => Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
 
     private DateTime Now() => _time.GetUtcNow().UtcDateTime;
 }

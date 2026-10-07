@@ -1,9 +1,8 @@
-﻿using System.Security.Cryptography;
-using System.Text.Json;
+﻿using System.Text.Json;
 using CoreKit.IAM.Constants;
 using CoreKit.IAM.Entities;
 using CoreKit.IAM.Interfaces;
-using Microsoft.AspNetCore.WebUtilities;
+using CoreKit.IAM.Security;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
@@ -69,16 +68,11 @@ public sealed class TokenService : ITokenService
 
     public GeneratedRefreshToken CreateRefreshToken()
     {
-        var rawToken = WebEncoders.Base64UrlEncode(RandomNumberGenerator.GetBytes(64));
+        var rawToken = OpaqueToken.Generate(64);
         var expires = _time.GetUtcNow().UtcDateTime.AddDays(_options.RefreshTokenDays);
 
         return new GeneratedRefreshToken(rawToken, HashRefreshToken(rawToken), expires);
     }
 
-    /// <summary>
-    /// A plain SHA-256 is enough here: the token is 64 random bytes, so there is nothing to guess.
-    /// (Passwords are different: humans choose them, so they need a slow, salted hash.)
-    /// </summary>
-    public string HashRefreshToken(string rawToken)
-        => Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(rawToken)));
+    public string HashRefreshToken(string rawToken) => OpaqueToken.Hash(rawToken);
 }

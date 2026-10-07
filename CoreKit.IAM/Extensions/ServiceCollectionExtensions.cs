@@ -1,4 +1,6 @@
-﻿namespace CoreKit.IAM.Extensions;
+﻿using CoreKit.IAM.Repositories;
+
+namespace CoreKit.IAM.Extensions;
 
 public static class ServiceCollectionExtensions
 {
@@ -37,7 +39,7 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Registers all of IAM for a web app: database, services, JWT authentication,
+    /// Registers all of IAM for a web app: database, repositories, services, JWT authentication,
     /// permission-based authorization and rate limiting.
     /// Reads "ConnectionStrings:Iam", "Iam:Jwt" and "Iam:RateLimit" from configuration.
     /// </summary>
@@ -67,18 +69,32 @@ public static class ServiceCollectionExtensions
             .Bind(configuration.GetSection(IamRateLimitOptions.SectionName))
             .Validate(o => o.PermitLimit >= 1 && o.WindowSeconds >= 1, "Iam:RateLimit values must be positive.");
 
+        services.AddOptions<IamEmailVerificationOptions>()
+            .Bind(configuration.GetSection(IamEmailVerificationOptions.SectionName))
+            .Validate(o => o.TokenHours is >= 1 and <= 168 && o.ResendCooldownSeconds >= 0,
+                "Iam:EmailVerification values are out of range.");
+
         services.AddHttpContextAccessor();
+
+        // Persistence: the only code that touches the DbContext.
+        services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IRoleRepository, RoleRepository>();
+        services.AddScoped<IPermissionRepository, PermissionRepository>();
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
+
+        // Focused collaborators.
+        services.AddScoped<IAccessResolver, AccessResolver>();
+        services.AddScoped<IAdministratorGuard, AdministratorGuard>();
+        services.AddScoped<ISessionIssuer, SessionIssuer>();
         services.AddSingleton<ITokenService, TokenService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
+
+        // Business services.
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserService, UserService>();
         services.AddScoped<IRoleService, RoleService>();
         services.AddScoped<IPermissionService, PermissionService>();
-
-        services.AddOptions<IamEmailVerificationOptions>()
-    .Bind(configuration.GetSection(IamEmailVerificationOptions.SectionName))
-    .Validate(o => o.TokenHours is >= 1 and <= 168 && o.ResendCooldownSeconds >= 0,
-        "Iam:EmailVerification values are out of range.");
 
         services.TryAddSingleton<IIamEmailSender, NullIamEmailSender>();
         services.AddScoped<IEmailVerificationService, EmailVerificationService>();

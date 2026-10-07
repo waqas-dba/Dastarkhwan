@@ -2,5 +2,6 @@
   <Folder Name="/CoreKit/">
     <Project Path="CoreKit.IAM.SampleHost/CoreKit.IAM.SampleHost.csproj" Id="b910d96f-6d7b-49f6-b25f-31fd5118aef4" />
     <Project Path="CoreKit.IAM/CoreKit.IAM.csproj" Id="f9e114ad-922a-420a-874a-a53f519e5fde" />
+    <Project Path="CoreKit.Tenant/CoreKit.Tenant.csproj" Id="e0d47be8-fd8d-4032-98ab-e5e8ba6480a3" />
   </Folder>
 </Solution>

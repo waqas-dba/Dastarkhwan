@@ -1,0 +1,20 @@
+﻿global using System.Security.Claims;
+global using Microsoft.AspNetCore.Builder;
+global using Microsoft.AspNetCore.Http;
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.Extensions.Configuration;
+global using Microsoft.Extensions.DependencyInjection;
+global using Microsoft.Extensions.DependencyInjection.Extensions;
+global using Microsoft.Extensions.Logging;
+global using Microsoft.Extensions.Options;
+
+global using CoreKit.Tenant.Abstractions;
+global using CoreKit.Tenant.Common;
+global using CoreKit.Tenant.Constants;
+global using CoreKit.Tenant.Entities;
+global using CoreKit.Tenant.Isolation;
+global using CoreKit.Tenant.Models;
+global using CoreKit.Tenant.Persistence;
+global using CoreKit.Tenant.Resolution;
+global using CoreKit.Tenant.Services;
+global using CoreKit.Tenant.Settings;

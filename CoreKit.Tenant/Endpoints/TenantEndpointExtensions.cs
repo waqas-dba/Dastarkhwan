@@ -139,4 +139,22 @@ public static class TenantEndpointExtensions
     private static void MapMemberRoutes(RouteGroupBuilder members)
     {
         members.MapGet("/", async (Guid tenantId, ITenantMembershipService s, CancellationToken ct) =>
-                (await s.ListMembersAsync(tenantId, ct)).ToHttpResult
+                (await s.ListMembersAsync(tenantId, ct)).ToHttpResult())
+            .RequirePermission(TenantPermissionNames.MembersRead);
+
+        members.MapPost("/", async (
+                Guid tenantId, AddTenantMemberRequest r, ITenantMembershipService s, CancellationToken ct) =>
+            (await s.AddMemberAsync(tenantId, r, ct)).ToHttpResult())
+            .RequirePermission(TenantPermissionNames.MembersManage);
+
+        members.MapDelete("/{userId:guid}", async (
+                Guid tenantId, Guid userId, ITenantMembershipService s, CancellationToken ct) =>
+            (await s.RemoveMemberAsync(tenantId, userId, ct)).ToHttpResult())
+            .RequirePermission(TenantPermissionNames.MembersManage);
+
+        members.MapPut("/{userId:guid}/owner", async (
+                Guid tenantId, Guid userId, SetTenantOwnerRequest r, ITenantMembershipService s, CancellationToken ct) =>
+            (await s.SetOwnerAsync(tenantId, userId, r, ct)).ToHttpResult())
+            .RequirePermission(TenantPermissionNames.MembersManage);
+    }
+}

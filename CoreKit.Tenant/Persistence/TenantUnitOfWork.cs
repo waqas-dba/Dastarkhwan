@@ -1,4 +1,6 @@
-﻿namespace CoreKit.Tenant.Persistence;
+﻿
+
+namespace CoreKit.Tenant.Persistence;
 
 internal enum SaveOutcome
 {

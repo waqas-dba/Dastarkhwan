@@ -1,6 +1,6 @@
 ﻿namespace CoreKit.Tenant.Persistence;
 
-internal interface ITenantMemberRepository
+public interface ITenantMemberRepository
 {
     /// <summary>Read-only.</summary>
     Task<TenantMember?> FindAsync(Guid tenantId, Guid userId, CancellationToken ct = default);
@@ -29,7 +29,7 @@ internal interface ITenantMemberRepository
     void Remove(TenantMember member);
 }
 
-internal sealed class TenantMemberRepository : ITenantMemberRepository
+public sealed class TenantMemberRepository : ITenantMemberRepository
 {
     private readonly TenantDbContext _db;
 

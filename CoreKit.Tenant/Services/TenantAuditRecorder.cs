@@ -1,12 +1,12 @@
 ﻿namespace CoreKit.Tenant.Services;
 
 /// <summary>Stages an audit entry. It is saved together with the change it describes.</summary>
-internal interface ITenantAuditRecorder
+public interface ITenantAuditRecorder
 {
     void Record(Guid tenantId, string action, string? details = null);
 }
 
-internal sealed class TenantAuditRecorder : ITenantAuditRecorder
+public sealed class TenantAuditRecorder : ITenantAuditRecorder
 {
     private const int MaxDetailsLength = 2000;
 

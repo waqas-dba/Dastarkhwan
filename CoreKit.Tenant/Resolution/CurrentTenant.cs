@@ -1,13 +1,13 @@
 ﻿namespace CoreKit.Tenant.Resolution;
 
 /// <summary>Lets the resolution middleware record which tenant a request belongs to.</summary>
-internal interface ITenantContextSetter
+public interface ITenantContextSetter
 {
     void Set(Guid tenantId);
 }
 
 /// <summary>Scoped: one instance per request, so tenants can never leak between requests.</summary>
-internal sealed class CurrentTenant : ICurrentTenant, ITenantContextSetter
+public sealed class CurrentTenant : ICurrentTenant, ITenantContextSetter
 {
     private Guid? _id;
 

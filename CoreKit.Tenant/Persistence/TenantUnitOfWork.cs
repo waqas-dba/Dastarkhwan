@@ -2,7 +2,7 @@
 
 namespace CoreKit.Tenant.Persistence;
 
-internal enum SaveOutcome
+public enum SaveOutcome
 {
     Saved,
 
@@ -17,12 +17,12 @@ internal enum SaveOutcome
 /// Saves everything staged by the repositories in one transaction, so a change and its audit entry
 /// are stored together or not at all.
 /// </summary>
-internal interface ITenantUnitOfWork
+public interface ITenantUnitOfWork
 {
     Task<SaveOutcome> SaveAsync(CancellationToken ct = default);
 }
 
-internal sealed class TenantUnitOfWork : ITenantUnitOfWork
+public sealed class TenantUnitOfWork : ITenantUnitOfWork
 {
     private readonly TenantDbContext _db;
     private readonly ILogger<TenantUnitOfWork> _logger;
@@ -55,7 +55,7 @@ internal sealed class TenantUnitOfWork : ITenantUnitOfWork
     }
 }
 
-internal static class SaveOutcomeExtensions
+public static class SaveOutcomeExtensions
 {
     /// <summary>Null when the save worked.</summary>
     public static TenantError? ToError(this SaveOutcome outcome) => outcome switch

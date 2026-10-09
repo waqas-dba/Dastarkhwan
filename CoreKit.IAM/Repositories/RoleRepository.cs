@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CoreKit.IAM.Repositories;
 
-internal sealed class RoleRepository : IRoleRepository
+public sealed class RoleRepository : IRoleRepository
 {
     private readonly IamDbContext _db;
 

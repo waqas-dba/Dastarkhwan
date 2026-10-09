@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CoreKit.IAM.Repositories;
 
-internal sealed class PermissionRepository : IPermissionRepository
+public sealed class PermissionRepository : IPermissionRepository
 {
     private readonly IamDbContext _db;
 

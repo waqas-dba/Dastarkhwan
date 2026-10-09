@@ -4,7 +4,7 @@ using System.Text;
 
 namespace CoreKit.IAM.Services;
 
-internal static class RefreshTokenRevocation
+public static class RefreshTokenRevocation
 {
     /// <summary>
     /// Ends every session of a user in one statement. Used after a password change, a deactivation

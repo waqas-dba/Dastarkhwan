@@ -6,7 +6,7 @@ using CoreKit.IAM.Models;
 
 namespace CoreKit.IAM.Services;
 
-internal sealed class SessionIssuer : ISessionIssuer
+public sealed class SessionIssuer : ISessionIssuer
 {
     private readonly IAccessResolver _accessResolver;
     private readonly ITokenService _tokens;

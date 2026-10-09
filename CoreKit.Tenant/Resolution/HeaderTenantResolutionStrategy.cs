@@ -4,7 +4,7 @@
 /// The tenant named in a request header (typically set by a reverse proxy from the host name).
 /// Does nothing unless Tenant:Resolution:TrustHeader is true, because any client can send a header.
 /// </summary>
-internal sealed class HeaderTenantResolutionStrategy : ITenantResolutionStrategy
+public sealed class HeaderTenantResolutionStrategy : ITenantResolutionStrategy
 {
     private readonly TenantResolutionOptions _options;
 

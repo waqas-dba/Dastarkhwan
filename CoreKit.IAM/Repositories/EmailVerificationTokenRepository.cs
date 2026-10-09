@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CoreKit.IAM.Repositories;
 
-internal sealed class EmailVerificationTokenRepository : IEmailVerificationTokenRepository
+public sealed class EmailVerificationTokenRepository : IEmailVerificationTokenRepository
 {
     private readonly IamDbContext _db;
 

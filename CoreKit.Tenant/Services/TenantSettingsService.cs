@@ -2,7 +2,7 @@
 
 namespace CoreKit.Tenant.Services;
 
-internal sealed class TenantSettingsService : ITenantSettingsService
+public sealed class TenantSettingsService : ITenantSettingsService
 {
     private static readonly Regex KeyPattern = new(
         "^[a-z0-9]+([._-][a-z0-9]+)*$", RegexOptions.Compiled | RegexOptions.CultureInvariant);

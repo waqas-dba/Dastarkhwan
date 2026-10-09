@@ -45,7 +45,7 @@ public sealed class IamResult<T> : IamResult
 {
     private readonly T? _value;
 
-    internal IamResult(T? value, IamError? error) : base(error)
+    public IamResult(T? value, IamError? error) : base(error)
     {
         _value = value;
     }

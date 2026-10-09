@@ -5,7 +5,7 @@ using CoreKit.IAM.Normalization;
 namespace CoreKit.IAM.Common;
 
 /// <summary>The one place that knows which role is the protected Administrator role.</summary>
-internal static class AdministratorRole
+public static class AdministratorRole
 {
     public static readonly string NormalizedName = IamNormalizer.NormalizeName(IamRoleNames.Administrator);
 

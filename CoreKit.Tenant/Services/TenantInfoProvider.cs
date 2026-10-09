@@ -2,7 +2,7 @@
 
 namespace CoreKit.Tenant.Services;
 
-internal interface ITenantInfoCache
+public interface ITenantInfoCache
 {
     /// <summary>Forgets what is remembered about a tenant, by id and by each given slug.</summary>
     void Invalidate(Guid id, params string[] slugs);
@@ -13,7 +13,7 @@ internal interface ITenantInfoCache
 /// services forget it the moment a tenant changes. With several servers a change can take up to
 /// Tenant:InfoCacheSeconds to reach the others.
 /// </summary>
-internal sealed class TenantInfoProvider : ITenantInfoProvider, ITenantInfoCache
+public sealed class TenantInfoProvider : ITenantInfoProvider, ITenantInfoCache
 {
     private const string KeyPrefix = "corekit.tenant:";
 

@@ -2,7 +2,7 @@
 
 namespace CoreKit.IAM.Repositories;
 
-internal sealed class UserRepository : IUserRepository
+public sealed class UserRepository : IUserRepository
 {
     private readonly IamDbContext _db;
 

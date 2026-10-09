@@ -1,6 +1,6 @@
 ﻿namespace CoreKit.Tenant.Persistence;
 
-internal interface ITenantSettingRepository
+public interface ITenantSettingRepository
 {
     /// <summary>Read-only, ordered by key.</summary>
     Task<IReadOnlyList<TenantSetting>> ListAsync(Guid tenantId, CancellationToken ct = default);
@@ -22,7 +22,7 @@ internal interface ITenantSettingRepository
     void Remove(TenantSetting setting);
 }
 
-internal sealed class TenantSettingRepository : ITenantSettingRepository
+public sealed class TenantSettingRepository : ITenantSettingRepository
 {
     private readonly TenantDbContext _db;
 

@@ -8,7 +8,7 @@ namespace CoreKit.Tenant.Tests.Support;
 /// the services share one DbContext, and the tests read results back through a separate one.
 /// By default the actor is a platform administrator and no tenant is resolved.
 /// </summary>
-internal sealed class TestEnv : IDisposable
+public sealed class TestEnv : IDisposable
 {
     private readonly SqliteConnection _connection;
     private readonly DbContextOptions<TenantDbContext> _dbOptions;

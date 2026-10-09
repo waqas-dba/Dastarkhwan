@@ -1,6 +1,6 @@
 ﻿namespace CoreKit.Tenant.Services;
 
-internal sealed class TenantPlatformAccess : ITenantPlatformAccess
+public sealed class TenantPlatformAccess : ITenantPlatformAccess
 {
     private readonly ITenantActor _actor;
     private int _grants;

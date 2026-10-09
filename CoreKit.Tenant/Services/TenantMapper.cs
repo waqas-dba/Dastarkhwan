@@ -1,6 +1,6 @@
 ﻿namespace CoreKit.Tenant.Services;
 
-internal static class TenantMapper
+public static class TenantMapper
 {
     public static TenantDto ToDto(TenantEntity tenant) => new()
     {

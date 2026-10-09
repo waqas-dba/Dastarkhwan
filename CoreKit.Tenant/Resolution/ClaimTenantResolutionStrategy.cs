@@ -4,7 +4,7 @@
 /// The tenant a signed-in user belongs to, from the access token IAM issued. It is signed, so a client
 /// cannot change it. Run the middleware after authentication.
 /// </summary>
-internal sealed class ClaimTenantResolutionStrategy : ITenantResolutionStrategy
+public sealed class ClaimTenantResolutionStrategy : ITenantResolutionStrategy
 {
     private readonly TenantResolutionOptions _options;
 

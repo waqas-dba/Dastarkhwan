@@ -5,7 +5,7 @@
 /// have platform access. Anything else is refused, so a missing tenant claim never turns into extra power.
 /// Each method returns an error, or null when the call is allowed.
 /// </summary>
-internal sealed class TenantAccessGuard
+public sealed class TenantAccessGuard
 {
     private readonly ICurrentTenant _currentTenant;
     private readonly ITenantPlatformAccess _platform;

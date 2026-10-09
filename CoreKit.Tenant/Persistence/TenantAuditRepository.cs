@@ -1,6 +1,6 @@
 ﻿namespace CoreKit.Tenant.Persistence;
 
-internal interface ITenantAuditRepository
+public interface ITenantAuditRepository
 {
     void Add(TenantAuditEntry entry);
 
@@ -9,7 +9,7 @@ internal interface ITenantAuditRepository
         Guid tenantId, int page, int pageSize, CancellationToken ct = default);
 }
 
-internal sealed class TenantAuditRepository : ITenantAuditRepository
+public sealed class TenantAuditRepository : ITenantAuditRepository
 {
     private readonly TenantDbContext _db;
 

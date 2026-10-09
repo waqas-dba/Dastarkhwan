@@ -7,7 +7,7 @@ namespace CoreKit.IAM.Services;
 /// What the user may actually do right now: the names of their active roles and the active
 /// permissions of those roles. Inactive roles and permissions grant nothing.
 /// </summary>
-internal sealed class AccessResolver : IAccessResolver
+public sealed class AccessResolver : IAccessResolver
 {
     private readonly IPermissionRepository _permissionRepository;
 

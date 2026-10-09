@@ -1,6 +1,6 @@
 ﻿namespace CoreKit.Tenant.Services;
 
-internal sealed class TenantAuditLog : ITenantAuditLog
+public sealed class TenantAuditLog : ITenantAuditLog
 {
     private readonly ITenantAuditRepository _audit;
     private readonly TenantAccessGuard _guard;

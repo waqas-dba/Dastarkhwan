@@ -56,7 +56,7 @@ public sealed class ThrowingHandler<TEvent> : ITenantEventHandler<TEvent> where 
     public Task HandleAsync(TEvent tenantEvent, CancellationToken ct = default) => throw _exception;
 }
 
-internal static class ResultAssert
+public static class ResultAssert
 {
     public static T Ok<T>(TenantResult<T> result)
     {

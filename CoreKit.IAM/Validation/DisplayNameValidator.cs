@@ -2,7 +2,7 @@
 
 namespace CoreKit.IAM.Validation;
 
-internal static class DisplayNameValidator
+public static class DisplayNameValidator
 {
     public const int MaxLength = 200;
 

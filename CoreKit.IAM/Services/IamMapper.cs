@@ -3,7 +3,7 @@ using CoreKit.IAM.Models;
 
 namespace CoreKit.IAM.Services;
 
-internal static class IamMapper
+public static class IamMapper
 {
     /// <summary>The user must be loaded with UserRoles and each UserRole's Role.</summary>
     public static UserDto ToDto(User user, IReadOnlyCollection<string>? permissions = null) => new()

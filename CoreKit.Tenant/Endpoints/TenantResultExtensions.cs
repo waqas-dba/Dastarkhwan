@@ -12,13 +12,13 @@ public static class TenantResultExtensions
     public static IResult ToHttpResult(this TenantError error)
         => Results.Json(new { code = error.Code, message = error.Message }, statusCode: StatusCodeFor(error.Kind));
 
-    internal static int StatusCodeFor(TenantErrorKind kind) => kind switch
+    public static int StatusCodeFor(TenantErrorKind kind) => kind switch
     {
         TenantErrorKind.Validation => StatusCodes.Status400BadRequest,
         TenantErrorKind.Unauthorized => StatusCodes.Status401Unauthorized,
         TenantErrorKind.Forbidden => StatusCodes.Status403Forbidden,
         TenantErrorKind.NotFound => StatusCodes.Status404NotFound,
         TenantErrorKind.Conflict => StatusCodes.Status409Conflict,
-        _ => StatusCodes.Status500InternalServerError
+        _ => StatusCodes.Status500publicServerError
     };
 }

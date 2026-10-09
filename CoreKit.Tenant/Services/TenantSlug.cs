@@ -8,7 +8,7 @@ namespace CoreKit.Tenant.Services;
 /// One place that decides what a valid slug is. A slug is also a valid DNS label, so it can safely become
 /// part of a sub-domain later.
 /// </summary>
-internal static class TenantSlug
+public static class TenantSlug
 {
     public const int MinLength = 3;
     public const int MaxLength = 63;

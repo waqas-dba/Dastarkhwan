@@ -12,6 +12,9 @@ public sealed class TenantDbContextFactory : IDesignTimeDbContextFactory<TenantD
     {
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Tenant");
 
+
+        //var connectionString = "Host=127.0.0.1;Port=5432;Database=daskhawa;Username=postgres;Password=123";
+
         if (string.IsNullOrWhiteSpace(connectionString))
             throw new InvalidOperationException(
                 "Set the ConnectionStrings__Tenant environment variable before running dotnet ef. " +

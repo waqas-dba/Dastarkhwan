@@ -1,6 +1,6 @@
 ﻿namespace CoreKit.Tenant.Services;
 
-internal sealed class TenantMembershipService : ITenantMembershipService
+public sealed class TenantMembershipService : ITenantMembershipService
 {
     private readonly ITenantRepository _tenants;
     private readonly ITenantMemberRepository _members;

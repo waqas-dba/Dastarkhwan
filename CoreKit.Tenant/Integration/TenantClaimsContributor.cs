@@ -7,7 +7,7 @@ namespace CoreKit.Tenant.Integration;
 /// Adds the user's tenant to the access token IAM issues, so every later request carries it in a signed claim.
 /// A user with several tenants gets their default one. A user with none gets no claim.
 /// </summary>
-internal sealed class TenantClaimsContributor : IAccessTokenClaimsContributor
+public sealed class TenantClaimsContributor : IAccessTokenClaimsContributor
 {
     private readonly ITenantMemberRepository _members;
 

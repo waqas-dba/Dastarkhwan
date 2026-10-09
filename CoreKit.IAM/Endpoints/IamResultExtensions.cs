@@ -18,7 +18,7 @@ public static class IamResultExtensions
             IamErrorKind.Forbidden => StatusCodes.Status403Forbidden,
             IamErrorKind.NotFound => StatusCodes.Status404NotFound,
             IamErrorKind.Conflict => StatusCodes.Status409Conflict,
-            _ => StatusCodes.Status500InternalServerError
+            _ => StatusCodes.Status500publicServerError
         };
 
         return Results.Json(new { code = error.Code, message = error.Message }, statusCode: status);

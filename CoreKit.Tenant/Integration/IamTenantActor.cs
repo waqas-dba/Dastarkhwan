@@ -3,7 +3,7 @@
 namespace CoreKit.Tenant.Integration;
 
 /// <summary>Takes the acting user from IAM. Platform administrators hold the tenants.platform permission.</summary>
-internal sealed class IamTenantActor : ITenantActor
+public sealed class IamTenantActor : ITenantActor
 {
     private readonly ICurrentUserService? _currentUser;
 

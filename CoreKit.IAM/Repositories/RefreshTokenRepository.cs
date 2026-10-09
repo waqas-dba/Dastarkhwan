@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace CoreKit.IAM.Repositories;
 
-internal sealed class RefreshTokenRepository : IRefreshTokenRepository
+public sealed class RefreshTokenRepository : IRefreshTokenRepository
 {
     private readonly IamDbContext _db;
 

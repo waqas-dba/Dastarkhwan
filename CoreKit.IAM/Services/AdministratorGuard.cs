@@ -3,7 +3,7 @@ using CoreKit.IAM.Interfaces;
 
 namespace CoreKit.IAM.Services;
 
-internal sealed class AdministratorGuard : IAdministratorGuard
+public sealed class AdministratorGuard : IAdministratorGuard
 {
     private readonly IUserRepository _userRepository;
 

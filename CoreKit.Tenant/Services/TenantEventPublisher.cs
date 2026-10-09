@@ -1,11 +1,11 @@
 ﻿namespace CoreKit.Tenant.Services;
 
-internal interface ITenantEventPublisher
+public interface ITenantEventPublisher
 {
     Task PublishAsync<TEvent>(TEvent tenantEvent, CancellationToken ct = default) where TEvent : ITenantEvent;
 }
 
-internal sealed class TenantEventPublisher : ITenantEventPublisher
+public sealed class TenantEventPublisher : ITenantEventPublisher
 {
     private readonly IServiceProvider _services;
     private readonly ILogger<TenantEventPublisher> _logger;

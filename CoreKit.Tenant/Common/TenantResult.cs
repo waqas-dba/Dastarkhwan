@@ -39,7 +39,7 @@ public sealed class TenantResult<T> : TenantResult
 {
     private readonly T? _value;
 
-    internal TenantResult(T? value, TenantError? error) : base(error)
+    public TenantResult(T? value, TenantError? error) : base(error)
     {
         _value = value;
     }

@@ -2,7 +2,7 @@
 
 namespace CoreKit.IAM.Validation;
 
-internal static class RoleInputValidator
+public static class RoleInputValidator
 {
     public const int MaxNameLength = 100;
     public const int MaxDescriptionLength = 500;

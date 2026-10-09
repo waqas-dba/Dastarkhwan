@@ -8,7 +8,7 @@ namespace CoreKit.Tenant.Resolution;
 /// strategy that found one must agree. Requests that identify no tenant continue without one
 /// (use RequireTenant() on routes that need a tenant).
 /// </summary>
-internal sealed class TenantResolutionMiddleware
+public sealed class TenantResolutionMiddleware
 {
     private readonly RequestDelegate _next;
 

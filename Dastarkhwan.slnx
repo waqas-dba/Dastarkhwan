@@ -4,4 +4,5 @@
     <Project Path="CoreKit.IAM/CoreKit.IAM.csproj" Id="f9e114ad-922a-420a-874a-a53f519e5fde" />
     <Project Path="CoreKit.Tenant/CoreKit.Tenant.csproj" Id="e0d47be8-fd8d-4032-98ab-e5e8ba6480a3" />
   </Folder>
+  <Project Path="CoreKit.Tenant.Tests/CoreKit.Tenant.Tests.csproj" />
 </Solution>

@@ -103,7 +103,7 @@ public sealed class TenantAuditLogTests : IDisposable
     }
 }
 
-internal static class TestEnvExtensions
+public static class TestEnvExtensions
 {
     public static TenantService NewScopeService(this TestEnv env) => env.CreateTenantService();
 }

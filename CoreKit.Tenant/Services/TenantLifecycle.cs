@@ -1,7 +1,7 @@
 ﻿namespace CoreKit.Tenant.Services;
 
 /// <summary>The only place that knows which status changes are allowed.</summary>
-internal static class TenantLifecycle
+public static class TenantLifecycle
 {
     public static bool CanTransition(TenantStatus from, TenantStatus to) => (from, to) switch
     {

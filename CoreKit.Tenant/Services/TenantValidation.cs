@@ -1,6 +1,6 @@
 ﻿namespace CoreKit.Tenant.Services;
 
-internal static class TenantValidation
+public static class TenantValidation
 {
     public const int MaxNameLength = 200;
     public const int MaxReasonLength = 500;

@@ -293,7 +293,11 @@ public sealed class TenantService : ITenantService
 
         var from = tenant.Status;
 
-        if (!TenantLifecycle.CanTransition(from, target) || (requireArchived && from != TenantStatus.Archived))
+        var restoring = requireArchived;
+
+        if (!TenantLifecycle.CanTransition(from, target)
+            || (restoring && from != TenantStatus.Archived)
+            || (!restoring && from == TenantStatus.Archived))
             return TenantErrors.InvalidTransition(from, target);
 
         var now = Now();

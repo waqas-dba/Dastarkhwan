@@ -1,7 +1,7 @@
 ﻿namespace CoreKit.IAM.Endpoints;
 
 /// <summary>The one place that turns an IamError into an HTTP status code.</summary>
-public static class IamResultExtensions
+internal static class IamResultExtensions
 {
     public static IResult ToHttpResult(this IamResult result, Func<IResult>? onSuccess = null)
         => result.IsSuccess ? (onSuccess?.Invoke() ?? Results.NoContent()) : Problem(result.Error!);
@@ -18,7 +18,7 @@ public static class IamResultExtensions
             IamErrorKind.Forbidden => StatusCodes.Status403Forbidden,
             IamErrorKind.NotFound => StatusCodes.Status404NotFound,
             IamErrorKind.Conflict => StatusCodes.Status409Conflict,
-            _ => StatusCodes.Status500publicServerError
+            _ => StatusCodes.Status500InternalServerError
         };
 
         return Results.Json(new { code = error.Code, message = error.Message }, statusCode: status);

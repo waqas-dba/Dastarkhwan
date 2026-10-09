@@ -252,11 +252,16 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
         var tenant = _env.AddTenant();
         Assert.True((await RunAsync(Request(claim: tenant.Id))).NextCalled);
 
-        await _env.CreateTenantService().SuspendAsync(tenant.Id, new ChangeTenantStatusRequest());
+        // The platform administrator acts in a request of their own, where no tenant is resolved.
+        using (_env.CurrentTenant.Change(null))
+            ResultAssert.Ok(await _env.CreateTenantService()
+                .SuspendAsync(tenant.Id, new ChangeTenantStatusRequest()));
 
+        // The tenant's next request starts fresh too.
         using var fresh = _env.CurrentTenant.Change(null);
         var run = await RunAsync(Request(claim: tenant.Id));
 
         Assert.False(run.NextCalled);
+        Assert.Contains("tenant.suspended", run.Body);
     }
 }

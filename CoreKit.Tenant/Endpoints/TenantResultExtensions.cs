@@ -19,6 +19,6 @@ public static class TenantResultExtensions
         TenantErrorKind.Forbidden => StatusCodes.Status403Forbidden,
         TenantErrorKind.NotFound => StatusCodes.Status404NotFound,
         TenantErrorKind.Conflict => StatusCodes.Status409Conflict,
-        _ => StatusCodes.Status500publicServerError
+        _ => StatusCodes.Status500InternalServerError
     };
 }

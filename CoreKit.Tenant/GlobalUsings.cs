@@ -18,3 +18,4 @@ global using CoreKit.Tenant.Persistence;
 global using CoreKit.Tenant.Resolution;
 global using CoreKit.Tenant.Services;
 global using CoreKit.Tenant.Settings;
+global using CoreKit.SharedKernel;

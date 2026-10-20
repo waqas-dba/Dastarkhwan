@@ -1,4 +1,5 @@
 ﻿global using System.Security.Claims;
+global using CoreKit.SharedKernel;
 global using CoreKit.Tenant.Abstractions;
 global using CoreKit.Tenant.Common;
 global using CoreKit.Tenant.Constants;

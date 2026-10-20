@@ -89,6 +89,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISessionIssuer, SessionIssuer>();
         services.AddSingleton<ITokenService, TokenService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
+        services.AddScoped<CoreKit.SharedKernel.ICurrentUser>(sp => sp.GetRequiredService<ICurrentUserService>());   // new: the kernel's view of the same user
 
         // Business services.
         services.AddScoped<IAuthService, AuthService>();

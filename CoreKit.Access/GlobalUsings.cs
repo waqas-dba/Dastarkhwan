@@ -1,0 +1,20 @@
+﻿global using System.Security.Claims;
+global using Microsoft.AspNetCore.Builder;
+global using Microsoft.AspNetCore.Http;
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.Extensions.Configuration;
+global using Microsoft.Extensions.DependencyInjection;
+global using Microsoft.Extensions.DependencyInjection.Extensions;
+global using Microsoft.Extensions.Logging;
+global using Microsoft.Extensions.Options;
+
+global using CoreKit.Access.Abstractions;
+global using CoreKit.Access.Catalog;
+global using CoreKit.Access.Common;
+global using CoreKit.Access.Constants;
+global using CoreKit.Access.Entities;
+global using CoreKit.Access.Models;
+global using CoreKit.Access.Persistence;
+global using CoreKit.Access.Services;
+global using CoreKit.Access.Settings;
+global using CoreKit.SharedKernel;

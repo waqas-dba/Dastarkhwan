@@ -1,8 +1,8 @@
-﻿namespace CoreKit.Tenant.Abstractions;
+﻿namespace CoreKit.SharedKernel;
 
 /// <summary>
-/// The tenant of the current request or operation. Application code reads this and never has to
-/// know how the tenant was found.
+/// The tenant of the current request or operation. Any module reads this and never has to know
+/// how the tenant was found. The Tenant module provides it.
 /// </summary>
 public interface ICurrentTenant
 {
@@ -19,4 +19,13 @@ public interface ICurrentTenant
     /// For background jobs, seeders and tests.
     /// </summary>
     IDisposable Change(Guid? tenantId);
+}
+
+/// <summary>A tenant was required but none was resolved.</summary>
+public sealed class TenantNotResolvedException : InvalidOperationException
+{
+    public TenantNotResolvedException()
+        : base("No tenant has been resolved for this operation.")
+    {
+    }
 }

@@ -6,6 +6,7 @@ using CoreKit.IAM.Interfaces;
 using CoreKit.IAM.Persistence;
 using CoreKit.IAM.SampleHost;
 using CoreKit.IAM.Seeding;
+using CoreKit.SharedKernel;
 using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Endpoints;
 using CoreKit.Tenant.Extensions;

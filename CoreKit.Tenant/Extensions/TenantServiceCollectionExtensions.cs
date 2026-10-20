@@ -76,6 +76,7 @@ public static class TenantServiceCollectionExtensions
         services.AddScoped<ITenantSettingsService, TenantSettingsService>();
         services.AddScoped<ITenantMembershipService, TenantMembershipService>();
         services.AddScoped<ITenantAuditLog, TenantAuditLog>();
+        services.AddScoped<ITenantMembershipReader, TenantMembershipReader>();   // new: for other modules, through the shared kernel
 
         // Resolution strategies. Other modules add theirs the same way.
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITenantResolutionStrategy, ClaimTenantResolutionStrategy>());

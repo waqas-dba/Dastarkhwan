@@ -17,7 +17,7 @@ public static class AccessEndpointFilterExtensions
             if (services.GetRequiredService<IAccessScopeContext>().Current is null)
                 return AccessErrors.ScopeRequired.ToHttpResult();
 
-            if (services.GetRequiredService<IAccessActor>().UserId is null)
+            if (services.GetRequiredService<ICurrentUser>().UserId is null)
                 return AccessErrors.NotAuthenticated.ToHttpResult();
 
             var allowed = await services.GetRequiredService<IAccessService>()

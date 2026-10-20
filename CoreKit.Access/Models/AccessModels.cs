@@ -51,3 +51,29 @@ public sealed class SetAccessUserRolesRequest
 {
     public List<Guid> RoleIds { get; set; } = new();
 }
+
+public sealed class AccessAuditEntryDto
+{
+    public Guid Id { get; set; }
+
+    public string Action { get; set; } = null!;
+
+    public Guid? ActorUserId { get; set; }
+
+    public string? Details { get; set; }
+
+    public DateTime OccurredAt { get; set; }
+}
+
+public sealed class AccessPagedResult<T>
+{
+    public IReadOnlyList<T> Items { get; init; } = Array.Empty<T>();
+
+    public int Page { get; init; }
+
+    public int PageSize { get; init; }
+
+    public int TotalCount { get; init; }
+
+    public int TotalPages => PageSize <= 0 ? 0 : (int)Math.Ceiling(TotalCount / (double)PageSize);
+}

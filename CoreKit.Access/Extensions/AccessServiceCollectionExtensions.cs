@@ -7,9 +7,9 @@ public static class AccessServiceCollectionExtensions
     public const string ConnectionStringName = "Access";
 
     /// <summary>
-    /// Registers Access: database, repositories, services and defaults for the three ports. On its own it
-    /// grants nothing, because nobody is a member of anything. Add a bridge (for example for Tenant) to give
-    /// it a scope and membership. Reads "ConnectionStrings:Access" and "Access".
+    /// Registers Access: database, repositories, services, and defaults that read the current user, tenant and
+    /// tenant membership through the shared kernel. Without a Tenant module nobody belongs to a scope, so
+    /// nothing is granted. Reads "ConnectionStrings:Access" and "Access".
     /// </summary>
     /// <param name="configureDatabase">
     /// Optional. Replaces the PostgreSQL setup, which is how tests plug in another database.
@@ -63,11 +63,21 @@ public static class AccessServiceCollectionExtensions
         services.AddScoped<IAccessRoleService, AccessRoleService>();
         services.AddScoped<IAccessAssignmentService, AccessAssignmentService>();
         services.AddScoped<IAccessMaintenance, AccessMaintenance>();
+        services.AddScoped<IAccessAuditLog, AccessAuditLog>();
 
-        // Defaults for the ports. A bridge replaces the scope and membership ones.
-        services.TryAddScoped<IAccessActor, ClaimsAccessActor>();
-        services.TryAddScoped<IAccessScopeContext, NoAccessScopeContext>();
-        services.TryAddScoped<IAccessMembership, NoAccessMembership>();
+        // What Access offers other modules, through the shared kernel.
+        services.AddScoped<IPermissionChecker, AccessPermissionChecker>();
+
+        // What Access reads from other modules, through the shared kernel. Each default works with or
+        // without the Tenant and identity modules: a missing one simply means "no scope" or "nobody belongs".
+        services.TryAddScoped<ICurrentUser, ClaimsCurrentUser>();
+        services.TryAddScoped<IAccessScopeContext, TenantAccessScopeContext>();
+        services.TryAddScoped<IAccessMembership, TenantAccessMembership>();
+
+        // React to tenant facts: roles for a new tenant, cleanup when someone leaves or the tenant is deleted.
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IEventHandler<TenantCreated>, TenantCreatedHandler>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IEventHandler<TenantMemberRemoved>, TenantMemberRemovedHandler>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IEventHandler<TenantDeleted>, TenantDeletedHandler>());
 
         return services;
     }

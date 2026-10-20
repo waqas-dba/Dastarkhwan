@@ -7,7 +7,7 @@ internal sealed class AccessService : IAccessService
     private readonly IAccessCache _cache;
     private readonly AccessCatalog _catalog;
     private readonly IAccessScopeContext _scopeContext;
-    private readonly IAccessActor _actor;
+    private readonly ICurrentUser _actor;
 
     public AccessService(
         IAccessMembership membership,
@@ -15,7 +15,7 @@ internal sealed class AccessService : IAccessService
         IAccessCache cache,
         AccessCatalog catalog,
         IAccessScopeContext scopeContext,
-        IAccessActor actor)
+        ICurrentUser actor)
     {
         _membership = membership;
         _assignments = assignments;

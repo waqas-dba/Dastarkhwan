@@ -15,9 +15,10 @@ public sealed class ModuleBoundaryTests
     {
         ["CoreKit.SharedKernel"] = Array.Empty<string>(),
         ["CoreKit.IAM"] = new[] { "CoreKit.SharedKernel" },
+        ["CoreKit.Access"] = new[] { "CoreKit.SharedKernel" },
 
         // Temporary: Tenant still uses IAM's token hook, permission seeds and endpoint permission check.
-        // They move behind the shared kernel when Access provides the permission policies.
+        // They move behind the shared kernel when Access's permission checks replace IAM's.
         ["CoreKit.Tenant"] = new[] { "CoreKit.SharedKernel", "CoreKit.IAM" }
     };
 

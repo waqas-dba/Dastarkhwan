@@ -53,6 +53,9 @@ public static class AccessEndpointExtensions
                 Guid userId, SetAccessUserRolesRequest r, IAccessAssignmentService s, CancellationToken ct) =>
             (await s.SetRolesAsync(userId, r, ct)).ToHttpResult());
 
+        access.MapGet("/audit", async (int? page, int? pageSize, IAccessAuditLog s, CancellationToken ct) =>
+            (await s.ListAsync(page ?? 1, pageSize ?? 50, ct)).ToHttpResult());
+
         return app;
     }
 

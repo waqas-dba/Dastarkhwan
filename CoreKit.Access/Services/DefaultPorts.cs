@@ -1,19 +1,21 @@
 ﻿namespace CoreKit.Access.Services;
 
 /// <summary>
-/// The default actor: the signed-in user's id from a claim (IAM issues "sub"). It works with any JWT
-/// authentication, so Access does not need to know about IAM.
+/// Used only when no identity module registered the kernel's ICurrentUser: the signed-in user's id is read
+/// from a claim (IAM issues "sub"), so Access works with any JWT authentication.
 /// </summary>
-internal sealed class ClaimsAccessActor : IAccessActor
+internal sealed class ClaimsCurrentUser : ICurrentUser
 {
     private readonly IHttpContextAccessor _accessor;
     private readonly string _claimType;
 
-    public ClaimsAccessActor(IHttpContextAccessor accessor, IOptions<AccessOptions> options)
+    public ClaimsCurrentUser(IHttpContextAccessor accessor, IOptions<AccessOptions> options)
     {
         _accessor = accessor;
         _claimType = options.Value.UserIdClaimType;
     }
+
+    public bool IsAuthenticated => UserId is not null;
 
     public Guid? UserId
     {
@@ -29,15 +31,37 @@ internal sealed class ClaimsAccessActor : IAccessActor
     }
 }
 
-/// <summary>Used until a bridge supplies the real scope: there is no scope, so scoped calls are refused.</summary>
-internal sealed class NoAccessScopeContext : IAccessScopeContext
+/// <summary>
+/// The scope of a request is its tenant, read through the shared kernel. Without a tenant module
+/// there is no scope, so scoped calls are refused.
+/// </summary>
+internal sealed class TenantAccessScopeContext : IAccessScopeContext
 {
-    public AccessScope? Current => null;
+    private readonly ICurrentTenant? _tenant;
+
+    public TenantAccessScopeContext(ICurrentTenant? tenant = null) => _tenant = tenant;
+
+    public AccessScope? Current => _tenant?.Id is { } id ? AccessScope.ForTenant(id) : null;
 }
 
-/// <summary>Used until a bridge supplies real membership: nobody belongs anywhere, so nobody is granted anything.</summary>
-internal sealed class NoAccessMembership : IAccessMembership
+/// <summary>
+/// Members of a tenant are the people who can hold its roles, read through the shared kernel.
+/// Without a tenant module nobody belongs anywhere, so nobody is granted anything.
+/// </summary>
+internal sealed class TenantAccessMembership : IAccessMembership
 {
-    public Task<AccessMember?> FindAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
-        => Task.FromResult<AccessMember?>(null);
+    private readonly ITenantMembershipReader? _reader;
+
+    public TenantAccessMembership(ITenantMembershipReader? reader = null) => _reader = reader;
+
+    public async Task<AccessMember?> FindAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
+    {
+        // Other scope types (for example a store) are served by their own membership.
+        if (_reader is null || scope.Type != AccessScope.TenantType)
+            return null;
+
+        var member = await _reader.FindAsync(scope.Id, userId, ct);
+
+        return member is null ? null : new AccessMember(member.IsOwner);
+    }
 }

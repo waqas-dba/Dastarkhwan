@@ -100,23 +100,23 @@ public sealed class TenantClaimsContributorTests : IDisposable
     }
 }
 
-public sealed class IamTenantActorTests
+public sealed class IdentityTenantActorTests
 {
     [Fact]
-    public void WithoutIam_ThereIsNoUserAndNoPlatformAccess()
+    public void WithoutIdentity_ThereIsNoUserAndNoPlatformAccess()
     {
-        var actor = new IamTenantActor();
+        var actor = new IdentityTenantActor();
 
         Assert.Null(actor.UserId);
         Assert.False(actor.IsPlatformAdmin);
     }
 
     [Fact]
-    public void TakesTheUserFromIam()
+    public void TakesTheUserFromIdentity()
     {
         var id = Guid.NewGuid();
 
-        Assert.Equal(id, new IamTenantActor(new FakeCurrentUserService { UserId = id }).UserId);
+        Assert.Equal(id, new IdentityTenantActor(new FakeCurrentUserService { UserId = id }).UserId);
     }
 
     [Fact]
@@ -128,8 +128,8 @@ public sealed class IamTenantActorTests
             Permissions = new[] { TenantPermissionNames.Update, TenantPermissionNames.Read }
         };
 
-        Assert.True(new IamTenantActor(withPermission).IsPlatformAdmin);
-        Assert.False(new IamTenantActor(withOthers).IsPlatformAdmin);
+        Assert.True(new IdentityTenantActor(withPermission).IsPlatformAdmin);
+        Assert.False(new IdentityTenantActor(withOthers).IsPlatformAdmin);
     }
 }
 
@@ -270,7 +270,7 @@ public sealed class TenantDependencyInjectionTests
     }
 
     [Fact]
-    public void RegistersBothResolutionStrategies_AndTheIamClaimsContributor()
+    public void RegistersBothResolutionStrategies_AndTheIdentityClaimsContributor()
     {
         using var connection = new SqliteConnection("DataSource=:memory:");
         connection.Open();

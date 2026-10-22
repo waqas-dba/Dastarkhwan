@@ -23,6 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CoreKit.Identity\CoreKit.Identity.csproj" />
     <ProjectReference Include="..\CoreKit.Tenant\CoreKit.Tenant.csproj" />
   </ItemGroup>
 

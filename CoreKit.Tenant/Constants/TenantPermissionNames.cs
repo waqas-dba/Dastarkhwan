@@ -3,7 +3,7 @@
 public sealed record TenantPermissionDefinition(string Name, string Description);
 
 /// <summary>
-/// Permission names for tenant management. IAM roles are global, so a tenant-bound user can only ever
+/// Permission names for tenant management. Identity roles are global, so a tenant-bound user can only ever
 /// act on their own tenant (the service layer enforces that), and cross-tenant work needs <see cref="Platform"/>.
 /// </summary>
 public static class TenantPermissionNames

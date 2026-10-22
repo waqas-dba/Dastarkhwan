@@ -227,7 +227,7 @@ public sealed class TenantPermissionTests
     }
 
     [Fact]
-    public void IamSeeds_MirrorTheDefinitions()
+    public void IdentitySeeds_MirrorTheDefinitions()
     {
         var seeds = CoreKit.Tenant.Integration.TenantPermissionSeeds.All;
 

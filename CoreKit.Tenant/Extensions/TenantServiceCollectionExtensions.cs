@@ -9,8 +9,8 @@ public static class TenantServiceCollectionExtensions
 
     /// <summary>
     /// Registers everything Tenant needs: database, repositories, services, tenant resolution and the
-    /// IAM integration (a tenant claim in the access token). Reads "ConnectionStrings:Tenant" and "Tenant".
-    /// Call after AddIam.
+    /// Identity integration (a tenant claim in the access token). Reads "ConnectionStrings:Tenant" and "Tenant".
+    /// Call after AddIdentity.
     /// </summary>
     /// <param name="configureDatabase">
     /// Optional. Replaces the PostgreSQL setup, which is how tests plug in another database.
@@ -59,8 +59,8 @@ public static class TenantServiceCollectionExtensions
         services.AddScoped<ICurrentTenant>(sp => sp.GetRequiredService<CurrentTenant>());
         services.AddScoped<ITenantContextSetter>(sp => sp.GetRequiredService<CurrentTenant>());
 
-        // Who is acting, and the tenant boundary. TryAdd: a host without IAM can register its own actor first.
-        services.TryAddScoped<ITenantActor, IamTenantActor>();
+        // Who is acting, and the tenant boundary. TryAdd: a host without Identity can register its own actor first.
+        services.TryAddScoped<ITenantActor, IdentityTenantActor>();
         services.AddScoped<ITenantPlatformAccess, TenantPlatformAccess>();
         services.AddScoped<TenantAccessGuard>();
 
@@ -82,7 +82,7 @@ public static class TenantServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITenantResolutionStrategy, ClaimTenantResolutionStrategy>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITenantResolutionStrategy, HeaderTenantResolutionStrategy>());
 
-        // IAM puts the tenant claim in every access token it issues.
+        // Identity puts the tenant claim in every access token it issues.
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IAccessTokenClaimsContributor, TenantClaimsContributor>());
 
         return services;

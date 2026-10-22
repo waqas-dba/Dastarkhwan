@@ -2,7 +2,7 @@
 
 /// <summary>
 /// Used only when no identity module registered the kernel's ICurrentUser: the signed-in user's id is read
-/// from a claim (IAM issues "sub"), so Access works with any JWT authentication.
+/// from a claim (Identity issues "sub"), so Access works with any JWT authentication.
 /// </summary>
 internal sealed class ClaimsCurrentUser : ICurrentUser
 {

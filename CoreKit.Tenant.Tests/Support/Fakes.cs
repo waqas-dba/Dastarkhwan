@@ -20,7 +20,7 @@ public sealed class FakeTenantActor : ITenantActor
     public bool IsPlatformAdmin { get; set; }
 }
 
-/// <summary>Stands in for IAM's current user. If your ICurrentUserService has other members, add them here.</summary>
+/// <summary>Stands in for Identity's current user. If your ICurrentUserService has other members, add them here.</summary>
 public sealed class FakeCurrentUserService : ICurrentUserService
 {
     public Guid? UserId { get; set; }

@@ -1,7 +1,7 @@
 ﻿namespace CoreKit.Tenant.Resolution;
 
 /// <summary>
-/// The tenant a signed-in user belongs to, from the access token IAM issued. It is signed, so a client
+/// The tenant a signed-in user belongs to, from the access token Identity issued. It is signed, so a client
 /// cannot change it. Run the middleware after authentication.
 /// </summary>
 public sealed class ClaimTenantResolutionStrategy : ITenantResolutionStrategy

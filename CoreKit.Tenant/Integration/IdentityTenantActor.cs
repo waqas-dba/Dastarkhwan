@@ -1,0 +1,16 @@
+﻿using CoreKit.Identity.Services;
+
+namespace CoreKit.Tenant.Integration;
+
+/// <summary>Takes the acting user from Identity. Platform administrators hold the tenants.platform permission.</summary>
+public sealed class IdentityTenantActor : ITenantActor
+{
+    private readonly ICurrentUserService? _currentUser;
+
+    public IdentityTenantActor(ICurrentUserService? currentUser = null) => _currentUser = currentUser;
+
+    public Guid? UserId => _currentUser?.UserId;
+
+    public bool IsPlatformAdmin
+        => _currentUser?.Permissions.Contains(TenantPermissionNames.Platform) == true;
+}

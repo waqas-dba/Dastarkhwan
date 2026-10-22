@@ -6,7 +6,7 @@
 /// </summary>
 public static class TenantDbContextConfigurator
 {
-    /// <summary>Tenant keeps its own migration history, so it never mixes with IAM's or another module's.</summary>
+    /// <summary>Tenant keeps its own migration history, so it never mixes with Identity    's or another module's.</summary>
     public const string MigrationsHistoryTable = "__TenantMigrationsHistory";
 
     public static DbContextOptionsBuilder Configure(DbContextOptionsBuilder options, string connectionString)

@@ -15,6 +15,6 @@ public sealed class AccessOptions
     /// </summary>
     public int CacheSeconds { get; set; } = 30;
 
-    /// <summary>The claim that holds the user id. IAM issues it as "sub".</summary>
+    /// <summary>The claim that holds the user id. Identity issues it as "sub".</summary>
     public string UserIdClaimType { get; set; } = "sub";
 }

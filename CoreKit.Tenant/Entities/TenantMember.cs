@@ -1,8 +1,8 @@
 ﻿namespace CoreKit.Tenant.Entities;
 
 /// <summary>
-/// Links a user to a tenant. UserId points at an IAM user but has no foreign key,
-/// so the tenant database and the IAM database stay independent.
+/// Links a user to a tenant. UserId points at an Identity user but has no foreign key,
+/// so the tenant database and the Identity database stay independent.
 /// </summary>
 public sealed class TenantMember
 {

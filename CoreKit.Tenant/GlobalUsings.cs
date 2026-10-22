@@ -19,3 +19,5 @@ global using CoreKit.Tenant.Resolution;
 global using CoreKit.Tenant.Services;
 global using CoreKit.Tenant.Settings;
 global using CoreKit.SharedKernel;
+global using CoreKit.Identity.Entities;
+global using CoreKit.Identity.Hooks;

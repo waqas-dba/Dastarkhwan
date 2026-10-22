@@ -1,6 +1,6 @@
 ﻿using CoreKit.SharedKernel;
 
-namespace CoreKit.IAM.Services;
+namespace CoreKit.Identity.Services;
 
 /// <summary>
 /// Who is making this request? Read from the validated token, so it never touches the database.

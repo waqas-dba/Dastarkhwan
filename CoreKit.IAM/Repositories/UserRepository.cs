@@ -1,6 +1,6 @@
 ﻿
 
-namespace CoreKit.IAM.Repositories;
+namespace CoreKit.Identity.Repositories;
 
 public sealed class UserRepository : IUserRepository
 {

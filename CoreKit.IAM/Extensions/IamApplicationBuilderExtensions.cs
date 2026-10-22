@@ -1,7 +1,7 @@
 ﻿
 using Microsoft.AspNetCore.Builder;
 
-namespace CoreKit.IAM.Extensions;
+namespace CoreKit.Identity.Extensions;
 
 
 

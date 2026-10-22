@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 
-namespace CoreKit.IAM.Seeding;
+namespace CoreKit.Identity.Seeding;
 
 /// <summary>
 /// Safe to run on every startup. It creates what is missing and never removes anything:

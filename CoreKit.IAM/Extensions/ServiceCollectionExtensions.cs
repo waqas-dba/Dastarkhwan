@@ -1,6 +1,6 @@
-﻿using CoreKit.IAM.Repositories;
+﻿using CoreKit.Identity.Repositories;
 
-namespace CoreKit.IAM.Extensions;
+namespace CoreKit.Identity.Extensions;
 
 public static class ServiceCollectionExtensions
 {

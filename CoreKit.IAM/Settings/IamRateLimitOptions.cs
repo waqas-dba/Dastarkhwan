@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace CoreKit.IAM.Settings;
+namespace CoreKit.Identity.Settings;
 
 public static class IamRateLimiting
 {

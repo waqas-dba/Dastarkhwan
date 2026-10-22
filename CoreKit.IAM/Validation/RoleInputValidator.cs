@@ -1,6 +1,6 @@
-﻿using CoreKit.IAM.Common;
+﻿using CoreKit.Identity.Common;
 
-namespace CoreKit.IAM.Validation;
+namespace CoreKit.Identity.Validation;
 
 public static class RoleInputValidator
 {

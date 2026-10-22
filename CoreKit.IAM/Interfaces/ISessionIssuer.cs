@@ -1,7 +1,7 @@
-﻿using CoreKit.IAM.Entities;
-using CoreKit.IAM.Models;
+﻿using CoreKit.Identity.Entities;
+using CoreKit.Identity.Models;
 
-namespace CoreKit.IAM.Interfaces;
+namespace CoreKit.Identity.Interfaces;
 
 /// <summary>Creates the access token and a new stored refresh token for a user who has just been authenticated.</summary>
 public interface ISessionIssuer

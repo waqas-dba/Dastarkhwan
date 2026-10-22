@@ -1,15 +1,15 @@
-﻿using CoreKit.IAM.Common;
-using CoreKit.IAM.Entities;
-using CoreKit.IAM.Interfaces;
-using CoreKit.IAM.Models;
-using CoreKit.IAM.Normalization;
-using CoreKit.IAM.Security;
-using CoreKit.IAM.Settings;
-using CoreKit.IAM.Validation;
+﻿using CoreKit.Identity.Common;
+using CoreKit.Identity.Entities;
+using CoreKit.Identity.Interfaces;
+using CoreKit.Identity.Models;
+using CoreKit.Identity.Normalization;
+using CoreKit.Identity.Security;
+using CoreKit.Identity.Settings;
+using CoreKit.Identity.Validation;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-namespace CoreKit.IAM.Services;
+namespace CoreKit.Identity.Services;
 
 public sealed class EmailVerificationService : IEmailVerificationService
 {

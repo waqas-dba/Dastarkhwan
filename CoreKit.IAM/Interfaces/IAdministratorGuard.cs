@@ -1,4 +1,4 @@
-﻿namespace CoreKit.IAM.Interfaces;
+﻿namespace CoreKit.Identity.Interfaces;
 
 /// <summary>
 /// Prevents the one mistake that locks everybody out: removing, deactivating or deleting

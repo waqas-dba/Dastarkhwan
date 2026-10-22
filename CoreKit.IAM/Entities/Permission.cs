@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace CoreKit.IAM.Entities;
+namespace CoreKit.Identity.Entities;
 
 public sealed class Permission
 {

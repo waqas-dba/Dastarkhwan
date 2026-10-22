@@ -1,7 +1,7 @@
-﻿using CoreKit.IAM.Models;
+﻿using CoreKit.Identity.Models;
 
 
-namespace CoreKit.IAM.Interfaces;
+namespace CoreKit.Identity.Interfaces;
 
 public interface IUserService
 {

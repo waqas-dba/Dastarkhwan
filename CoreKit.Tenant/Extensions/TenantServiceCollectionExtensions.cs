@@ -1,4 +1,4 @@
-﻿using CoreKit.IAM.Hooks;
+﻿using CoreKit.Identity.Hooks;
 using CoreKit.Tenant.Integration;
 
 namespace CoreKit.Tenant.Extensions;

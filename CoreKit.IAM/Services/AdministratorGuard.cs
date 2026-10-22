@@ -1,7 +1,7 @@
-﻿using CoreKit.IAM.Common;
-using CoreKit.IAM.Interfaces;
+﻿using CoreKit.Identity.Common;
+using CoreKit.Identity.Interfaces;
 
-namespace CoreKit.IAM.Services;
+namespace CoreKit.Identity.Services;
 
 public sealed class AdministratorGuard : IAdministratorGuard
 {

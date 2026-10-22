@@ -1,4 +1,4 @@
-﻿using CoreKit.IAM.Authorization;
+﻿using CoreKit.Identity.Authorization;
 using Microsoft.AspNetCore.Routing;
 
 namespace CoreKit.Tenant.Endpoints;

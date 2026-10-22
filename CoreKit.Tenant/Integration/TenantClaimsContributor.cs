@@ -1,5 +1,5 @@
-﻿using CoreKit.IAM.Entities;
-using CoreKit.IAM.Hooks;
+﻿using CoreKit.Identity.Entities;
+using CoreKit.Identity.Hooks;
 
 namespace CoreKit.Tenant.Integration;
 

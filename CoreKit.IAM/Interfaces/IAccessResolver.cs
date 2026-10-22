@@ -1,6 +1,6 @@
-﻿using CoreKit.IAM.Entities;
+﻿using CoreKit.Identity.Entities;
 
-namespace CoreKit.IAM.Interfaces;
+namespace CoreKit.Identity.Interfaces;
 
 /// <summary>What a user may actually do right now.</summary>
 public sealed record UserAccess(IReadOnlyList<string> Roles, IReadOnlyList<string> Permissions);

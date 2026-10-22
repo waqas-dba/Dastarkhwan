@@ -1,11 +1,11 @@
-﻿using CoreKit.IAM.Common;
-using CoreKit.IAM.Entities;
-using CoreKit.IAM.Interfaces;
-using CoreKit.IAM.Models;
-using CoreKit.IAM.Persistence;
+﻿using CoreKit.Identity.Common;
+using CoreKit.Identity.Entities;
+using CoreKit.Identity.Interfaces;
+using CoreKit.Identity.Models;
+using CoreKit.Identity.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace CoreKit.IAM.Repositories;
+namespace CoreKit.Identity.Repositories;
 
 public sealed class RoleRepository : IRoleRepository
 {

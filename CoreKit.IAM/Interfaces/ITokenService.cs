@@ -1,9 +1,9 @@
-﻿using CoreKit.IAM.Entities;
+﻿using CoreKit.Identity.Entities;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace CoreKit.IAM.Interfaces;
+namespace CoreKit.Identity.Interfaces;
 
 
 public sealed record AccessTokenResult(string Token, DateTime ExpiresAt);

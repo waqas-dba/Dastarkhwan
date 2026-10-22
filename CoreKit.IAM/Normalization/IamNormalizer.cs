@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace CoreKit.IAM.Normalization;
+namespace CoreKit.Identity.Normalization;
 
 /// <summary>
 /// One place that decides what "the same email" or "the same role name" means.

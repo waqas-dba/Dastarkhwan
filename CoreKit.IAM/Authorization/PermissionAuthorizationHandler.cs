@@ -1,10 +1,10 @@
-﻿using CoreKit.IAM.Constants;
+﻿using CoreKit.Identity.Constants;
 using Microsoft.AspNetCore.Authorization;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace CoreKit.IAM.Authorization;
+namespace CoreKit.Identity.Authorization;
 
 
 public sealed class PermissionAuthorizationHandler : AuthorizationHandler<PermissionRequirement>

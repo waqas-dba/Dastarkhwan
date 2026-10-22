@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace CoreKit.IAM.Services;
+namespace CoreKit.Identity.Services;
 
 public static class RefreshTokenRevocation
 {

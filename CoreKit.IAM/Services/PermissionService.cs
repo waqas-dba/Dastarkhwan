@@ -1,8 +1,8 @@
-﻿using CoreKit.IAM.Common;
-using CoreKit.IAM.Interfaces;
-using CoreKit.IAM.Models;
+﻿using CoreKit.Identity.Common;
+using CoreKit.Identity.Interfaces;
+using CoreKit.Identity.Models;
 
-namespace CoreKit.IAM.Services;
+namespace CoreKit.Identity.Services;
 
 public sealed class PermissionService : IPermissionService
 {

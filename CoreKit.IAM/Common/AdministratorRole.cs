@@ -1,8 +1,8 @@
-﻿using CoreKit.IAM.Constants;
-using CoreKit.IAM.Entities;
-using CoreKit.IAM.Normalization;
+﻿using CoreKit.Identity.Constants;
+using CoreKit.Identity.Entities;
+using CoreKit.Identity.Normalization;
 
-namespace CoreKit.IAM.Common;
+namespace CoreKit.Identity.Common;
 
 /// <summary>The one place that knows which role is the protected Administrator role.</summary>
 public static class AdministratorRole

@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace CoreKit.IAM.Models;
+namespace CoreKit.Identity.Models;
 
 
 /// <summary>What the API returns about a user. It has no password hash, by design.</summary>

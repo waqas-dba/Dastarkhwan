@@ -1,4 +1,4 @@
-﻿using CoreKit.IAM.Entities;
+﻿using CoreKit.Identity.Entities;
 using CoreKit.Tenant.Extensions;
 using CoreKit.Tenant.Integration;
 using Microsoft.Extensions.Configuration;
@@ -278,7 +278,7 @@ public sealed class TenantDependencyInjectionTests
         using var scope = provider.CreateScope();
 
         var strategies = scope.ServiceProvider.GetServices<ITenantResolutionStrategy>().ToList();
-        var contributors = scope.ServiceProvider.GetServices<CoreKit.IAM.Hooks.IAccessTokenClaimsContributor>().ToList();
+        var contributors = scope.ServiceProvider.GetServices<CoreKit.Identity.Hooks.IAccessTokenClaimsContributor>().ToList();
 
         Assert.Equal(2, strategies.Count);
         Assert.Contains(contributors, c => c is TenantClaimsContributor);

@@ -1,11 +1,11 @@
-﻿using CoreKit.IAM.Entities;
+﻿using CoreKit.Identity.Entities;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Reflection.Emit;
 using System.Text;
 
-namespace CoreKit.IAM.Persistence;
+namespace CoreKit.Identity.Persistence;
 
 public sealed class IamDbContext : DbContext
 {

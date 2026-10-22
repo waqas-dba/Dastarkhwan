@@ -1,7 +1,7 @@
-﻿using CoreKit.IAM.Entities;
-using CoreKit.IAM.Interfaces;
+﻿using CoreKit.Identity.Entities;
+using CoreKit.Identity.Interfaces;
 
-namespace CoreKit.IAM.Services;
+namespace CoreKit.Identity.Services;
 
 /// <summary>
 /// What the user may actually do right now: the names of their active roles and the active

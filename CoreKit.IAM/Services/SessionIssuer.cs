@@ -1,10 +1,10 @@
 ﻿using System.Security.Claims;
-using CoreKit.IAM.Entities;
-using CoreKit.IAM.Hooks;
-using CoreKit.IAM.Interfaces;
-using CoreKit.IAM.Models;
+using CoreKit.Identity.Entities;
+using CoreKit.Identity.Hooks;
+using CoreKit.Identity.Interfaces;
+using CoreKit.Identity.Models;
 
-namespace CoreKit.IAM.Services;
+namespace CoreKit.Identity.Services;
 
 public sealed class SessionIssuer : ISessionIssuer
 {

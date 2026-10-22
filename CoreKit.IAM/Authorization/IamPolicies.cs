@@ -1,7 +1,7 @@
 ﻿
 using System.Diagnostics.CodeAnalysis;
 
-namespace CoreKit.IAM.Authorization;
+namespace CoreKit.Identity.Authorization;
 
 
 

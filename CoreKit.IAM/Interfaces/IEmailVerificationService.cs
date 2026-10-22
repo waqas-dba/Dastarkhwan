@@ -1,4 +1,4 @@
-﻿namespace CoreKit.IAM.Interfaces;
+﻿namespace CoreKit.Identity.Interfaces;
 
 public interface IEmailVerificationService
 {

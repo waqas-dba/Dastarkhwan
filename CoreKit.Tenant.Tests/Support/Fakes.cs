@@ -1,4 +1,4 @@
-﻿using CoreKit.IAM.Services;
+﻿using CoreKit.Identity.Services;
 
 namespace CoreKit.Tenant.Tests.Support;
 

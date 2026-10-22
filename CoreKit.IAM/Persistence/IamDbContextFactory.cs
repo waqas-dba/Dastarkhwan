@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace CoreKit.IAM.Persistence;
+namespace CoreKit.Identity.Persistence;
 
 /// <summary>
 /// Used only by 'dotnet ef'. The connection string comes from an environment

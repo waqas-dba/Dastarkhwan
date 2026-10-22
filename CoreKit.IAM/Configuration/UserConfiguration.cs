@@ -1,11 +1,11 @@
-﻿using CoreKit.IAM.Entities;
+﻿using CoreKit.Identity.Entities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace CoreKit.IAM.Configuration;
+namespace CoreKit.Identity.Configuration;
 
 
 public sealed class UserConfiguration : IEntityTypeConfiguration<User>

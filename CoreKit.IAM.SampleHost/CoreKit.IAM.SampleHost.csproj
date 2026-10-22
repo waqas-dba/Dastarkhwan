@@ -18,7 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CoreKit.Access\CoreKit.Access.csproj" />
-    <ProjectReference Include="..\CoreKit.IAM\CoreKit.IAM.csproj" />
+    <ProjectReference Include="..\CoreKit.Identity\CoreKit.Identity.csproj" />
     <ProjectReference Include="..\CoreKit.Tenant\CoreKit.Tenant.csproj" />
   </ItemGroup>
 

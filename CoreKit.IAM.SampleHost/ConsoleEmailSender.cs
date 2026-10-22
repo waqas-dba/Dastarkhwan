@@ -1,5 +1,5 @@
 ﻿using System.Collections.Concurrent;
-using CoreKit.IAM.Interfaces;
+using CoreKit.Identity.Interfaces;
 
 /// <summary>DEVELOPMENT ONLY. Remembers the latest verification token per email so tests can read it.</summary>
 public sealed class DevEmailInbox

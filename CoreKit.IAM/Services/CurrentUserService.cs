@@ -1,11 +1,11 @@
-﻿using CoreKit.IAM.Constants;
+﻿using CoreKit.Identity.Constants;
 using Microsoft.AspNetCore.Http;
 using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Text;
 
-namespace CoreKit.IAM.Services;
+namespace CoreKit.Identity.Services;
 
 public sealed class CurrentUserService : ICurrentUserService
 {

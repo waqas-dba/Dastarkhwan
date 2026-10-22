@@ -21,7 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CoreKit.IAM\CoreKit.IAM.csproj" />
+    <ProjectReference Include="..\CoreKit.Identity\CoreKit.Identity.csproj" />
     <ProjectReference Include="..\CoreKit.SharedKernel\CoreKit.SharedKernel.csproj" />
   </ItemGroup>
 

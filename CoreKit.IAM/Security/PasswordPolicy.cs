@@ -1,5 +1,5 @@
 ﻿
-namespace CoreKit.IAM.Security;
+namespace CoreKit.Identity.Security;
 
 /// <summary>
 /// One place that decides what an acceptable password is. Length matters more than special-character

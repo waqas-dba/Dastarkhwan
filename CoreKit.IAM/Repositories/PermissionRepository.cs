@@ -1,9 +1,9 @@
-﻿using CoreKit.IAM.Interfaces;
-using CoreKit.IAM.Models;
-using CoreKit.IAM.Persistence;
+﻿using CoreKit.Identity.Interfaces;
+using CoreKit.Identity.Models;
+using CoreKit.Identity.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace CoreKit.IAM.Repositories;
+namespace CoreKit.Identity.Repositories;
 
 public sealed class PermissionRepository : IPermissionRepository
 {

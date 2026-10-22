@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Routing;
 
-namespace CoreKit.IAM.Endpoints;
+namespace CoreKit.Identity.Endpoints;
 
 public static class IamEndpointExtensions
 {

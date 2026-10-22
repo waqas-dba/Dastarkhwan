@@ -2,7 +2,7 @@
 using System.Text;
 using Microsoft.AspNetCore.WebUtilities;
 
-namespace CoreKit.IAM.Security;
+namespace CoreKit.Identity.Security;
 
 /// <summary>
 /// Random, single-use tokens (refresh tokens, email verification links).

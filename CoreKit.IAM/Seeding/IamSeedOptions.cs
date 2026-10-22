@@ -1,4 +1,4 @@
-﻿namespace CoreKit.IAM.Seeding;
+﻿namespace CoreKit.Identity.Seeding;
 
 /// <summary>
 /// The first administrator. Keep AdminPassword out of source control

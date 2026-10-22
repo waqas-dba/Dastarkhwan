@@ -1,7 +1,7 @@
 ﻿
 using Microsoft.AspNetCore.Authorization;
 
-namespace CoreKit.IAM.Authorization;
+namespace CoreKit.Identity.Authorization;
 
 
 

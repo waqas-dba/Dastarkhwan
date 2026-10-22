@@ -1,6 +1,6 @@
-﻿using CoreKit.IAM.Models;
+﻿using CoreKit.Identity.Models;
 
-namespace CoreKit.IAM.Interfaces;
+namespace CoreKit.Identity.Interfaces;
 
 /// <summary>
 /// Read-only on purpose. Permissions are created by the seeder or by each module's own setup,

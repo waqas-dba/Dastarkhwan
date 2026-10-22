@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace CoreKit.IAM.Migrations
+namespace CoreKit.Identity.Migrations
 {
     /// <inheritdoc />
     public partial class add_email_verification : Migration

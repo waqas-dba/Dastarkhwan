@@ -1,11 +1,11 @@
-﻿using CoreKit.IAM.Entities;
+﻿using CoreKit.Identity.Entities;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace CoreKit.IAM.Configuration;
+namespace CoreKit.Identity.Configuration;
 
 public sealed class PermissionConfiguration : IEntityTypeConfiguration<Permission>
 {

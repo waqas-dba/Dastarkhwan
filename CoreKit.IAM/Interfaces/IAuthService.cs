@@ -1,8 +1,8 @@
 ﻿
-using CoreKit.IAM.Models;
-using CoreKit.IAM.Common;
+using CoreKit.Identity.Models;
+using CoreKit.Identity.Common;
 
-namespace CoreKit.IAM.Interfaces;
+namespace CoreKit.Identity.Interfaces;
 
 public interface IAuthService
 {

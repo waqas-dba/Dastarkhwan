@@ -1,13 +1,13 @@
 ﻿using System.Text.Json;
-using CoreKit.IAM.Constants;
-using CoreKit.IAM.Entities;
-using CoreKit.IAM.Interfaces;
-using CoreKit.IAM.Security;
+using CoreKit.Identity.Constants;
+using CoreKit.Identity.Entities;
+using CoreKit.Identity.Interfaces;
+using CoreKit.Identity.Security;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
-namespace CoreKit.IAM.Services;
+namespace CoreKit.Identity.Services;
 
 public sealed class TokenService : ITokenService
 {

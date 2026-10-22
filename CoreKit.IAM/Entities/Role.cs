@@ -1,4 +1,4 @@
-﻿namespace CoreKit.IAM.Entities;
+﻿namespace CoreKit.Identity.Entities;
 
 public sealed class Role
 {

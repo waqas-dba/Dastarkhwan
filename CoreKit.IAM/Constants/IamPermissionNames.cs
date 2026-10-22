@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace CoreKit.IAM.Constants;
+namespace CoreKit.Identity.Constants;
 
 public sealed record PermissionSeed(string Name, string Description);
 

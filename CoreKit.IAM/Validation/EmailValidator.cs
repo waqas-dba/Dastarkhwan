@@ -1,6 +1,6 @@
 ﻿using System.Net.Mail;
 
-namespace CoreKit.IAM.Validation;
+namespace CoreKit.Identity.Validation;
 
 public static class EmailValidator
 {

@@ -19,13 +19,13 @@ The same module works for a restaurant SaaS, an e-commerce SaaS, a school SaaS o
 | Tenant data isolation for EF Core | Anything specific to your product |
 | Tenant settings (key/value) | |
 | Tenant members and owners | |
-| Authorization integration with `CoreKit.IAM` | |
+| Authorization integration with `CoreKit.Identity` | |
 | Audit trail and in-process events | |
 
 ## How it fits
 
 ```text
-   Your application  ──►  CoreKit.Tenant  ──►  CoreKit.IAM
+   Your application  ──►  CoreKit.Tenant  ──►  CoreKit.Identity
    (any SaaS)              (this module)        (users, roles, JWT)
 ```
 

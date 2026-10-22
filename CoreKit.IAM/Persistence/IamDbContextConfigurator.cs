@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace CoreKit.IAM.Persistence;
+namespace CoreKit.Identity.Persistence;
 
 /// <summary>
 /// The single place that decides how IAM connects to PostgreSQL. The running app and

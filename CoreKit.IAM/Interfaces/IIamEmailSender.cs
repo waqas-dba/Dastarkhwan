@@ -1,4 +1,4 @@
-﻿namespace CoreKit.IAM.Interfaces;
+﻿namespace CoreKit.Identity.Interfaces;
 
 /// <summary>What the host needs to build and send the verification email.</summary>
 public sealed record EmailVerificationMessage(

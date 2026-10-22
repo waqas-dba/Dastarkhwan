@@ -1,4 +1,4 @@
-﻿namespace CoreKit.IAM.Seeding;
+﻿namespace CoreKit.Identity.Seeding;
 
 public static class SeedingExtensions
 {

@@ -1,4 +1,4 @@
-﻿namespace CoreKit.IAM.Endpoints;
+﻿namespace CoreKit.Identity.Endpoints;
 
 /// <summary>The one place that turns an IamError into an HTTP status code.</summary>
 internal static class IamResultExtensions

@@ -1,5 +1,5 @@
 ﻿
-namespace CoreKit.IAM.Models;
+namespace CoreKit.Identity.Models;
 
 public sealed class PagedResult<T>
 {

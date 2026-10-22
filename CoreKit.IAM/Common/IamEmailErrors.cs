@@ -1,4 +1,4 @@
-﻿namespace CoreKit.IAM.Common;
+﻿namespace CoreKit.Identity.Common;
 
 public static class IamEmailErrors
 {

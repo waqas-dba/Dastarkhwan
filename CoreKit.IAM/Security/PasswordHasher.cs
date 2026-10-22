@@ -1,4 +1,4 @@
-﻿namespace CoreKit.IAM.Security;
+﻿namespace CoreKit.Identity.Security;
 
 /// <summary>
 /// Wraps ASP.NET Core's built-in hasher (PBKDF2 with HMAC-SHA512, random salt per hash,

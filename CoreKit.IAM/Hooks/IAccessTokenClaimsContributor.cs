@@ -1,4 +1,4 @@
-﻿namespace CoreKit.IAM.Hooks;
+﻿namespace CoreKit.Identity.Hooks;
 
 /// <summary>
 /// Lets another module add claims to the access token without IAM knowing about it.

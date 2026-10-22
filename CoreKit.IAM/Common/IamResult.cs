@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace CoreKit.IAM.Common;
+namespace CoreKit.Identity.Common;
 
 
 public enum IamErrorKind

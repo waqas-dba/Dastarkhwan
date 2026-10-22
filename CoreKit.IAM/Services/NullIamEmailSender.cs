@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 
-namespace CoreKit.IAM.Services;
+namespace CoreKit.Identity.Services;
 
 /// <summary>Used until the host registers a real sender. It sends nothing and says so in the log.</summary>
 public sealed class NullIamEmailSender : IIamEmailSender

@@ -1,5 +1,5 @@
 ﻿
-namespace CoreKit.IAM.Authorization;
+namespace CoreKit.Identity.Authorization;
 
 
 /// <summary>

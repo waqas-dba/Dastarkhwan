@@ -1,4 +1,4 @@
-﻿namespace CoreKit.IAM.Settings;
+﻿namespace CoreKit.Identity.Settings;
 
 public sealed class JwtOptions
 {

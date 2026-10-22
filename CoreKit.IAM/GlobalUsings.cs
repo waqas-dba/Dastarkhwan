@@ -13,17 +13,17 @@ global using Microsoft.IdentityModel.Tokens;
 global using Microsoft.AspNetCore.Builder;
 
 
-global using CoreKit.IAM.Common;
-global using CoreKit.IAM.Constants;
-global using CoreKit.IAM.Entities;
-global using CoreKit.IAM.Interfaces;
-global using CoreKit.IAM.Models;
-global using CoreKit.IAM.Normalization;
-global using CoreKit.IAM.Persistence;
-global using CoreKit.IAM.Security;
-global using CoreKit.IAM.Services;
-global using CoreKit.IAM.Settings;
-global using CoreKit.IAM.Validation;
+global using CoreKit.Identity.Common;
+global using CoreKit.Identity.Constants;
+global using CoreKit.Identity.Entities;
+global using CoreKit.Identity.Interfaces;
+global using CoreKit.Identity.Models;
+global using CoreKit.Identity.Normalization;
+global using CoreKit.Identity.Persistence;
+global using CoreKit.Identity.Security;
+global using CoreKit.Identity.Services;
+global using CoreKit.Identity.Settings;
+global using CoreKit.Identity.Validation;
 
 global using Microsoft.AspNetCore.WebUtilities;
 global using Microsoft.IdentityModel.JsonWebTokens;
@@ -31,6 +31,6 @@ global using System.Security.Cryptography;
 global using System.Text.Json;
 global using Microsoft.AspNetCore.Identity;
 
-global using CoreKit.IAM.Authorization;
-global using CoreKit.IAM.Hooks;
-global using CoreKit.IAM.Seeding;
+global using CoreKit.Identity.Authorization;
+global using CoreKit.Identity.Hooks;
+global using CoreKit.Identity.Seeding;

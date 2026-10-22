@@ -1,6 +1,6 @@
-﻿using CoreKit.IAM.Entities;
+﻿using CoreKit.Identity.Entities;
 
-namespace CoreKit.IAM.Interfaces;
+namespace CoreKit.Identity.Interfaces;
 
 /// <summary>Persistence for users. Nothing outside the repositories should touch the DbContext.</summary>
 public interface IUserRepository

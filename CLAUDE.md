@@ -67,3 +67,28 @@ If documents conflict, do not silently invent a decision. Explain the conflict a
 3. Security/data/performance considerations.
 4. Risks, assumptions, and manual verification steps.
 5. Suggested next milestone and Git checkpoint/message if appropriate.
+
+## Multi-AI Development Workflow
+
+### Roles
+- ChatGPT: coordinate milestones, clarify requirements, and prepare implementation tasks.
+- Claude Account 1 (Developer): implement one approved task at a time.
+- Claude Account 2 (Reviewer): independently review the proposed changes and report defects or improvements. Do not implement the same task.
+- Additional Claude accounts: perform separate research or specialist reviews only when needed.
+- DeepSeek: provide an independent second opinion when useful.
+- User: approve important decisions, run tests manually, and control Git operations.
+
+### Shared Project Context
+- Provide each AI with the relevant project documentation before assigning work.
+- Treat `CLAUDE.md`, `roadmap.md`, and `docs/` as the shared source of project guidance.
+- Do not assume different accounts share chat history or context.
+- The developer must report changed files, implementation details, unresolved issues, and manual verification steps.
+- Transfer the developer's change summary and diff to the reviewer.
+
+### Change Coordination
+- Only one AI may implement changes in the repository at a time.
+- Reviewers must not edit the same task or overwrite the developer's changes.
+- Do not start another implementation until the current changes are reviewed and reconciled.
+- Keep changes small, focused, and consistent with the existing architecture.
+- Never stage, commit, push, switch branches, or rewrite Git history.
+- The user runs tests manually; AI assistants must not run tests, builds, or migrations unless explicitly authorized.

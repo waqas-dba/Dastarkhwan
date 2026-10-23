@@ -102,3 +102,12 @@ Tell the user which tests changed, how they can run them in their own environmen
 
 ## Git checkpoint
 Never stage or commit. After a coherent, reviewable milestone, you may suggest a manual checkpoint, e.g. `feat(access): enforce store-scoped permissions`. Do not recommend committing incomplete work or unresolved critical security issues.
+
+## Multi-Account Handoff
+
+1. Coordinator defines one task with clear scope and acceptance criteria.
+2. Developer inspects relevant files, briefly plans, and implements the task.
+3. Developer provides a summary, changed-file list, diff, risks, and manual test instructions.
+4. Reviewer independently checks the changes against project requirements and security rules.
+5. Coordinator reconciles review findings and returns necessary fixes to the developer.
+6. User manually verifies the result and decides when to create a Git checkpoint.

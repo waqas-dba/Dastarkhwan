@@ -1,113 +1,214 @@
-# AI Task Workflow — ChatGPT, Claude, DeepSeek
+# AI Task Workflow — ChatGPT and Claude Accounts
 
-## Roles
-| Participant | Responsibility | Avoid |
+## 1. Roles
+| Participant | Responsibility | Must avoid |
 |---|---|---|
-| ChatGPT | Coordinate architecture, plan milestones, define acceptance criteria, review | Repeated redesign of accepted decisions |
-| Claude | Primary implementation owner for one task at a time | Scope expansion, unrelated refactors, unauthorized test runs |
-| DeepSeek | Independent review of a focused diff/contracts | Reimplementing the same feature |
-| IDE assistant | Routine local completion where available | Unapproved broad design changes |
-| User | Product decisions, manual tests, review, Git, acceptance/release | Accepting unverified claims |
+| ChatGPT / coordinator | Clarify goals, define micro-slices and acceptance criteria, reconcile reviews | Repeating broad investigations or reopening accepted decisions without evidence |
+| Claude Account 1 | Primary implementer for one approved slice at a time | Scope expansion, unrelated refactoring, unauthorized commands |
+| Claude Account 2 | Independent read-only reviewer of a focused diff/report | Editing files, reimplementing, or reviewing a different/old baseline |
+| User | Product decisions, manual testing, acceptance, all Git write operations | Treating unverified reports as proof |
 
-Free-tool availability and limits may change. Models do not automatically share chat history; use repository docs as shared context.
+AI accounts do not automatically share chat history, memory, repository access, or files. Supply each account only the task brief, relevant project docs, baseline hash, and relevant diff/files. Do not use multiple accounts to bypass service limits or terms.
 
-## One-owner rule
-One task has one implementation owner. Other assistants review the diff or focused contracts instead of rewriting the same feature. Share relevant requirements and changed files, not the entire repository by default. User resolves conflicts and accepts changes.
+## 2. Mandatory latest-code verification
+Before every task, each account must:
+1. Confirm repository root and relevant document/source paths.
+2. Read current HEAD hash and commit date.
+3. Check staged, unstaged, and untracked files with `git status --short`.
+4. Inspect only relevant files and changes.
+5. State the exact HEAD hash used as baseline.
+6. Stop and ask if the baseline differs from the task brief or relevant uncommitted changes could be affected.
 
-## Workflow
-1. Select the smallest dependency-ready roadmap item.
-2. Read `CLAUDE.md` and only relevant sections/files.
-3. State a short plan and identify blocking decisions.
-4. Implement one coherent change.
-5. Request focused independent review when useful, especially for security-sensitive work.
-6. Add/update tests but do not run them.
-7. Update current-state, decisions, or roadmap only where facts/status changed.
-8. Report changed files, tests not run, risks, and manual verification.
-9. User runs tests, reviews, and decides whether to accept/commit.
+The recorded M0 baseline is `9555b8c` dated 2026-10-23. It is not automatically the latest HEAD. Never rely solely on old chat output or old documentation ZIPs. Do not scan all Git history unless the task specifically requires it.
 
-## Save tokens/credits
-- One measurable outcome per task.
-- Inspect relevant files only; avoid full-repository dumps.
-- Do not repeatedly summarize the same files.
-- One implementer; other models review.
-- Use review on risky changes, not every trivial edit.
-- Avoid speculative abstractions and broad refactoring.
-- Ask for concise, factual completion reports.
+## 3. Strict token and context budget
+- One request = one small, measurable outcome.
+- Read only the files required for that outcome.
+- Do not dump the whole repository or entire documents when a relevant section is sufficient.
+- Do not repeat project context, previous findings, or decisions already recorded.
+- Reuse the last verified report; check only for changes since its baseline where relevant.
+- Load only the skill/agent needed for the current task.
+- Do not run broad audits, speculative research, or parallel agent reviews for trivial changes.
+- Do not investigate later milestones or unresolved product questions prematurely.
+- Prefer concise factual outputs, paths, and line references over long prose.
+- Do not create additional documentation unless the user asks or the task requires it.
+- Stop once the acceptance criteria for the current micro-slice are satisfied.
 
-## Implementation task template
+## 4. Micro-slice rules
+A micro-slice should have one primary concern, a small expected file set, and observable acceptance criteria. Split a task further if it changes multiple module boundaries, persistence models, or unrelated behaviors.
+
+For every task:
+1. Verify latest code and working tree.
+2. Inspect relevant files only.
+3. Provide a short plan (goal, expected files, acceptance criteria).
+4. Wait for approval before making changes or running state-changing commands.
+5. Complete only the approved slice.
+6. Report changed files, outcome, tests added/updated but not run, risks, and one next suggested slice.
+7. Stop and wait for the user.
+
+Never proceed automatically to the next slice. Never bundle multiple proposed slices simply to save turns.
+
+## 5. One-owner and two-account coordination
+- Account 1 is the only implementation owner for a given task.
+- Account 2 is read-only. It receives the same task brief, relevant docs, baseline commit, and focused diff/report produced by Account 1.
+- Account 2 independently checks requirements, security, architecture, compatibility, and task acceptance criteria. It does not edit or implement fixes.
+- Only one AI account may modify the working tree at a time. Prefer a read-only copy or a pasted diff for Account 2.
+- If review finds issues, Account 1 addresses only the approved findings in a separate micro-slice.
+- The user decides which review findings to accept. Do not silently combine contradictory recommendations.
+- Both accounts must report their own baseline hash. Do not assume one account's inspection represents the other account's current repository.
+
+## 6. Permission boundaries
+- AI may inspect Git read-only. AI must not stage, commit, push, pull, switch/checkout branches, merge, rebase, reset, cherry-pick, clean, amend, create branches, rewrite history, or change Git configuration/hooks.
+- Do not run tests or builds unless the user explicitly authorizes that specific run. AI may add/update relevant test files; report them as not run.
+- Do not generate/apply migrations or modify a database unless the user explicitly authorizes the specific operation. Creating migration files also requires approval.
+- Do not modify/delete/overwrite existing uncommitted work.
+- Do not expose secret values in logs, reports, or documentation.
+
+## 7. Implementation task template
 ```markdown
-# Task: [short measurable title]
+# Micro-task: [one measurable outcome]
+
+## Baseline
+- Repository HEAD: [hash and date]
+- Working tree: [clean / relevant local changes]
 
 ## Goal
-[One observable outcome.]
+[One observable outcome only.]
 
-## Context
-Read `CLAUDE.md` and only relevant sections of `roadmap.md`,
-`docs/architecture.md`, `docs/current-state.md`, and `docs/decisions.md`.
-Relevant files/contracts: [paths if known].
+## Read
+[Exact paths or relevant sections only.]
 
 ## Scope
-- [Required behavior]
 - Owning module: [module]
+- Expected files: [paths, if known]
 - Acceptance criteria:
-  - [ ] Observable behavior works.
-  - [ ] Security/data-integrity requirements are met.
-  - [ ] Relevant tests are added/updated.
-  - [ ] Documentation/status is updated if needed.
+  - [ ] [Observable result]
+  - [ ] [Security/data/compatibility condition]
+  - [ ] Focused tests added/updated if applicable (not run)
+  - [ ] Relevant documentation/status updated if needed
 
 ## Out of scope
-- Unrelated refactoring/features.
-- Changes to other modules' private persistence.
-- Unapproved architectural decisions.
+- Other roadmap slices or future product decisions.
+- Unrelated refactoring.
+- Other modules' private persistence.
 
 ## Constraints
-- Inspect existing code and reuse sound behavior.
-- Follow `CLAUDE.md` and accepted decisions.
-- Keep change small, secure, maintainable, and performance-conscious.
-- Enforce authorization and tenant/store isolation where applicable.
-- Add/update tests but do not run them.
-- Do not stage, commit, push, change branches, or alter Git history.
-- Ask rather than guess about security, money, persisted data, or module boundaries.
+- Follow CLAUDE.md and accepted decisions.
+- Inspect existing implementation before changing it.
+- Keep the smallest compatible change.
+- Do not run tests/builds/migrations or Git write operations without explicit permission.
 
 ## Completion report
-1. Files changed and why.
-2. Behavior implemented.
-3. Tests added/updated (not run).
-4. Security/data/performance considerations.
-5. Manual verification steps for user.
-6. Risks and unresolved questions.
-7. Next milestone.
-8. Suggested Git checkpoint/message, if appropriate.
+- Baseline hash / working-tree status:
+- Files changed:
+- Outcome:
+- Tests added/updated: [not run unless explicitly authorized]
+- Risks/manual verification:
+- Next suggested micro-slice:
+- Suggested manual Git checkpoint/message (optional):
 ```
 
-## Independent review template
+## 8. Independent review template
 ```markdown
-Review this focused diff against the task acceptance criteria,
-`CLAUDE.md`, `docs/architecture.md`, and accepted decisions.
+Review only this focused change against the task acceptance criteria,
+CLAUDE.md, docs/architecture.md, and accepted decisions.
 
-Do not implement or rewrite. Report actionable findings ordered by severity,
-with file/line references where available.
+Baseline commit: [hash]
 
-Check requirement gaps, edge cases, authentication/authorization, tenant/store
-isolation, fail-closed behavior, validation, transactions, idempotency,
-cross-module coupling, N+1/unbounded queries, compatibility, errors, and tests.
+Do not edit files, implement fixes, run tests/builds, or perform Git write
+operations. Inspect only the supplied diff and relevant surrounding code.
 
-For each finding, describe the concrete failure scenario and smallest fix.
-Separate confirmed defects from questions/speculation. If there are no material
-findings, say so.
+Report only actionable findings, ordered by severity. For each, provide:
+- Severity (Critical / High / Medium / Low)
+- File and line/reference
+- Concrete failure scenario
+- Smallest suggested correction
+
+Check relevant requirement gaps, authn/authz, tenant/store isolation,
+fail-closed behavior, validation, transactions/idempotency, module coupling,
+compatibility, error handling, and test coverage. Separate confirmed defects
+from questions or speculation. If no material findings exist, say so briefly.
 ```
 
-## Manual verification handoff
-Tell the user which tests changed, how they can run them in their own environment, expected results, required safe configuration, and any migration/deployment cautions. Do not claim success before results are available.
+## 9. Git commit message guidance (user performs commits)
+AI must never create a commit. After a slice is complete, reviewed, and the user has run any required manual verification, AI may propose a commit subject and body for the user to use.
 
-## Git checkpoint
-Never stage or commit. After a coherent, reviewable milestone, you may suggest a manual checkpoint, e.g. `feat(access): enforce store-scoped permissions`. Do not recommend committing incomplete work or unresolved critical security issues.
+Use a concise Conventional Commit style:
 
-## Multi-Account Handoff
+`<type>(<scope>): <imperative summary>`
 
-1. Coordinator defines one task with clear scope and acceptance criteria.
-2. Developer inspects relevant files, briefly plans, and implements the task.
-3. Developer provides a summary, changed-file list, diff, risks, and manual test instructions.
-4. Reviewer independently checks the changes against project requirements and security rules.
-5. Coordinator reconciles review findings and returns necessary fixes to the developer.
-6. User manually verifies the result and decides when to create a Git checkpoint.
+Suggested types:
+- `docs` — documentation only.
+- `feat` — new behavior.
+- `fix` — defect correction.
+- `refactor` — behavior-preserving restructuring.
+- `test` — test-only changes.
+- `build` — build/package/dependency configuration.
+- `security` — security hardening (use only if consistent with the repository's chosen convention).
+
+Guidelines:
+- Subject: concise, specific, imperative; avoid vague text such as `updates`, `changes`, or `fixes`.
+- Body: explain **what changed and why**, plus relevant design/security implications. Use short paragraphs or bullets; wrap long lines where practical.
+- Reference a task/slice or issue if the repository uses identifiers.
+- Mention migration compatibility or required manual action when relevant, but never include secrets.
+- Use `BREAKING CHANGE: ...` only when the change truly breaks compatibility.
+- Prefer one commit per coherent reviewed slice; do not combine unrelated slices.
+- Do not recommend a commit while critical review findings remain or verification is incomplete.
+
+Examples for this project:
+
+**Documentation synchronization (S1)**
+```text
+docs(corekit): record approved M1 decisions
+
+- Record JWT refresh rotation and account lockout policy
+- Document shared-database tenant isolation safeguards
+- Record Tenant and Identity dependency direction
+
+Refs: M1 / S1
+```
+
+**Dedicated Access test project**
+```text
+test(access): separate Access tests from architecture tests
+
+- Add a dedicated Access test project
+- Keep architecture dependency tests focused on module boundaries
+
+Refs: M2 / S2.1
+```
+
+**Tenant decoupling**
+```text
+refactor(tenant): depend on SharedKernel contracts
+
+- Remove direct Identity project references from Tenant
+- Preserve tenant behavior through stable public abstractions
+
+Refs: M5 / S4
+```
+
+**Account lockout**
+```text
+feat(identity): enforce temporary account lockout
+
+- Lock accounts after five failed login attempts
+- Apply the approved fifteen-minute lockout duration
+- Add focused lockout tests
+
+Refs: M3 / S5
+```
+
+These are examples only. Adjust scope and wording to the actual reviewed change. The user decides whether to use them.
+
+## 10. Completion and handoff
+Keep the report short:
+1. Baseline hash and working-tree status.
+2. Files changed or reviewed.
+3. Outcome/findings and acceptance status.
+4. Tests added/updated (not run) or explicitly authorized test result.
+5. Security/data/compatibility risks and manual verification.
+6. One next micro-slice.
+7. Optional suggested manual commit subject/body.
+
+Never claim success for tests, builds, migrations, deployments, or commits unless the user authorized the operation and the result is observed.

@@ -1,94 +1,109 @@
-# Dastarkhwan / CoreKit — Engineering Rules
+# Dastarkhwan / CoreKit — Engineering Instructions
 
-## Purpose
-Build a secure, maintainable, performant modular application for food-item delivery and parcel pickup/delivery, initially in Pakistan. Prefer small steps and reuse sound existing code.
+## 1. Product scope
+Build a secure, maintainable modular application for food-item delivery and parcel pickup/delivery. Pakistan is the first market; additional markets, including the UK, come later through configuration and replaceable integrations. Do not add hotel, dine-in, or unrelated verticals without an approved decision.
 
-## Source of truth
-- `roadmap.md`: milestone order.
-- `docs/architecture.md`: module boundaries and dependencies.
-- `docs/current-state.md`: verified implementation status.
-- `docs/decisions.md`: accepted decisions and open questions.
-- `docs/ai-tasks.md`: AI workflow and task templates.
+## 2. Project source of truth
+- `roadmap.md` — milestone order and completion criteria.
+- `docs/architecture.md` — target architecture and module boundaries.
+- `docs/current-state.md` — verified implementation status and evidence.
+- `docs/decisions.md` — accepted decisions and open questions.
+- `docs/ai-tasks.md` — AI workflow, account roles, task templates, and Git message guidance.
 
-If documents conflict, do not silently invent a decision. Explain the conflict and ask when it affects security, data, product behavior, or module boundaries.
+Do not duplicate full sections across files. If documents conflict, report the exact conflict and ask before changing security, persistence, product behavior, compatibility, or module boundaries. Code inspected at the latest repository baseline is evidence of implementation; architecture documents describe intended design unless marked implemented.
 
-## Workflow
-1. Briefly plan substantial changes.
-2. Inspect only relevant files and existing patterns.
-3. Identify owning module, dependencies, scope, and acceptance criteria.
-4. Implement the smallest coherent change.
-5. Add/update focused tests, but **do not run tests**; the user runs them.
-6. Update relevant documentation.
-7. Report changed files, tests not run, risks, and next step.
+## 3. Mandatory pre-task repository check
+Before starting **every** task, including documentation-only tasks:
+1. Verify repository root and the actual paths of the relevant files.
+2. Read the current HEAD hash and commit date (`git rev-parse HEAD`, `git show -s --format=%H%n%cI HEAD`).
+3. Check staged, unstaged, and untracked changes (`git status --short`).
+4. Inspect only the files and diffs relevant to the assigned task. Check changes since the supplied baseline only when needed.
+5. State the exact HEAD hash used as the task baseline and whether relevant local changes exist.
+6. If the baseline differs from the task brief, or relevant uncommitted changes could be overwritten or conflict, stop and ask the user how to proceed. Never discard, overwrite, or silently absorb existing changes.
 
-## Scope and architecture
-- Do not rewrite working code or perform unrelated refactoring.
-- Preserve compatibility where practical; explain breaking changes.
-- Prefer a modular monolith; no premature microservices or distributed infrastructure.
-- Each module owns its rules and persistence. Cross modules only through explicit public contracts/events.
+The M0 report references commit `9555b8c` dated 2026-10-23. This is a **historical verified baseline**, not a claim that it remains the current HEAD. Always check the actual HEAD before work. Do not scan all Git history or the whole solution unless the task requires it.
+
+Read-only Git inspection is allowed. Git write operations are prohibited; see Section 10.
+
+## 4. Token efficiency — strict
+Token and context conservation are priorities.
+- One request should have one small, measurable outcome.
+- Read only the relevant documentation sections and source files; do not dump or summarize the whole repository.
+- Use existing task reports and `current-state.md`; do not repeat completed investigations unless code has changed.
+- Do not repeat project context already present in these files.
+- Load only the skill, agent, or specialist needed for the current slice.
+- Avoid speculative alternatives, unnecessary web research, broad audits, premature abstractions, and verbose explanations.
+- Do not investigate future milestones while completing the current slice.
+- Do not generate extra documentation or refactor unrelated code.
+- Stop as soon as the assigned outcome and acceptance criteria are complete.
+- Keep plans, progress reports, and completion reports concise. If a blocker exists, state only the blocker and required decision.
+
+## 5. Micro-milestone execution
+For every non-trivial task:
+1. Verify the latest code and working tree as in Section 3.
+2. Read only relevant files.
+3. Provide a short plan: goal, files expected to change, and acceptance criteria.
+4. Wait for user approval before editing or executing commands that change state.
+5. Implement only the approved micro-slice; do not bundle unrelated tasks.
+6. Report changed files, outcome, tests added/updated but not run, risks, and one next suggested slice.
+7. Stop and wait. Do not automatically continue to the next slice.
+
+A micro-slice should normally change one concern and have a clear review boundary. Split further if it touches multiple module boundaries, persistence changes, or unrelated behaviors. No task may quietly expand its scope.
+
+## 6. Two-account responsibilities
+- **Claude Account 1 — primary implementer:** owns one approved implementation or documentation slice at a time.
+- **Claude Account 2 — independent reviewer:** read-only review of the same task brief, relevant documents, baseline commit, and focused diff/report. It does not implement, edit files, or redo the developer's work.
+- Only one AI account may modify the working tree at a time. Account 2 should use a read-only copy or a supplied diff/report where possible.
+- Both accounts must verify and state their own baseline commit. Do not assume they share chat history or files.
+- Resolve review findings before starting the next dependent slice. The user decides which findings to accept.
+- Do not use multiple accounts to duplicate work or bypass service limits or terms.
+
+## 7. Backend-first development
+Initial development priority is backend only:
+1. CoreKit module boundaries and SharedKernel contracts.
+2. Identity authentication, credentials, sessions, and tokens.
+3. Access roles, permissions, and authorization.
+4. Tenant lifecycle, context, and tenant isolation.
+5. Backend APIs and application use cases for food delivery and parcel pickup.
+
+Do not start frontend/UI work, marketplace features, or later business workflows until their roadmap dependencies and decisions are ready.
+
+## 8. Architecture and implementation rules
+- Prefer a modular monolith; do not introduce microservices or distributed infrastructure without an evidenced need.
+- Each module owns its business rules and persistence. Cross modules only through explicit public contracts or events.
 - Never access another module's private `DbContext`, tables, repositories, or internals.
-- Avoid circular dependencies and generic frameworks for hypothetical needs.
-- Identity owns accounts/authentication/credentials/sessions; Access owns roles/permissions/authorization.
-- Create separate modules only for genuinely distinct responsibilities or business rules.
-- Keep controllers/endpoints thin; business rules belong in the owning application/domain layer.
+- Avoid circular dependencies and hypothetical generic frameworks.
+- **Identity** owns accounts, authentication, credentials, sessions/tokens, and account recovery.
+- **Access** owns roles, permissions, assignments, and authorization policy/enforcement.
+- Tenant must not depend directly on Identity; use an approved stable contract/abstraction at the appropriate boundary.
+- Keep endpoints thin; business rules belong to the owning application/domain layer.
+- Preserve existing behavior and compatibility where practical. Explain any required breaking change before implementation.
+- Do not assume planned architecture is already implemented; verify source and tests.
 
-## Security
-- Enforce authorization server-side for every protected operation.
-- Fail closed when identity, tenant, store, permission, or resource ownership is unclear.
-- Never trust client-supplied user IDs, tenant/store IDs, prices, discounts, or state transitions without validation.
+## 9. Security, data, and quality
+- Authorize every protected server operation. Fail closed when identity, tenant, store, permission, or resource ownership is unclear.
+- Never trust client-supplied user, tenant, store, price, discount, or state values without server-side validation.
 - Apply tenant/store scope to reads, writes, exports, reports, jobs, callbacks, and admin paths.
-- Hostnames are routing inputs, not authorization.
-- Validate input; use parameterized database operations and safe output encoding.
-- Keep secrets out of source control and logs; do not log tokens, passwords, payment secrets, or connection strings.
-- Validate webhook signatures; make retries idempotent.
-- Add negative tests for unauthorized and cross-tenant/store access where applicable.
+- Hostnames and request headers are routing/context inputs, not authorization by themselves.
+- For the approved shared-database strategy, tenant-owned rows must carry explicit tenant ownership; EF Core global query filters are defense-in-depth, not the only security boundary. Enforce scope in application services/authorization and test cross-tenant denial.
+- Keep secrets out of source control and logs. Do not print tokens, passwords, signing keys, connection strings, or secret configuration values.
+- Use parameterized data access, validation, safe errors, appropriate constraints, short transactions, idempotency for retries/callbacks, and explicit currency/decimal handling for money.
+- Add focused positive and negative tests for relevant changes, especially authorization and cross-tenant access.
+- AI may create or update tests but **must not run tests or builds unless the user explicitly authorizes that specific action**. The user normally runs verification manually.
+- Do not execute database migrations or modify a database unless explicitly authorized. Creating migration files also requires explicit approval for that slice.
+- Never claim a test, build, migration, or deployment succeeded unless its result was actually observed and authorized.
 
-## Data and performance
-- Use decimal/fixed precision for money and explicit currency codes.
-- Preserve order price, discount, tax, fee, and currency snapshots.
-- Use database constraints and short transactions for important invariants.
-- Use async I/O, bounded pagination, projections, and avoid N+1 queries.
-- Add indexes for real query patterns; measure before optimizing.
-- Cache only with understood invalidation and tenant-safe keys.
-- Use background processing for suitable long tasks, with retry/idempotency.
-- Never trade security or correctness for unmeasured speed.
+## 10. Git and commit-message rules
+The user alone controls Git write operations. AI must never stage, commit, push, pull, checkout/switch branches, merge, rebase, reset, cherry-pick, clean, amend, create branches, or rewrite history. Do not change Git configuration or hooks.
 
-## Quality and Git
-- Follow existing conventions and verify framework versions before changing them.
-- Comments only for non-obvious design, security, or complex business rules.
-- Do not run tests/builds/migrations/destructive commands unless explicitly authorized.
-- Never stage, commit, push, change branches, or rewrite Git history.
-- You may recommend a user-made checkpoint and provide a commit message.
-- Never claim verification succeeded unless the result was observed.
+After a coherent slice is complete and reviewed, AI may **suggest** a manual checkpoint and prepare a commit message. The user decides whether and when to commit. Use the format and examples in `docs/ai-tasks.md`. Do not suggest a commit for incomplete work, unreviewed changes, or unresolved critical security/data issues. Do not claim that a commit was created.
 
-## Completion report
-1. Files changed and behavior.
-2. Tests added/updated (not run).
-3. Security/data/performance considerations.
-4. Risks, assumptions, and manual verification steps.
-5. Suggested next milestone and Git checkpoint/message if appropriate.
-
-## Multi-AI Development Workflow
-
-### Roles
-- ChatGPT: coordinate milestones, clarify requirements, and prepare implementation tasks.
-- Claude Account 1 (Developer): implement one approved task at a time.
-- Claude Account 2 (Reviewer): independently review the proposed changes and report defects or improvements. Do not implement the same task.
-- Additional Claude accounts: perform separate research or specialist reviews only when needed.
-- DeepSeek: provide an independent second opinion when useful.
-- User: approve important decisions, run tests manually, and control Git operations.
-
-### Shared Project Context
-- Provide each AI with the relevant project documentation before assigning work.
-- Treat `CLAUDE.md`, `roadmap.md`, and `docs/` as the shared source of project guidance.
-- Do not assume different accounts share chat history or context.
-- The developer must report changed files, implementation details, unresolved issues, and manual verification steps.
-- Transfer the developer's change summary and diff to the reviewer.
-
-### Change Coordination
-- Only one AI may implement changes in the repository at a time.
-- Reviewers must not edit the same task or overwrite the developer's changes.
-- Do not start another implementation until the current changes are reviewed and reconciled.
-- Keep changes small, focused, and consistent with the existing architecture.
-- Never stage, commit, push, switch branches, or rewrite Git history.
-- The user runs tests manually; AI assistants must not run tests, builds, or migrations unless explicitly authorized.
+## 11. Completion report
+Keep the report short and factual:
+1. Baseline HEAD hash and working-tree status.
+2. Files changed and the outcome.
+3. Tests added/updated (not run), or tests explicitly authorized and their observed result.
+4. Security/data/compatibility considerations and unresolved risks.
+5. Manual verification steps for the user.
+6. One next suggested micro-slice.
+7. Optional user-run Git checkpoint and suggested commit subject/body.

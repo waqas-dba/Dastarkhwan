@@ -1,4 +1,15 @@
 <Solution>
+  <Folder Name="/claude/" />
+  <Folder Name="/claude/skills/" />
+  <Folder Name="/claude/skills/backend-microtask/">
+    <File Path="backend-microtask_Skill.md" />
+  </Folder>
+  <Folder Name="/claude/skills/git-workflow/">
+    <File Path="git-workflow_Skill.md" />
+  </Folder>
+  <Folder Name="/claude/skills/iam-security-review/">
+    <File Path="iam-security-review_Skill.md" />
+  </Folder>
   <Folder Name="/CoreKit/">
     <Project Path="CoreKit.Access/CoreKit.Access.csproj" Id="5a93a43f-cde6-41dc-a20e-d1650f7b8714" />
     <Project Path="CoreKit.Architecture.Tests/CoreKit.Architecture.Tests.csproj" Id="7e7ec530-7036-4a8e-9579-a2554bfa4c5c" />

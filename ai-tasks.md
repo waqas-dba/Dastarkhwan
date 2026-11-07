@@ -1,17 +1,18 @@
-# AI Task Workflow — ChatGPT and Claude Accounts
+# AI Task Workflow — Four-Agent Team and User
 
 ## 1. Roles
 | Participant | Responsibility | Must avoid |
 |---|---|---|
-| ChatGPT / coordinator | Clarify goals, define micro-slices and acceptance criteria, reconcile reviews | Repeating broad investigations or reopening accepted decisions without evidence |
-| Claude Account 1 | Primary implementer for one approved slice at a time | Scope expansion, unrelated refactoring, unauthorized commands |
-| Claude Account 2 | Independent read-only reviewer of a focused diff/report | Editing files, reimplementing, or reviewing a different/old baseline |
-| User | Product decisions, manual testing, acceptance, all Git write operations | Treating unverified reports as proof |
+| ChatGPT — Project Manager | Coordinates the project; defines tasks and acceptance criteria; oversees architecture; reviews agent reports; recommends acceptance | Editing repository files, performing Git writes, or reopening accepted decisions without evidence |
+| DeepSeek Harness — Preparation Engineer | Researches and explores the repository; prepares implementation plans and technical handovers; investigates errors and dependencies; takes only explicitly approved, isolated, low-risk implementation slices | Replacing Claude 1 or Claude 2, expanding scope, or implementing unapproved work |
+| Claude Account 1 — Primary Developer | Owns primary implementation for one approved slice at a time; implements approved changes; supplies exact diffs and completion reports | Scope expansion, unrelated refactoring, unauthorized commands |
+| Claude Account 2 — Independent Reviewer | Independent read-only review of actual code, architecture, security, and the focused diff/report | Editing implementation files, reimplementing, or reviewing a different/old baseline |
+| User — Project Owner | Architecture approval, scope changes, manual testing, release acceptance, all Git write operations | Treating unverified reports as proof |
 
-AI accounts do not automatically share chat history, memory, repository access, or files. Supply each account only the task brief, relevant project docs, baseline hash, and relevant diff/files. Do not use multiple accounts to bypass service limits or terms.
+AI agents do not automatically share chat history, memory, repository access, or files. Supply each agent only the task brief, relevant documents, baseline hash, and relevant diff/files. When DeepSeek prepares a task, its plan and handover become the brief for Claude 1. Do not use multiple agents to duplicate work or bypass service limits or terms.
 
 ## 2. Mandatory latest-code verification
-Before every task, each account must:
+Before every task, each participating agent must:
 1. Confirm repository root and relevant document/source paths.
 2. Read current HEAD hash and commit date.
 3. Check staged, unstaged, and untracked files with `git status --short`.
@@ -48,14 +49,15 @@ For every task:
 
 Never proceed automatically to the next slice. Never bundle multiple proposed slices simply to save turns.
 
-## 5. One-owner and two-account coordination
-- Account 1 is the only implementation owner for a given task.
-- Account 2 is read-only. It receives the same task brief, relevant docs, baseline commit, and focused diff/report produced by Account 1.
-- Account 2 independently checks requirements, security, architecture, compatibility, and task acceptance criteria. It does not edit or implement fixes.
-- Only one AI account may modify the working tree at a time. Prefer a read-only copy or a pasted diff for Account 2.
+## 5. One-owner and multi-agent coordination
+- One implementation owner per task. Account 1 owns implementation; ChatGPT defines tasks and recommends acceptance; DeepSeek prepares plans and handovers; Account 2 reviews. No agent takes over another's responsibility.
+- DeepSeek prepares the task before Account 1 implements when prior investigation is useful; its plan and handover are the brief. DeepSeek does not implement that same task unless the user separately approves an isolated, low-risk slice.
+- Account 2 is read-only. It receives the same task brief, relevant docs, baseline commit, and the focused diff/report produced by Account 1, and independently checks requirements, security, architecture, compatibility, and acceptance criteria. It does not edit or implement fixes.
+- Only one AI agent may modify the shared working tree at a time. Every other agent uses a read-only copy or a pasted diff.
 - If review finds issues, Account 1 addresses only the approved findings in a separate micro-slice.
 - The user decides which review findings to accept. Do not silently combine contradictory recommendations.
-- Both accounts must report their own baseline hash. Do not assume one account's inspection represents the other account's current repository.
+- Every participating agent verifies and reports its own baseline hash. Do not assume one agent's inspection represents another agent's current repository.
+- No agent may silently expand scope. Preserve existing uncommitted work; security-critical and architectural changes require explicit user approval and independent review.
 
 ## 6. Permission boundaries
 - AI may inspect Git read-only. AI must not stage, commit, push, pull, switch/checkout branches, merge, rebase, reset, cherry-pick, clean, amend, create branches, rewrite history, or change Git configuration/hooks.
@@ -111,7 +113,7 @@ Never proceed automatically to the next slice. Never bundle multiple proposed sl
 ## 8. Independent review template
 ```markdown
 Review only this focused change against the task acceptance criteria,
-CLAUDE.md, docs/architecture.md, and accepted decisions.
+CLAUDE.md, architecture.md, and accepted decisions.
 
 Baseline commit: [hash]
 

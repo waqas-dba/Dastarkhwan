@@ -5,10 +5,11 @@ Build a secure, maintainable modular application for food-item delivery and parc
 
 ## 2. Project source of truth
 - `roadmap.md` — milestone order and completion criteria.
-- `docs/architecture.md` — target architecture and module boundaries.
-- `docs/current-state.md` — verified implementation status and evidence.
-- `docs/decisions.md` — accepted decisions and open questions.
-- `docs/ai-tasks.md` — AI workflow, account roles, task templates, and Git message guidance.
+- `architecture.md` — target architecture and module boundaries.
+- `current-state.md` — verified implementation status and evidence.
+- `decisions.md` — accepted decisions and open questions.
+- `ai-tasks.md` — AI workflow, agent roles, task templates, and Git message guidance.
+- `AGENTS.md` — short entry point for AI agents; summarizes the four-agent workflow and points to the files above. It is a summary, not a source of truth.
 
 Do not duplicate full sections across files. If documents conflict, report the exact conflict and ask before changing security, persistence, product behavior, compatibility, or module boundaries. Code inspected at the latest repository baseline is evidence of implementation; architecture documents describe intended design unless marked implemented.
 
@@ -50,13 +51,24 @@ For every non-trivial task:
 
 A micro-slice should normally change one concern and have a clear review boundary. Split further if it touches multiple module boundaries, persistence changes, or unrelated behaviors. No task may quietly expand its scope.
 
-## 6. Two-account responsibilities
-- **Claude Account 1 — primary implementer:** owns one approved implementation or documentation slice at a time.
-- **Claude Account 2 — independent reviewer:** read-only review of the same task brief, relevant documents, baseline commit, and focused diff/report. It does not implement, edit files, or redo the developer's work.
-- Only one AI account may modify the working tree at a time. Account 2 should use a read-only copy or a supplied diff/report where possible.
-- Both accounts must verify and state their own baseline commit. Do not assume they share chat history or files.
+## 6. Multi-agent responsibilities
+
+Four AI agents plus the user participate. Full role definitions and coordination rules are in `ai-tasks.md` §1 and §5; do not restate them elsewhere.
+
+| Agent | Responsibility |
+|---|---|
+| **ChatGPT — Project Manager** | Coordinates the project, defines tasks and acceptance criteria, oversees architecture, reviews agent reports, and recommends acceptance. Does not modify repository files or perform Git writes. |
+| **DeepSeek Harness — Preparation Engineer** | Researches and explores the repository, prepares implementation plans and technical handovers, investigates errors and dependencies, and performs only explicitly approved, isolated, low-risk implementation slices. Does not replace Claude 1 or Claude 2. |
+| **Claude Account 1 — Primary Developer** | Owns primary implementation; implements approved changes and provides exact diffs and completion reports. |
+| **Claude Account 2 — Independent Reviewer** | Independent read-only review of actual code, architecture, and security against the task brief and focused diff/report. Does not modify implementation files. |
+| **User — Project Owner** | Controls architecture approval, scope changes, Git operations, manual testing, and release acceptance. |
+
+- One implementation owner per task. Only one AI agent may modify a shared working tree at a time; every other agent uses a read-only copy or a supplied diff/report.
+- DeepSeek prepares the task and handover before Claude 1 implements when prior investigation is useful. Claude 2 reviews independently. No agent may silently expand scope.
+- Every participating agent verifies and states the same baseline commit. Do not assume agents share chat history or files.
+- Preserve existing uncommitted work. Security-critical and architectural changes require explicit user approval and independent review.
 - Resolve review findings before starting the next dependent slice. The user decides which findings to accept.
-- Do not use multiple accounts to duplicate work or bypass service limits or terms.
+- Do not use multiple agents to duplicate work or bypass service limits or terms.
 
 ## 7. Backend-first development
 Initial development priority is backend only:
@@ -96,7 +108,7 @@ Do not start frontend/UI work, marketplace features, or later business workflows
 ## 10. Git and commit-message rules
 The user alone controls Git write operations. AI must never stage, commit, push, pull, checkout/switch branches, merge, rebase, reset, cherry-pick, clean, amend, create branches, or rewrite history. Do not change Git configuration or hooks.
 
-After a coherent slice is complete and reviewed, AI may **suggest** a manual checkpoint and prepare a commit message. The user decides whether and when to commit. Use the format and examples in `docs/ai-tasks.md`. Do not suggest a commit for incomplete work, unreviewed changes, or unresolved critical security/data issues. Do not claim that a commit was created.
+After a coherent slice is complete and reviewed, AI may **suggest** a manual checkpoint and prepare a commit message. The user decides whether and when to commit. Use the format and examples in `ai-tasks.md`. Do not suggest a commit for incomplete work, unreviewed changes, or unresolved critical security/data issues. Do not claim that a commit was created.
 
 ## 11. Completion report
 Keep the report short and factual:

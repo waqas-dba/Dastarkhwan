@@ -7,14 +7,15 @@ Build a secure, reusable modular SaaS platform for food-item delivery and parcel
 - Verify the actual latest commit and working-tree status before each task; `9555b8c` is the recorded M0 baseline, not necessarily today's HEAD.
 - Inspect only relevant files. Do not assume a feature is missing without checking current code.
 - Break work into small, independently reviewable micro-slices; one approved slice per request.
-- Account 1 implements; Account 2 independently reviews read-only. Only one AI modifies the working tree at a time.
+- Four-agent workflow: ChatGPT (Project Manager) defines tasks and acceptance criteria and recommends acceptance without editing files or performing Git writes; DeepSeek Harness (Preparation Engineer) prepares plans and technical handovers and takes only explicitly approved, isolated, low-risk slices; Claude Account 1 (Primary Developer) implements; Claude Account 2 (Independent Reviewer) reviews read-only. The user is the Project Owner.
+- Only one AI agent modifies the shared working tree at a time, and every participating agent verifies the same baseline SHA. Roles and coordination rules: `ai-tasks.md` §1 and §5.
 - AI may add/update tests but does not run tests/builds without explicit permission. User performs normal verification.
 - AI does not execute migrations or modify databases without explicit permission.
 - AI never performs Git write operations. It may suggest a manual checkpoint and prepare the commit message for the user.
 - Update docs only when facts, decisions, or status change. Do not duplicate material across files.
 
 ## M0 — Repository baseline
-**Status: Inspection reported complete at commit `9555b8c` (2026-10-23).** The baseline report is recorded in `docs/current-state.md`. It is an inspection-only milestone; it does not mean later development work is complete. Before relying on it, verify current HEAD and relevant file changes.
+**Status: Inspection reported complete at commit `9555b8c` (2026-10-23).** The baseline report is recorded in `current-state.md`. It is an inspection-only milestone; it does not mean later development work is complete. Before relying on it, verify current HEAD and relevant file changes.
 
 **Done when:** solution/module structure, framework, persistence/migrations, Identity/Access, tenancy, tests, and key gaps are recorded with evidence and a safe next task.
 
@@ -26,7 +27,7 @@ Build a secure, reusable modular SaaS platform for food-item delivery and parcel
 
 Deferred until needed by the relevant milestone: checkout grouping, parcel pickup initiation details, payment methods/COD, operational currency/market rules beyond the accepted Pakistan-first direction, and website/domain strategy.
 
-**Done when:** accepted decisions are recorded accurately in `docs/decisions.md` and `docs/current-state.md` distinguishes decisions from implementation status.
+**Done when:** accepted decisions are recorded accurately in `decisions.md` and `current-state.md` distinguishes decisions from implementation status.
 
 ## Near-term execution queue (one micro-slice per request)
 These are the proposed order from the M0 report. Verify the repository before each slice and obtain user approval before implementation or command execution.
@@ -108,4 +109,4 @@ Add only needed notifications, background jobs, audit/logging, health checks, ba
 **Done when:** operational checklist, recovery considerations, and known limitations are documented.
 
 ## Roadmap status rule
-A roadmap item is not complete merely because it is described or a plan exists. Mark it complete only when implementation evidence and acceptance criteria are reviewed. Record actual code status in `docs/current-state.md`; record decisions in `docs/decisions.md`.
+A roadmap item is not complete merely because it is described or a plan exists. Mark it complete only when implementation evidence and acceptance criteria are reviewed. Record actual code status in `current-state.md`; record decisions in `decisions.md`.

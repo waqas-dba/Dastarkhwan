@@ -10,26 +10,13 @@ namespace CoreKit.Architecture.Tests;
 /// <summary>
 /// Keeps the modules independent. A module may reference the shared kernel, but another module
 /// only where this list says so. Every row you delete from the exceptions makes the design stricter,
-/// and a new, unlisted reference fails the build.
+/// and a new, unlisted reference fails the build. The compiled-assembly allowlist is shared with
+/// ProjectReferenceBoundaryTests via ModuleBoundaryMatrix.
 /// </summary>
 public sealed class ModuleBoundaryTests
 {
-    // module -> the CoreKit assemblies it may reference
-    private static readonly Dictionary<string, string[]> Allowed = new()
-    {
-        ["CoreKit.SharedKernel"] = Array.Empty<string>(),
-        ["CoreKit.Identity"] = new[] { "CoreKit.SharedKernel" },
-        ["CoreKit.Access"] = new[] { "CoreKit.SharedKernel" },
-
-        // Temporary exception (decision D-015, roadmap S4.3): Tenant still consumes Identity's
-        // token hook, permission seeds, endpoint permission check and global usings. These move
-        // behind CoreKit.SharedKernel contracts; removing "CoreKit.Identity" from this row is the
-        // completion evidence for S4.3, after which any new direct reference fails the test again.
-        // Do not extend this list for other modules.
-        ["CoreKit.Tenant"] = new[] { "CoreKit.SharedKernel", "CoreKit.Identity" }
-    };
-
-    public static IEnumerable<object[]> Modules() => Allowed.Keys.Select(m => new object[] { m });
+    public static IEnumerable<object[]> Modules() =>
+        ModuleBoundaryMatrix.CompiledAssemblyAllowlist.Keys.Select(m => new object[] { m });
 
     private static List<string> CoreKitReferencesOf(string module)
         => Load(module).GetReferencedAssemblies()
@@ -58,7 +45,8 @@ public sealed class ModuleBoundaryTests
     [MemberData(nameof(Modules))]
     public void A_module_references_only_the_modules_it_is_allowed_to(string module)
     {
-        var illegal = CoreKitReferencesOf(module).Except(Allowed[module]).ToList();
+        var allowed = ModuleBoundaryMatrix.CompiledAssemblyAllowlist[module];
+        var illegal = CoreKitReferencesOf(module).Except(allowed).ToList();
 
         Assert.True(
             illegal.Count == 0,

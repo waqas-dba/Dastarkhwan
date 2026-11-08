@@ -320,4 +320,27 @@ public sealed class IvtMechanismScannerTests
         var findings = IvtMechanismScanner.ScanProject(files);
         Assert.Empty(findings);
     }
+
+    [Fact]
+    public void Ignores_file_level_alias_from_another_file()
+    {
+        var files = new List<(string Path, string Text)>
+        {
+            ("Tests/FileA.cs", """
+                using IVT = System.Runtime.CompilerServices.InternalsVisibleToAttribute;
+                [assembly: IVT("OtherTarget")]
+                """),
+            ("Tests/FileB.cs", """
+                using IVT = System.Runtime.CompilerServices.InternalsVisibleToAttribute;
+                [assembly: IVT("CoreKit.Access.Tests")]
+                """)
+        };
+
+        var findings = IvtMechanismScanner.ScanProject(files);
+
+        // FileA's file-level alias must not leak into FileB.
+        // FileB's own alias should resolve.
+        Assert.Single(findings);
+        Assert.Equal("InternalsVisibleTo attribute", findings[0].Kind);
+    }
 }

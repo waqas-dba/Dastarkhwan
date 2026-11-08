@@ -77,15 +77,9 @@ internal static class IvtMechanismScanner
         {
             var debugAliases = new Dictionary<string, string>(StringComparer.Ordinal);
             var releaseAliases = new Dictionary<string, string>(StringComparer.Ordinal);
-            CollectAliases(text, debugAliases, releaseAliases);
+            CollectAliases(text, globalDebugAliases, globalReleaseAliases, debugAliases, releaseAliases);
             fileDebugAliases[path] = debugAliases;
             fileReleaseAliases[path] = releaseAliases;
-
-            // Merge file-level aliases into global aliases.
-            foreach (var kvp in debugAliases)
-                TryAddAlias(globalDebugAliases, kvp.Key, kvp.Value);
-            foreach (var kvp in releaseAliases)
-                TryAddAlias(globalReleaseAliases, kvp.Key, kvp.Value);
         }
 
         var findings = new List<IvtFinding>();
@@ -97,7 +91,7 @@ internal static class IvtMechanismScanner
 
             foreach (var options in new[] { DebugParseOptions, ReleaseParseOptions })
             {
-                var isDebug = options.PreprocessorSymbols.Contains("DEBUG");
+                var isDebug = options.PreprocessorSymbolNames.Contains("DEBUG");
                 var combinedAliases = isDebug
                     ? MergeAliases(globalDebugAliases, debugAliases)
                     : MergeAliases(globalReleaseAliases, releaseAliases);
@@ -162,6 +156,8 @@ internal static class IvtMechanismScanner
     /// namespace-scoped aliases do not influence assembly-level attributes.
     /// </summary>
     private static void CollectAliases(string text,
+        Dictionary<string, string> globalDebugAliases,
+        Dictionary<string, string> globalReleaseAliases,
         Dictionary<string, string> debugAliases,
         Dictionary<string, string> releaseAliases)
     {
@@ -181,10 +177,22 @@ internal static class IvtMechanismScanner
                 if (name is not null)
                 {
                     var aliasName = usingDirective.Alias.Name.Identifier.ValueText;
-                    if (options.PreprocessorSymbols.Contains("DEBUG"))
-                        TryAddAlias(debugAliases, aliasName, name);
-                    if (options.PreprocessorSymbols.Contains("RELEASE"))
-                        TryAddAlias(releaseAliases, aliasName, name);
+                    bool isGlobal = usingDirective.GetFirstToken().IsKind(SyntaxKind.GlobalKeyword);
+
+                    if (options.PreprocessorSymbolNames.Contains("DEBUG"))
+                    {
+                        if (isGlobal)
+                            TryAddAlias(globalDebugAliases, aliasName, name);
+                        else
+                            TryAddAlias(debugAliases, aliasName, name);
+                    }
+                    if (options.PreprocessorSymbolNames.Contains("RELEASE"))
+                    {
+                        if (isGlobal)
+                            TryAddAlias(globalReleaseAliases, aliasName, name);
+                        else
+                            TryAddAlias(releaseAliases, aliasName, name);
+                    }
                 }
             }
         }
@@ -199,7 +207,7 @@ internal static class IvtMechanismScanner
         if (aliases.TryGetValue(name, out var existing))
         {
             if (!string.Equals(existing, value, StringComparison.Ordinal))
-                return; // Conflicting alias - do not silently overwrite
+                aliases.Remove(name); // Conflicting alias - do not resolve ambiguously
         }
         else
         {

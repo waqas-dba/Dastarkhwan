@@ -12,7 +12,7 @@ Do not add hotel, dine-in, or unrelated verticals without an approved decision.
 - `architecture.md` — target architecture and module boundaries.
 - `current-state.md` — implementation status and supporting evidence.
 - `decisions.md` — accepted decisions and open questions.
-- `ai-tasks.md` — agent roles, task workflow, handovers, review templates, the mandatory nine-part task briefing and owner actions (§13), and Git guidance.
+- `ai-tasks.md` — agent roles, task workflow, handovers, review templates, the mandatory nine-part task briefing and owner actions (§13), and the mandatory documentation, code-comment and explainability standard (§14), and Git guidance.
 - `AGENTS.md` — short entry point for all AI agents.
 
 Do not duplicate full sections across files. If documents conflict, report the exact conflict and ask before changing security, persistence, product behavior, compatibility, or module boundaries.
@@ -166,5 +166,6 @@ Keep reports short and factual:
 5. Outstanding risks and manual verification steps.
 6. One suggested next micro-task.
 7. Optional suggested manual Git checkpoint and commit message.
+8. Documentation and code comments updated per `ai-tasks.md` §14, or a stated reason they were not required.
 
 Never claim local working-tree verification based only on GitHub inspection.

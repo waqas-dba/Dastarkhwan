@@ -325,6 +325,7 @@ Every brief must end with these four items, written concretely:
 - "No action required" is acceptable only when it is true and the reason is stated.
 - Briefs may be short, but no section may be omitted for small tasks.
 - This standard is the canonical one; other documents reference it and do not restate it.
+- Documentation produced under a brief must satisfy the standard in §14.
 
 ### Copy-ready template
 
@@ -352,3 +353,59 @@ Every brief must end with these four items, written concretely:
 **Your verification:**
 **Your acceptance:**
 ```
+
+## 14. Documentation, code comments and explainability standard
+
+Applies to every module, implementation, task brief, handover, review request, API/usage document, configuration note and code comment. Required documentation is part of acceptance, not optional.
+
+### 14.1 Two audiences
+
+Every relevant document must serve both readers:
+
+- **Project Owner (non-technical):** understands the business purpose, may not know programming terms.
+- **Developer:** needs implementation detail, dependencies, configuration and usage.
+
+Explain business meaning first, technical detail second. Do not assume the reader knows programming, frameworks, databases, APIs or architecture. Explain a technical term in simple words the first time it is used.
+
+### 14.2 Explain each module or significant feature in plain language
+
+Cover all ten points:
+
+1. What it is.
+2. Why the project needs it.
+3. What problem it solves.
+4. How it works, step by step.
+5. Who or what uses it.
+6. What information it receives.
+7. What result it produces.
+8. How it connects to other modules.
+9. How to configure and use it.
+10. What happens when something goes wrong.
+
+Add practical examples wherever they improve understanding.
+
+### 14.3 Developer detail
+
+Where applicable, document: module and project responsibilities; important classes, interfaces and services; public methods and their purpose; API endpoints with HTTP method and request/response examples; database entities, relationships and ownership; configuration settings and environment variables; authentication, authorization and tenant-scope requirements; dependencies and module integration; error handling and expected failure behaviour; installation/setup/usage steps; and testing instructions for the human operator. Never document secrets or real sensitive values.
+
+### 14.4 Code comments
+
+Comments explain reasoning, especially: complex business rules; security and authorization checks; tenant isolation; non-obvious validation; important dependencies; workarounds and compatibility requirements; unexpected behaviour and failure handling.
+
+Prefer meaningful names and simple code over comments. Do not restate the code. Document public APIs and non-obvious methods well enough for another developer to use them correctly.
+
+### 14.5 Examples
+
+Where useful, provide realistic business scenarios; example requests and responses; configuration examples with safe placeholder values; step-by-step usage; expected results; common errors and troubleshooting. Clearly separate illustrative examples from verified implementation behaviour.
+
+### 14.6 Accuracy and maintenance
+
+Describe the actual implementation, never an assumed or planned one. Label planned, implemented, verified and unverified behaviour using the statuses in §10. Update documentation when approved code changes alter behaviour. Correct outdated instructions only when authorized. Keep one authoritative explanation and link to it instead of duplicating. Never claim a feature works without implementation evidence and appropriate verification.
+
+### 14.7 Documentation acceptance
+
+A task is incomplete if required documentation is missing or materially misleading. The Project Owner must be able to understand purpose, workflow and practical usage without reading source; a developer must be able to understand responsibilities, integration and usage without guessing. Exceptions require explicit Project Owner approval recorded in the task brief.
+
+### 14.8 Scope of application
+
+This standard governs: task briefs, handovers and reviews; module overview documents; endpoint and API documentation; configuration documentation; and code comments. It does not require retrofitting every existing document at once; a documentation audit can be a separately approved task.

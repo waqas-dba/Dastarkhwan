@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using Xunit;
 
 namespace CoreKit.Architecture.Tests;
@@ -17,16 +16,6 @@ namespace CoreKit.Architecture.Tests;
 public sealed class ProjectReferenceBoundaryTests
 {
     private static readonly MsBuildProjectEvaluator Evaluator = new(SolutionInventory.SolutionDir);
-
-    // Architecture-test implementation files excluded from alternative-mechanism scanning.
-    private static readonly HashSet<string> ExcludedImplementationFiles = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "SolutionInventory.cs",
-        "MsBuildProjectEvaluator.cs",
-        "ProjectReferenceBoundaryTests.cs",
-        "ModuleBoundaryMatrix.cs",
-        "ModuleBoundaryTests.cs",
-    };
 
     [Fact]
     public void Solution_inventory_is_consistent()
@@ -413,7 +402,7 @@ public sealed class ProjectReferenceBoundaryTests
     [Fact]
     public void No_unsupported_internals_visible_to_mechanisms()
     {
-        var violations = ScanForAlternativeIvtMechanisms(SolutionInventory.SolutionDir);
+        var violations = IvtMechanismScanner.ScanSolution(SolutionInventory.SolutionDir);
         Assert.True(violations.Count == 0,
             $"Unsupported InternalsVisibleTo mechanisms detected:{Environment.NewLine}" +
             $"{string.Join(Environment.NewLine, violations)}");
@@ -457,159 +446,4 @@ public sealed class ProjectReferenceBoundaryTests
             yield return new object[] { p };
     }
 
-    // ------------------------------------------------------------------
-    // Alternative IVT mechanism scanning
-    // ------------------------------------------------------------------
-
-    private static List<string> ScanForAlternativeIvtMechanisms(string solutionDir)
-    {
-        var violations = new List<string>();
-
-        // Directories to exclude from scanning.
-        var excludedDirNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-        {
-            "bin", "obj", ".git",
-        };
-
-        var csFiles = Directory.GetFiles(solutionDir, "*.cs", SearchOption.AllDirectories)
-            .Where(f => !IsInExcludedDirectory(f, excludedDirNames))
-            .Where(f => !ExcludedImplementationFiles.Contains(Path.GetFileName(f)))
-            .ToList();
-
-        foreach (var csFile in csFiles)
-        {
-            var content = File.ReadAllText(csFile);
-            var stripped = StripComments(content);
-            var relativePath = Path.GetRelativePath(solutionDir, csFile).Replace('\\', '/');
-
-            // [assembly: InternalsVisibleTo(...)]
-            if (Regex.IsMatch(stripped,
-                @"\[\s*assembly\s*:\s*InternalsVisibleTo\s*\(",
-                RegexOptions.IgnoreCase))
-            {
-                violations.Add($"{relativePath}: source-level [assembly: InternalsVisibleTo(...)] attribute");
-            }
-
-            // IgnoresAccessChecksTo
-            if (Regex.IsMatch(stripped,
-                @"IgnoresAccessChecksTo",
-                RegexOptions.IgnoreCase))
-            {
-                violations.Add($"{relativePath}: IgnoresAccessChecksTo reference");
-            }
-
-            // [assembly: AssemblyMetadata(...)] with InternalsVisibleTo
-            if (Regex.IsMatch(stripped,
-                @"\[\s*assembly\s*:\s*AssemblyMetadata\s*\(.*InternalsVisibleTo",
-                RegexOptions.IgnoreCase | RegexOptions.Singleline))
-            {
-                violations.Add($"{relativePath}: [assembly: AssemblyMetadata(...)] with InternalsVisibleTo");
-            }
-        }
-
-        // Scan .csproj files for IgnoresAccessChecksTo
-        var csprojFiles = Directory.GetFiles(solutionDir, "*.csproj", SearchOption.AllDirectories)
-            .Where(f => !IsInExcludedDirectory(f, excludedDirNames))
-            .ToList();
-
-        foreach (var csprojFile in csprojFiles)
-        {
-            var content = File.ReadAllText(csprojFile);
-            var relativePath = Path.GetRelativePath(solutionDir, csprojFile).Replace('\\', '/');
-
-            if (Regex.IsMatch(content, @"IgnoresAccessChecksTo", RegexOptions.IgnoreCase))
-            {
-                violations.Add($"{relativePath}: IgnoresAccessChecksTo in project file");
-            }
-        }
-
-        return violations;
-    }
-
-    private static bool IsInExcludedDirectory(string filePath, HashSet<string> excludedDirNames)
-    {
-        var parts = filePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        foreach (var part in parts)
-        {
-            if (excludedDirNames.Contains(part))
-                return true;
-        }
-        return false;
-    }
-
-    /// <summary>
-    /// Strips C# comments (// line comments and /* ... */ block comments) to avoid
-    /// false positives from comment text matching search patterns.
-    /// </summary>
-    private static string StripComments(string input)
-    {
-        var result = new System.Text.StringBuilder(input.Length);
-        var i = 0;
-        while (i < input.Length)
-        {
-            // Line comment
-            if (i + 1 < input.Length && input[i] == '/' && input[i + 1] == '/')
-            {
-                while (i < input.Length && input[i] != '\n' && input[i] != '\r')
-                    i++;
-                continue;
-            }
-
-            // Block comment
-            if (i + 1 < input.Length && input[i] == '/' && input[i + 1] == '*')
-            {
-                i += 2;
-                while (i + 1 < input.Length && !(input[i] == '*' && input[i + 1] == '/'))
-                    i++;
-                i += 2; // skip */
-                continue;
-            }
-
-            // String literal (verbatim @"""...")
-            if (input[i] == '@' && i + 1 < input.Length && input[i + 1] == '"')
-            {
-                result.Append(input[i]);
-                result.Append(input[i + 1]);
-                i += 2;
-                while (i < input.Length)
-                {
-                    result.Append(input[i]);
-                    if (input[i] == '"' && i + 1 < input.Length && input[i + 1] == '"')
-                    {
-                        i += 2; // skip escaped quote
-                        continue;
-                    }
-                    if (input[i] == '"')
-                        break;
-                    i++;
-                }
-                continue;
-            }
-
-            // Regular string literal
-            if (input[i] == '"')
-            {
-                result.Append(input[i]);
-                i++;
-                while (i < input.Length)
-                {
-                    result.Append(input[i]);
-                    if (input[i] == '\\' && i + 1 < input.Length)
-                    {
-                        result.Append(input[i + 1]);
-                        i += 2;
-                        continue;
-                    }
-                    if (input[i] == '"')
-                        break;
-                    i++;
-                }
-                continue;
-            }
-
-            result.Append(input[i]);
-            i++;
-        }
-        return result.ToString();
-    }
 }

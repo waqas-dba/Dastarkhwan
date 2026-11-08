@@ -17,6 +17,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="CoreKit.Architecture.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\CoreKit.SharedKernel\CoreKit.SharedKernel.csproj" />
   </ItemGroup>
 

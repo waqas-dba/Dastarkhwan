@@ -8,7 +8,6 @@ using CoreKit.Identity.Endpoints;
 using CoreKit.Identity.Extensions;
 using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Persistence;
-using CoreKit.Identity.SampleHost;
 using CoreKit.Identity.Seeding;
 using CoreKit.SharedKernel;
 using CoreKit.Tenant.Endpoints;

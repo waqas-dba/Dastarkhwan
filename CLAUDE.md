@@ -12,7 +12,7 @@ Do not add hotel, dine-in, or unrelated verticals without an approved decision.
 - `architecture.md` — target architecture and module boundaries.
 - `current-state.md` — implementation status and supporting evidence.
 - `decisions.md` — accepted decisions and open questions.
-- `ai-tasks.md` — agent roles, task workflow, handovers, review templates, and Git guidance.
+- `ai-tasks.md` — agent roles, task workflow, handovers, review templates, the mandatory nine-part task briefing and owner actions (§13), and Git guidance.
 - `AGENTS.md` — short entry point for all AI agents.
 
 Do not duplicate full sections across files. If documents conflict, report the exact conflict and ask before changing security, persistence, product behavior, compatibility, or module boundaries.
@@ -55,7 +55,7 @@ For every non-trivial task:
 
 1. Verify the latest repository baseline and working tree.
 2. Read only the relevant files.
-3. Provide a short plan: goal, expected files, and acceptance criteria.
+3. Provide a task briefing using the mandatory nine-part structure and the four owner actions in `ai-tasks.md` §13: goal/current issue, scope, expected files, acceptance criteria, risks, and the owner's decision, action, verification and acceptance.
 4. Wait for user approval before editing or executing state-changing commands.
 5. Implement only the approved task.
 6. Report changed files, outcome, tests added or updated but not run, risks, and one suggested next task.

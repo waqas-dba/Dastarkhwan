@@ -19,7 +19,7 @@ Full responsibilities and coordination rules are defined in `ai-tasks.md`.
 ## 2. Read first
 
 1. `CLAUDE.md` — engineering instructions, architecture constraints, security rules, and prohibitions.
-2. `ai-tasks.md` — roles, handovers, task templates, review process, and Git guidance.
+2. `ai-tasks.md` — roles, handovers, task templates, review process, the mandatory nine-part task briefing and owner actions (§13), and Git guidance.
 3. `current-state.md` — implementation status and supporting evidence.
 4. `roadmap.md` — milestone order and acceptance criteria.
 5. `architecture.md` — target architecture and module boundaries.
@@ -55,6 +55,7 @@ Never overwrite or discard existing work.
 - Never expand task scope or modify unapproved files.
 - Never claim unobserved results.
 - Security-critical and architectural changes require explicit user approval and independent review.
+- Every task must use the nine-part briefing and the four owner actions defined in `ai-tasks.md` §13 before implementation starts.
 - Keep secrets out of files, logs, and reports.
 
 ## 5. Architecture boundaries

@@ -32,12 +32,12 @@ A status must describe the evidence available, not the intended architecture or 
 
 | Field | Value |
 |---|---|
-| Snapshot HEAD | `43c21792ff3f7e6ed8bdce15b1246e9c0b060a9c` |
-| Parent commit | `daa732666a497c87c9b9275abe1ed40899c3bf3b` |
+| Snapshot HEAD | `576c84d2ca0fb59b30266440e90d96faa04f264f` |
+| Parent commit | `43c21792ff3f7e6ed8bdce15b1246e9c0b060a9c` |
 | Branch | `master` |
-| Latest commit message | `Update the .md files to change the roles of models` |
-| Evidence basis | GitHub committed-file inspection at the snapshot HEAD, with source findings from the parent snapshot where the intervening commit did not change those source files |
-| Local working-tree status | Unknown. GitHub committed-file inspection cannot establish local staged, unstaged, or untracked changes. |
+| Latest commit message | `test(architecture): normalize test-project paths symmetrically` |
+| Evidence basis | Committed-file inspection at the snapshot HEAD. The remote was not queried; no claims are made about remote state. |
+| Local working-tree status | Clean at inspection time (`git status --short` returned empty). Not verified remotely. |
 | Scope | Point-in-time record of committed repository evidence |
 
 The historical M0 baseline `9555b8c` remains unchanged.
@@ -48,7 +48,7 @@ The commit at `43c2179` includes committed migration artifacts:
 - Identity: `CoreKit.Identity/Migrations/`
 - Tenant: `CoreKit.Tenant/Migrations/`
 
-Their presence in Git does not establish that they are reviewed, compatible with existing databases, successfully applied, or safe for production. No database application is claimed.
+Their presence in Git does not establish that they are reviewed, compatible with existing databases, successfully applied, or safe for production. No database application is claimed. No later commit changed these migration artifacts.
 
 Before every implementation task, verify the actual local HEAD, commit date, staged changes, unstaged changes, and untracked files. Do not assume the local working tree matches GitHub.
 
@@ -75,8 +75,8 @@ The following source findings were inspected at `daa7326` and remain applicable 
 
 | Area | Status | Evidence and limitations |
 |---|---|---|
-| Architecture tests | In progress | `CoreKit.Architecture.Tests/ModuleBoundaryTests.cs` covers SharedKernel, Identity, Access and Tenant, with Tenant → Identity as a documented temporary exception under D-015. Tests were not run as part of this inspection. |
-| Architecture test organization | Pending | Access-focused tests remain in `CoreKit.Architecture.Tests`; no dedicated `CoreKit.Access.Tests` project was established in the inspected snapshot. See S2.1. |
+| Architecture tests | In progress | Boundary enforcement now includes evaluated MSBuild project references, solution inventory and IVT policy (`MsBuildProjectEvaluator.cs`, `SolutionInventory.cs`, `ProjectReferenceBoundaryTests.cs`, `ModuleBoundaryMatrix.cs`). Tests were not run as part of this inspection. |
+| Architecture test organization | Under review | `CoreKit.Access.Tests` exists with 9 files (created in `470d42c`): four test files, `GlobalUsings.cs`, `Support/{Fakes,RulesTests,TestEnv}.cs`, and the csproj. Independent review and a user-run test execution are pending (S2.1). |
 | Access implementation | In progress | Access services, endpoints, audit and scope-related implementation exist. Build, test and manual verification results are not established here. |
 | Access migrations | Under review | Access migration artifacts are committed under `CoreKit.Access/Migrations/` at `43c2179`. Schema correctness, compatibility and database application are not verified. |
 | Identity | In progress | Identity implementation exists. The available evidence does not establish completion of the accepted Identity responsibilities or account lockout. |
@@ -94,12 +94,13 @@ The following source findings were inspected at `daa7326` and remain applicable 
 | Milestone | Status | Notes |
 |---|---|---|
 | M0 — Repository baseline | Reported complete (not independently verified) | Historical inspection report at `9555b8c`; inspection-only. |
-| M1 — Essential architecture decisions | In progress | Accepted decisions are recorded in `decisions.md`; S1 documentation synchronization remains in progress. Decision acceptance does not imply implementation completion. |
-| M2 — Module foundation | In progress | Boundary tests cover SharedKernel, Identity, Access and Tenant. Access test organization remains open under S2.1. |
+| M1 — Essential architecture decisions | In progress | Accepted decisions are recorded in `decisions.md`; S1 documentation synchronization remains in progress until implementation and review finish. Decision acceptance does not imply implementation completion. |
+| M2 — Module foundation | In progress | Boundary tests cover SharedKernel, Identity, Access and Tenant, with Tenant → Identity as an explicit temporary exception under D-015. Access suites now live in `CoreKit.Access.Tests` (S2.1 under review); boundary enforcement uses evaluated project references (S2.2 in progress). |
 | M3 — Identity | In progress | Identity exists; completion of lockout and the role/permission ownership transfer is not established. |
 | M4 — Access | In progress | Access services, endpoints and tests exist. Migration artifacts are committed and require review. Role ownership transfer and manual verification remain open. |
 | M5 — Tenant and Store | In progress | Tenant still references Identity directly. Store implementation is pending. |
-| M6–M13 | Pending | Product implementation and acceptance have not been established. |
+| M6 — SaaS Subscription (`CoreKit.Subscription`) | Pending | No implementation completion established. |
+| M7–M14 | Pending | Product implementation and acceptance have not been established. |
 
 ## Accepted decisions and implementation status
 
@@ -147,9 +148,7 @@ Only one agent may modify the shared working tree at a time. All participating a
 
 ### Instruction-file discrepancy
 
-`CLAUDE.md`, `ai-tasks.md` and `AGENTS.md` still contain the previous Claude-based role allocation. They have not been synchronized with the current allocation above.
-
-Do not treat their old role assignments as the current operating allocation. Updating those files is a separate documentation task and is not included in S1.
+`CLAUDE.md`, `ai-tasks.md` and `AGENTS.md` now state the current allocation (ChatGPT Account 1, DeepSeek Harness, OpenCode + Nemotron, ChatGPT Account 2, User). Verified at `576c84d`.
 
 ## Next proposed work
 
@@ -167,6 +166,7 @@ After S1, follow the approved roadmap queue. Migration artifacts committed at `4
 | 2026-11-04 | Documentation package refreshed to reflect M0 report, approved M1 decisions, micro-slice workflow and Git message guidance | Prepared documentation package; verify against actual repository before applying |
 | 2026-11-08 | Snapshot refreshed at `daa7326`; historical M0 baseline preserved; current snapshot recorded separately; accepted decisions separated from implementation | Committed-file inspection at `daa7326`; local working-tree details were separately reported and not remotely verified |
 | 2026-11-08 | Current snapshot updated for `43c2179`; committed Access, Identity and Tenant migration artifacts recorded; evidence labels and agent-allocation discrepancy clarified | GitHub committed-file inspection at `43c2179`; local working-tree and database state not verified |
+| 2026-11-08 | Snapshot refreshed to `576c84d`; S2.1 recorded Under review; architecture-test evidence updated; obsolete instruction-file discrepancy removed; mandatory task briefing recorded in `ai-tasks.md` §13 | Committed-file inspection at `576c84d`; local tree clean at inspection; no tests or builds run |
 
 ## Update rules
 

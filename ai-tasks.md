@@ -154,6 +154,8 @@ AI may add or update test files, but must report them as not run unless the user
 
 ## 8. Implementation task template
 
+Before using this template, complete the mandatory briefing standard in §13, including the four owner actions.
+
 ```markdown
 # Micro-task: [one measurable outcome]
 
@@ -288,3 +290,65 @@ DeepSeek Harness prepares and investigates.
 OpenCode + Nemotron implements approved tasks.
 ChatGPT Account 2 independently reviews.
 The user owns scope, architecture approval, Git operations, manual testing, and final acceptance.
+
+## 13. Mandatory task briefing standard
+
+Every task brief, handover, review request and implementation instruction must use the same
+nine-part structure and must end with the four owner actions. A brief that omits any part is
+incomplete and must not be implemented.
+
+### Required sections, in this order
+
+1. **Task ID and name** — one unique identifier plus a descriptive name.
+2. **Purpose** — why the work exists; the risk or gap it removes.
+3. **Current issue** — the observed problem, with evidence and current status.
+4. **Proposed changes** — what will change, described as behavior and artifacts.
+5. **Expected result** — the observable outcome once the change is accepted.
+6. **Files and scope** — the only files authorized to change, and what is explicitly out of scope.
+7. **Responsible agents** — preparation, implementation, independent review, coordination, final authority.
+8. **Acceptance criteria** — verifiable conditions; never mark one satisfied without evidence.
+9. **Risks and dependencies** — known risks, blockers and required decisions.
+
+### Required owner actions
+
+Every brief must end with these four items, written concretely:
+
+- **Your decision** — what the Project Owner must approve or choose before work starts.
+- **Your action** — what only the owner can do (Git operations, environment or approvals).
+- **Your verification** — what the owner must check manually.
+- **Your acceptance** — what closes the task.
+
+### Rules
+
+- No implementation starts before the owner approves the briefing.
+- The task ID appears in the handover, the implementation report and the review report.
+- "No action required" is acceptable only when it is true and the reason is stated.
+- Briefs may be short, but no section may be omitted for small tasks.
+- This standard is the canonical one; other documents reference it and do not restate it.
+
+### Copy-ready template
+
+```markdown
+# [Task ID] — [name]
+
+## 1. Task ID and name
+## 2. Purpose
+## 3. Current issue
+## 4. Proposed changes
+## 5. Expected result
+## 6. Files and scope
+## 7. Responsible agents
+- Preparation: DeepSeek Harness
+- Implementation: OpenCode + Nemotron
+- Independent review: ChatGPT Account 2 (read-only)
+- Coordination: ChatGPT Account 1
+- Final authority: User
+## 8. Acceptance criteria
+## 9. Risks and dependencies
+
+## What you need to do
+**Your decision:**
+**Your action:**
+**Your verification:**
+**Your acceptance:**
+```

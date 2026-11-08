@@ -11,7 +11,7 @@ Build a secure, reusable modular SaaS platform for food-item delivery and parcel
 - Break work into small, independently reviewable micro-slices; one approved slice per request.
 - Current agreed workflow: DeepSeek Harness prepares plans and technical handovers; OpenCode + Nemotron implement approved slices; ChatGPT Account 2 independently reviews read-only; ChatGPT Account 1 coordinates and recommends acceptance; the user approves, verifies manually and controls all Git operations.
 - Only one agent modifies the shared working tree at a time. Every participating agent verifies and reports its own baseline SHA.
-- `CLAUDE.md`, `ai-tasks.md` and `AGENTS.md` still contain the previous Claude-based role allocation. They are not yet synchronized with the current operating allocation. Do not rely on their old role assignments for current task ownership. Their synchronization requires a separate approved documentation task.
+- `CLAUDE.md`, `ai-tasks.md` and `AGENTS.md` state the current agent allocation and the mandatory task briefing standard (`ai-tasks.md` §13). Verify them before relying on role assignments.
 - AI may add or update tests but must not run tests or builds without explicit permission. The user normally performs verification manually.
 - AI does not execute migrations or modify databases without explicit permission. Creating migration files also requires approval for that specific slice.
 - AI never performs Git write operations. The user alone stages, commits, pushes, merges and controls repository history.
@@ -40,8 +40,8 @@ Slices are prepared by DeepSeek Harness, implemented by OpenCode + Nemotron, ind
 | Slice | Task | Status | Boundary / completion evidence |
 |---|---|---|---|
 | S1 | Documentation only: synchronize `current-state.md` and `roadmap.md` with accepted decisions, current evidence and current agent allocation | In progress | Corrected content is prepared for manual application. Not complete until the user applies it, the resulting diff is reviewed, and the user accepts it. |
-| S2.1 | Create a dedicated `CoreKit.Access.Tests` project | Pending | Project exists and contains the Access-focused tests in a controlled, reviewed change. |
-| S2.2 | Update architecture-test coverage and references for intended modules | In progress | Boundary rules cover SharedKernel, Identity, Access and Tenant, with a documented temporary exception. Tests have not been run as part of this documentation task. |
+| S2.1 | Create a dedicated `CoreKit.Access.Tests` project | Under review | `CoreKit.Access.Tests` exists with its Access-focused suites (created in `470d42c`). Independent review and user-run tests pending. File presence alone is not completion. |
+| S2.2 | Update architecture-test coverage and references for intended modules | In progress | Boundary rules cover SharedKernel, Identity, Access and Tenant, with a documented temporary exception. Boundary enforcement now evaluates actual MSBuild project references (imports included), validates solution inventory/classification and the IVT policy. Tests have not been run as part of this documentation task. |
 | S3 | Review the Access migration | Under review | Access migration files are committed under `CoreKit.Access/Migrations/` at `43c2179`. Review schema, constraints, relationships and compatibility. Database application requires separate explicit authorization. |
 | S4.1 | Inventory Tenant-to-Identity references and classify each | Reported complete (not independently verified) | Previously reported inventory requires refresh against the current implementation and an approved artifact. |
 | S4.2 | Define and approve SharedKernel contracts for the dependency | Pending | Contract ownership and dependency direction must be approved before implementation. |
@@ -61,7 +61,7 @@ Do not combine adjacent slices automatically. Stop after each slice and wait for
 
 Align module registration, public contracts, persistence ownership, configuration, errors and test conventions. Remove circular dependencies and private cross-module database access.
 
-Boundary tests cover SharedKernel, Identity, Access and Tenant, with Tenant → Identity as an explicit temporary exception under D-015. Access-focused tests remain inside the architecture test project; S2.1 tracks their separation.
+Boundary tests cover SharedKernel, Identity, Access and Tenant, with Tenant → Identity as an explicit temporary exception under D-015. Access suites now live in `CoreKit.Access.Tests` (S2.1 under review); boundary enforcement uses evaluated project references (S2.2 in progress).
 
 **Done when:** module dependency rules and test organization accurately cover the intended modules, with no circular or private persistence access.
 
@@ -77,7 +77,7 @@ The historical M0 report found Identity to be partial, without lockout, and stil
 
 Access owns roles, permissions, assignments and server-side authorization. It must not access Identity private tables or `DbContext`.
 
-Access implementation exists. Migration artifacts are committed at `43c2179` and require review. Their presence does not prove schema correctness, database compatibility or successful application. Role ownership transfer remains a separate task.
+Access implementation exists. Migration artifacts are committed at `43c2179` and require review. Their presence does not prove schema correctness, database compatibility or successful application. Access test suites were separated into `CoreKit.Access.Tests` (`470d42c`). Role ownership transfer remains a separate task.
 
 **Done when:** role/permission ownership and authorization are implemented with positive and negative tests, including tenant/resource-scope cases, and persistence migration is reviewed.
 

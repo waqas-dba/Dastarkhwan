@@ -1,5 +1,4 @@
-﻿using CoreKit.Architecture.Tests.Support;
-using Microsoft.Extensions.Caching.Memory;
+﻿using Microsoft.Extensions.Caching.Memory;
 
 namespace CoreKit.Access.Tests.Support;
 

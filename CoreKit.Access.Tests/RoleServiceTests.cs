@@ -1,6 +1,4 @@
-﻿using CoreKit.Architecture.Tests.Support;
-
-namespace CoreKit.Access.Tests;
+﻿namespace CoreKit.Access.Tests;
 
 public sealed class AccessRoleServiceReadTests : IDisposable
 {
@@ -125,9 +123,11 @@ public sealed class AccessRoleServiceCreateTests : IDisposable
     {
         _env.SignInAs(AccessPermissionNames.RolesRead);
 
+        var roleCountBefore = _env.Read(db => db.Roles.Count());
+
         ResultAssert.Fails(
             await Svc.CreateAsync(new CreateAccessRoleRequest { Name = "Cashier" }), AccessErrorKind.Forbidden, "access.denied");
-        Assert.Empty(_env.Read(db => db.Roles.ToList()));
+        Assert.Equal(roleCountBefore, _env.Read(db => db.Roles.Count()));
     }
 
     [Theory]

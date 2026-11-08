@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="CoreKit.Architecture.Tests" />
+    <InternalsVisibleTo Include="CoreKit.Access.Tests" />
   </ItemGroup>
 
   <ItemGroup>

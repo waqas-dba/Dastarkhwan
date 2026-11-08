@@ -1,6 +1,4 @@
-﻿using CoreKit.Architecture.Tests.Support;
-
-namespace CoreKit.Access.Tests;
+﻿namespace CoreKit.Access.Tests;
 
 public sealed class AccessMaintenanceTests : IDisposable
 {

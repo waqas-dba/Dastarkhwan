@@ -1,6 +1,4 @@
-﻿using CoreKit.Architecture.Tests.Support;
-
-namespace CoreKit.Access.Tests;
+﻿namespace CoreKit.Access.Tests;
 
 public sealed class AccessAssignmentServiceTests : IDisposable
 {
@@ -155,7 +153,13 @@ public sealed class AccessAssignmentServiceTests : IDisposable
         var staff = _env.AddMember(roles: new[] { boss });
 
         ResultAssert.Fails(await Svc.SetRolesAsync(staff, new SetAccessUserRolesRequest()), AccessErrorKind.Forbidden, "access.escalation");
-        Assert.Single(_env.Read(db => db.Assignments.ToList()));
+
+        var assignments = _env.Read(db => db.Assignments
+            .Where(a => a.UserId == staff)
+            .ToList());
+
+        var assignment = Assert.Single(assignments);
+        Assert.Equal(boss.Id, assignment.RoleId);
     }
 
     [Fact]

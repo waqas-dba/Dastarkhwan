@@ -1,0 +1,2190 @@
+[1mdiff --git a/CoreKit.Access/CoreKit.Access.csproj b/CoreKit.Access/CoreKit.Access.csproj[m
+[1mindex 3c4bded..2d18475 100644[m
+[1m--- a/CoreKit.Access/CoreKit.Access.csproj[m
+[1m+++ b/CoreKit.Access/CoreKit.Access.csproj[m
+[36m@@ -17,7 +17,7 @@[m
+   </ItemGroup>[m
+ [m
+   <ItemGroup>[m
+[31m-    <InternalsVisibleTo Include="CoreKit.Architecture.Tests" />[m
+[32m+[m[32m    <InternalsVisibleTo Include="CoreKit.Access.Tests" />[m
+   </ItemGroup>[m
+ [m
+   <ItemGroup>[m
+[1mdiff --git a/CoreKit.Architecture.Tests/AssignmentServiceTests.cs b/CoreKit.Architecture.Tests/AssignmentServiceTests.cs[m
+[1mdeleted file mode 100644[m
+[1mindex d9fcd2d..0000000[m
+[1m--- a/CoreKit.Architecture.Tests/AssignmentServiceTests.cs[m
+[1m+++ /dev/null[m
+[36m@@ -1,203 +0,0 @@[m
+[31m-﻿using CoreKit.Architecture.Tests.Support;[m
+[31m-[m
+[31m-namespace CoreKit.Access.Tests;[m
+[31m-[m
+[31m-public sealed class AccessAssignmentServiceTests : IDisposable[m
+[31m-{[m
+[31m-    private readonly TestEnv _env = new();[m
+[31m-[m
+[31m-    public void Dispose() => _env.Dispose();[m
+[31m-[m
+[31m-    private AccessAssignmentService Svc => _env.CreateAssignmentService();[m
+[31m-[m
+[31m-    private static SetAccessUserRolesRequest Roles(params AccessRole[] roles)[m
+[31m-        => new() { RoleIds = roles.Select(r => r.Id).ToList() };[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetRoles_GivesAMemberARole_AndRecordsWhoDidIt()[m
+[31m-    {[m
+[31m-        var owner = _env.SignInOwner();[m
+[31m-        var cashier = _env.AddRole("Cashier", new[] { "sales.create" });[m
+[31m-        var staff = _env.AddMember();[m
+[31m-[m
+[31m-        var roles = ResultAssert.Ok(await Svc.SetRolesAsync(staff, Roles(cashier)));[m
+[31m-[m
+[31m-        Assert.Equal("Cashier", Assert.Single(roles).Name);[m
+[31m-[m
+[31m-        var assignment = _env.Read(db => db.Assignments.Single());[m
+[31m-        Assert.Equal(staff, assignment.UserId);[m
+[31m-        Assert.Equal(cashier.Id, assignment.RoleId);[m
+[31m-        Assert.Equal(owner, assignment.AssignedBy);[m
+[31m-        Assert.Equal(_env.Scope.Id, assignment.ScopeId);[m
+[31m-        Assert.Equal(_env.UtcNow, assignment.AssignedAt);[m
+[31m-[m
+[31m-        var audit = _env.Read(db => db.AuditEntries.Single(a => a.Action == AccessAuditActions.RolesAssigned));[m
+[31m-        Assert.Contains("Cashier", audit.Details);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetRoles_ReplacesTheWholeSet()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var cashier = _env.AddRole("Cashier", new[] { "sales.create" });[m
+[31m-        var stock = _env.AddRole("Stock", new[] { "products.manage" });[m
+[31m-        var staff = _env.AddMember(roles: new[] { cashier });[m
+[31m-[m
+[31m-        var roles = ResultAssert.Ok(await Svc.SetRolesAsync(staff, Roles(stock)));[m
+[31m-[m
+[31m-        Assert.Equal(new[] { "Stock" }, roles.Select(r => r.Name));[m
+[31m-        Assert.Equal(stock.Id, _env.Read(db => db.Assignments.Single()).RoleId);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetRoles_WithNoRoles_RemovesThemAll()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var cashier = _env.AddRole("Cashier");[m
+[31m-        var staff = _env.AddMember(roles: new[] { cashier });[m
+[31m-[m
+[31m-        var roles = ResultAssert.Ok(await Svc.SetRolesAsync(staff, new SetAccessUserRolesRequest()));[m
+[31m-[m
+[31m-        Assert.Empty(roles);[m
+[31m-        Assert.Empty(_env.Read(db => db.Assignments.ToList()));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetRoles_TheSameSet_IsASilentSuccess()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var cashier = _env.AddRole("Cashier");[m
+[31m-        var staff = _env.AddMember(roles: new[] { cashier });[m
+[31m-[m
+[31m-        ResultAssert.Ok(await Svc.SetRolesAsync(staff, Roles(cashier)));[m
+[31m-[m
+[31m-        Assert.Empty(_env.Read(db => db.AuditEntries.ToList()));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetRoles_IgnoresRepeatedAndEmptyRoleIds()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var cashier = _env.AddRole("Cashier");[m
+[31m-        var staff = _env.AddMember();[m
+[31m-[m
+[31m-        var request = new SetAccessUserRolesRequest { RoleIds = { cashier.Id, cashier.Id, Guid.Empty } };[m
+[31m-[m
+[31m-        Assert.Single(ResultAssert.Ok(await Svc.SetRolesAsync(staff, request)));[m
+[31m-        Assert.Single(_env.Read(db => db.Assignments.ToList()));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetRoles_OnlyForPeopleWhoBelongToTheScope()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var cashier = _env.AddRole("Cashier");[m
+[31m-[m
+[31m-        ResultAssert.Fails(await Svc.SetRolesAsync(Guid.NewGuid(), Roles(cashier)), AccessErrorKind.Validation);[m
+[31m-        ResultAssert.Fails(await Svc.SetRolesAsync(Guid.Empty, Roles(cashier)), AccessErrorKind.Validation);[m
+[31m-        Assert.Empty(_env.Read(db => db.Assignments.ToList()));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetRoles_UnknownRolesAndRolesOfAnotherScopeAreNotFound()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var staff = _env.AddMember();[m
+[31m-        var foreign = _env.AddRole("Foreign", scope: AccessScope.ForTenant(Guid.NewGuid()));[m
+[31m-[m
+[31m-        ResultAssert.Fails([m
+[31m-            await Svc.SetRolesAsync(staff, new SetAccessUserRolesRequest { RoleIds = { Guid.NewGuid() } }), AccessErrorKind.NotFound);[m
+[31m-        ResultAssert.Fails(await Svc.SetRolesAsync(staff, Roles(foreign)), AccessErrorKind.NotFound);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetRoles_EnforcesTheLimitPerPerson()[m
+[31m-    {[m
+[31m-        using var env = new TestEnv(new AccessOptions { MaxRolesPerUser = 1 });[m
+[31m-        env.SignInOwner();[m
+[31m-        var staff = env.AddMember();[m
+[31m-[m
+[31m-        ResultAssert.Fails([m
+[31m-            await env.CreateAssignmentService().SetRolesAsync(staff, new SetAccessUserRolesRequest[m
+[31m-            {[m
+[31m-                RoleIds = { env.AddRole("One").Id, env.AddRole("Two").Id }[m
+[31m-            }),[m
+[31m-            AccessErrorKind.Conflict);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetRoles_NeedsTheManagePermission()[m
+[31m-    {[m
+[31m-        _env.SignInAs(AccessPermissionNames.AssignmentsRead);[m
+[31m-        var cashier = _env.AddRole("Cashier");[m
+[31m-        var staff = _env.AddMember();[m
+[31m-[m
+[31m-        ResultAssert.Fails(await Svc.SetRolesAsync(staff, Roles(cashier)), AccessErrorKind.Forbidden, "access.denied");[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetRoles_CannotGiveARoleStrongerThanTheCaller()[m
+[31m-    {[m
+[31m-        _env.SignInAs(AccessPermissionNames.AssignmentsManage, "sales.create");[m
+[31m-        var seller = _env.AddRole("Seller", new[] { "sales.create" });[m
+[31m-        var boss = _env.AddRole("Boss", new[] { "sales.create", "sales.refund" });[m
+[31m-        var staff = _env.AddMember();[m
+[31m-[m
+[31m-        ResultAssert.Fails(await Svc.SetRolesAsync(staff, Roles(boss)), AccessErrorKind.Forbidden, "access.escalation");[m
+[31m-        ResultAssert.Ok(await Svc.SetRolesAsync(staff, Roles(seller)));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetRoles_CannotTakeAwayARoleStrongerThanTheCaller()[m
+[31m-    {[m
+[31m-        _env.SignInAs(AccessPermissionNames.AssignmentsManage, "sales.create");[m
+[31m-        var boss = _env.AddRole("Boss", new[] { "sales.create", "sales.refund" });[m
+[31m-        var staff = _env.AddMember(roles: new[] { boss });[m
+[31m-[m
+[31m-        ResultAssert.Fails(await Svc.SetRolesAsync(staff, new SetAccessUserRolesRequest()), AccessErrorKind.Forbidden, "access.escalation");[m
+[31m-        Assert.Single(_env.Read(db => db.Assignments.ToList()));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetRoles_NobodyCanPromoteThemselvesPastTheirOwnLevel()[m
+[31m-    {[m
+[31m-        var caller = _env.SignInAs(AccessPermissionNames.AssignmentsManage);[m
+[31m-        var boss = _env.AddRole("Boss", new[] { "sales.refund" });[m
+[31m-[m
+[31m-        ResultAssert.Fails(await Svc.SetRolesAsync(caller, Roles(boss)), AccessErrorKind.Forbidden, "access.escalation");[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetRoles_TakesEffectAtOnce()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var cashier = _env.AddRole("Cashier", new[] { "sales.create" });[m
+[31m-        var staff = _env.AddMember();[m
+[31m-        Assert.False((await _env.Access.GetAccessAsync(staff, _env.Scope)).Has("sales.create"));[m
+[31m-[m
+[31m-        await Svc.SetRolesAsync(staff, Roles(cashier));[m
+[31m-[m
+[31m-        Assert.True((await _env.Access.GetAccessAsync(staff, _env.Scope)).Has("sales.create"));[m
+[31m-[m
+[31m-        await Svc.SetRolesAsync(staff, new SetAccessUserRolesRequest());[m
+[31m-[m
+[31m-        Assert.False((await _env.Access.GetAccessAsync(staff, _env.Scope)).Has("sales.create"));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task GetRoles_ShowsWhatAPersonHolds_AndNeedsTheReadPermission()[m
+[31m-    {[m
+[31m-        var cashier = _env.AddRole("Cashier", new[] { "sales.create" });[m
+[31m-        var staff = _env.AddMember(roles: new[] { cashier });[m
+[31m-[m
+[31m-        _env.SignInAs("sales.create");[m
+[31m-        ResultAssert.Fails(await Svc.GetRolesAsync(staff), AccessErrorKind.Forbidden, "access.denied");[m
+[31m-[m
+[31m-        _env.SignInAs(AccessPermissionNames.AssignmentsRead);[m
+[31m-        var roles = ResultAssert.Ok(await Svc.GetRolesAsync(staff));[m
+[31m-[m
+[31m-        Assert.Equal("Cashier", Assert.Single(roles).Name);[m
+[31m-        Assert.Equal(1, roles[0].MemberCount);[m
+[31m-        ResultAssert.Fails(await Svc.GetRolesAsync(Guid.Empty), AccessErrorKind.Validation);[m
+[31m-    }[m
+[31m-}[m
+\ No newline at end of file[m
+[1mdiff --git a/CoreKit.Architecture.Tests/CoreKit.Architecture.Tests.csproj b/CoreKit.Architecture.Tests/CoreKit.Architecture.Tests.csproj[m
+[1mindex 5399d91..51b2c8e 100644[m
+[1m--- a/CoreKit.Architecture.Tests/CoreKit.Architecture.Tests.csproj[m
+[1m+++ b/CoreKit.Architecture.Tests/CoreKit.Architecture.Tests.csproj[m
+[36m@@ -9,7 +9,6 @@[m
+ [m
+   <ItemGroup>[m
+     <PackageReference Include="coverlet.collector" Version="6.0.4" />[m
+[31m-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.13" />[m
+     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />[m
+     <PackageReference Include="xunit" Version="2.9.3" />[m
+     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />[m
+[1mdiff --git a/CoreKit.Architecture.Tests/DefaultsAndHostingTests.cs b/CoreKit.Architecture.Tests/DefaultsAndHostingTests.cs[m
+[1mdeleted file mode 100644[m
+[1mindex 841fc18..0000000[m
+[1m--- a/CoreKit.Architecture.Tests/DefaultsAndHostingTests.cs[m
+[1m+++ /dev/null[m
+[36m@@ -1,401 +0,0 @@[m
+[31m-﻿using CoreKit.Access.Endpoints;[m
+[31m-using CoreKit.Access.Extensions;[m
+[31m-using CoreKit.Architecture.Tests.Support;[m
+[31m-using Microsoft.AspNetCore.Mvc;[m
+[31m-using Microsoft.AspNetCore.Mvc.Abstractions;[m
+[31m-using Microsoft.AspNetCore.Mvc.Filters;[m
+[31m-using Microsoft.AspNetCore.Routing;[m
+[31m-using Microsoft.Extensions.Configuration;[m
+[31m-using Microsoft.Extensions.DependencyInjection;[m
+[31m-[m
+[31m-namespace CoreKit.Access.Tests;[m
+[31m-[m
+[31m-public sealed class ClaimsCurrentUserTests[m
+[31m-{[m
+[31m-    private static ClaimsCurrentUser For(HttpContext? context, string claimType = "sub")[m
+[31m-        => new([m
+[31m-            new HttpContextAccessor { HttpContext = context },[m
+[31m-            Options.Create(new AccessOptions { UserIdClaimType = claimType }));[m
+[31m-[m
+[31m-    private static DefaultHttpContext SignedIn(string claimType, string value, bool authenticated = true)[m
+[31m-        => new()[m
+[31m-        {[m
+[31m-            User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim(claimType, value) }, authenticated ? "test" : null))[m
+[31m-        };[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void WithoutARequest_ThereIsNoUser()[m
+[31m-    {[m
+[31m-        var user = For(null);[m
+[31m-[m
+[31m-        Assert.Null(user.UserId);[m
+[31m-        Assert.False(user.IsAuthenticated);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void AnAnonymousRequest_HasNoUser_EvenWithAClaim()[m
+[31m-        => Assert.Null(For(SignedIn("sub", Guid.NewGuid().ToString(), authenticated: false)).UserId);[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void ASignedInRequest_ReadsTheIdFromTheClaim()[m
+[31m-    {[m
+[31m-        var id = Guid.NewGuid();[m
+[31m-[m
+[31m-        var user = For(SignedIn("sub", id.ToString()));[m
+[31m-[m
+[31m-        Assert.Equal(id, user.UserId);[m
+[31m-        Assert.True(user.IsAuthenticated);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Theory][m
+[31m-    [InlineData("not-a-guid")][m
+[31m-    [InlineData("00000000-0000-0000-0000-000000000000")][m
+[31m-    [InlineData("")][m
+[31m-    public void ABadClaimValue_MeansNoUser(string value)[m
+[31m-        => Assert.Null(For(SignedIn("sub", value)).UserId);[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void TheClaimTypeIsConfigurable()[m
+[31m-    {[m
+[31m-        var id = Guid.NewGuid();[m
+[31m-[m
+[31m-        Assert.Equal(id, For(SignedIn("uid", id.ToString()), "uid").UserId);[m
+[31m-        Assert.Null(For(SignedIn("sub", id.ToString()), "uid").UserId);[m
+[31m-    }[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class TenantDefaultPortsTests[m
+[31m-{[m
+[31m-    [Fact][m
+[31m-    public void ScopeContext_WithoutATenantModule_HasNoScope()[m
+[31m-        => Assert.Null(new TenantAccessScopeContext().Current);[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void ScopeContext_WithoutAResolvedTenant_HasNoScope()[m
+[31m-        => Assert.Null(new TenantAccessScopeContext(new FakeCurrentTenant()).Current);[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void ScopeContext_IsTheCurrentTenant()[m
+[31m-    {[m
+[31m-        var id = Guid.NewGuid();[m
+[31m-[m
+[31m-        var scope = new TenantAccessScopeContext(new FakeCurrentTenant { Id = id }).Current;[m
+[31m-[m
+[31m-        Assert.Equal(AccessScope.ForTenant(id), scope);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Membership_WithoutATenantModule_NobodyBelongs()[m
+[31m-        => Assert.Null(await new TenantAccessMembership().FindAsync(AccessScope.ForTenant(Guid.NewGuid()), Guid.NewGuid()));[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Membership_ReadsTenantMembership_IncludingTheOwnerFlag()[m
+[31m-    {[m
+[31m-        var tenantId = Guid.NewGuid();[m
+[31m-        var owner = Guid.NewGuid();[m
+[31m-        var staff = Guid.NewGuid();[m
+[31m-        var reader = new FakeTenantMembershipReader();[m
+[31m-        reader.Members[(tenantId, owner)] = true;[m
+[31m-        reader.Members[(tenantId, staff)] = false;[m
+[31m-        var membership = new TenantAccessMembership(reader);[m
+[31m-        var scope = AccessScope.ForTenant(tenantId);[m
+[31m-[m
+[31m-        Assert.Equal(new AccessMember(true), await membership.FindAsync(scope, owner));[m
+[31m-        Assert.Equal(new AccessMember(false), await membership.FindAsync(scope, staff));[m
+[31m-        Assert.Null(await membership.FindAsync(scope, Guid.NewGuid()));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Membership_IsOnlyForTenantScopes()[m
+[31m-    {[m
+[31m-        var id = Guid.NewGuid();[m
+[31m-        var user = Guid.NewGuid();[m
+[31m-        var reader = new FakeTenantMembershipReader();[m
+[31m-        reader.Members[(id, user)] = true;[m
+[31m-[m
+[31m-        Assert.Null(await new TenantAccessMembership(reader).FindAsync(new AccessScope("store", id), user));[m
+[31m-    }[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class AccessPermissionCheckerTests : IDisposable[m
+[31m-{[m
+[31m-    private readonly TestEnv _env = new();[m
+[31m-[m
+[31m-    public void Dispose() => _env.Dispose();[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task AnswersForTheSignedInUserInTheCurrentScope()[m
+[31m-    {[m
+[31m-        _env.SignInAs("sales.create");[m
+[31m-        var checker = new AccessPermissionChecker(_env.Access);[m
+[31m-[m
+[31m-        Assert.True(await checker.HasPermissionAsync("sales.create"));[m
+[31m-        Assert.False(await checker.HasPermissionAsync("sales.refund"));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task WithoutAUserOrAScope_TheAnswerIsNo()[m
+[31m-    {[m
+[31m-        var checker = new AccessPermissionChecker(_env.Access);[m
+[31m-[m
+[31m-        Assert.False(await checker.HasPermissionAsync("sales.create"));[m
+[31m-[m
+[31m-        _env.SignInOwner();[m
+[31m-        _env.ScopeContext.Current = null;[m
+[31m-        Assert.False(await checker.HasPermissionAsync("sales.create"));[m
+[31m-    }[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class RequireAccessAttributeTests : IDisposable[m
+[31m-{[m
+[31m-    private readonly TestEnv _env = new();[m
+[31m-[m
+[31m-    public void Dispose() => _env.Dispose();[m
+[31m-[m
+[31m-    private async Task<(ActionExecutingContext Context, bool NextCalled)> RunAsync(string permission)[m
+[31m-    {[m
+[31m-        var services = new ServiceCollection()[m
+[31m-            .AddSingleton<IAccessScopeContext>(_env.ScopeContext)[m
+[31m-            .AddSingleton<ICurrentUser>(_env.User)[m
+[31m-            .AddSingleton<IAccessService>(_env.Access)[m
+[31m-            .BuildServiceProvider();[m
+[31m-[m
+[31m-        var http = new DefaultHttpContext { RequestServices = services };[m
+[31m-        var actionContext = new ActionContext(http, new RouteData(), new ActionDescriptor());[m
+[31m-        var context = new ActionExecutingContext([m
+[31m-            actionContext, new List<IFilterMetadata>(), new Dictionary<string, object?>(), new object());[m
+[31m-[m
+[31m-        var nextCalled = false;[m
+[31m-[m
+[31m-        await new RequireAccessAttribute(permission).OnActionExecutionAsync(context, () =>[m
+[31m-        {[m
+[31m-            nextCalled = true;[m
+[31m-            return Task.FromResult(new ActionExecutedContext(actionContext, new List<IFilterMetadata>(), new object()));[m
+[31m-        });[m
+[31m-[m
+[31m-        return (context, nextCalled);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task WithoutAScope_Answers400()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        _env.ScopeContext.Current = null;[m
+[31m-[m
+[31m-        var run = await RunAsync("sales.create");[m
+[31m-[m
+[31m-        Assert.False(run.NextCalled);[m
+[31m-        Assert.Equal(400, Assert.IsType<ObjectResult>(run.Context.Result).StatusCode);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task WhenNotSignedIn_Answers401()[m
+[31m-    {[m
+[31m-        var run = await RunAsync("sales.create");[m
+[31m-[m
+[31m-        Assert.False(run.NextCalled);[m
+[31m-        Assert.Equal(401, Assert.IsType<ObjectResult>(run.Context.Result).StatusCode);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task WithoutThePermission_Answers403()[m
+[31m-    {[m
+[31m-        _env.SignInAs("products.view");[m
+[31m-[m
+[31m-        var run = await RunAsync("sales.create");[m
+[31m-[m
+[31m-        Assert.False(run.NextCalled);[m
+[31m-        Assert.Equal(403, Assert.IsType<ObjectResult>(run.Context.Result).StatusCode);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task WithThePermission_TheActionRuns()[m
+[31m-    {[m
+[31m-        _env.SignInAs("sales.create");[m
+[31m-[m
+[31m-        var run = await RunAsync("sales.create");[m
+[31m-[m
+[31m-        Assert.True(run.NextCalled);[m
+[31m-        Assert.Null(run.Context.Result);[m
+[31m-    }[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class AccessDependencyInjectionTests[m
+[31m-{[m
+[31m-    private static ServiceProvider Build([m
+[31m-        SqliteConnection connection,[m
+[31m-        Dictionary<string, string?>? settings = null,[m
+[31m-        Action<IServiceCollection>? before = null)[m
+[31m-    {[m
+[31m-        var configuration = new ConfigurationBuilder()[m
+[31m-            .AddInMemoryCollection(settings ?? new Dictionary<string, string?>())[m
+[31m-            .Build();[m
+[31m-[m
+[31m-        var services = new ServiceCollection();[m
+[31m-        services.AddLogging();[m
+[31m-        before?.Invoke(services);[m
+[31m-        services.AddAccess(configuration, db => db.UseSqlite(connection));[m
+[31m-        services.AddAccessPermissions(p => p.Add("sales.create", "Ring up a sale"));[m
+[31m-        services.AddAccessPermissions(p => p.Add("sales.refund", "Refund a sale")[m
+[31m-            .AddRoleTemplate("Cashier", "Sells", "sales.create"));[m
+[31m-[m
+[31m-        return services.BuildServiceProvider(validateScopes: true);[m
+[31m-    }[m
+[31m-[m
+[31m-    private static SqliteConnection Open()[m
+[31m-    {[m
+[31m-        var connection = new SqliteConnection("DataSource=:memory:;Foreign Keys=True");[m
+[31m-        connection.Open();[m
+[31m-        return connection;[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void EverythingResolves_AndTheCatalogCombinesEveryContribution()[m
+[31m-    {[m
+[31m-        using var connection = Open();[m
+[31m-        using var provider = Build(connection);[m
+[31m-        using var scope = provider.CreateScope();[m
+[31m-        var sp = scope.ServiceProvider;[m
+[31m-[m
+[31m-        Assert.NotNull(sp.GetRequiredService<IAccessService>());[m
+[31m-        Assert.NotNull(sp.GetRequiredService<IAccessRoleService>());[m
+[31m-        Assert.NotNull(sp.GetRequiredService<IAccessAssignmentService>());[m
+[31m-        Assert.NotNull(sp.GetRequiredService<IAccessAuditLog>());[m
+[31m-        Assert.NotNull(sp.GetRequiredService<IAccessMaintenance>());[m
+[31m-        Assert.NotNull(sp.GetRequiredService<IPermissionChecker>());[m
+[31m-[m
+[31m-        var catalog = provider.GetRequiredService<AccessCatalog>();[m
+[31m-        Assert.True(catalog.Contains("sales.create"));[m
+[31m-        Assert.True(catalog.Contains("sales.refund"));[m
+[31m-        Assert.True(catalog.Contains(AccessPermissionNames.RolesManage));[m
+[31m-        Assert.Single(catalog.RoleTemplates);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task OnItsOwn_NoTenantModule_NothingIsGrantedAndScopedCallsAreRefused()[m
+[31m-    {[m
+[31m-        using var connection = Open();[m
+[31m-        using var provider = Build(connection);[m
+[31m-        using var scope = provider.CreateScope();[m
+[31m-[m
+[31m-        var access = scope.ServiceProvider.GetRequiredService<IAccessService>();[m
+[31m-[m
+[31m-        ResultAssert.Fails(await access.GetMyAccessAsync(), AccessErrorKind.Validation, "access.scope_required");[m
+[31m-        Assert.False(await scope.ServiceProvider.GetRequiredService<IPermissionChecker>().HasPermissionAsync("sales.create"));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task WithTheKernelContractsProvided_RolesWorkEndToEnd()[m
+[31m-    {[m
+[31m-        var tenantId = Guid.NewGuid();[m
+[31m-        var ownerId = Guid.NewGuid();[m
+[31m-        var reader = new FakeTenantMembershipReader();[m
+[31m-        reader.Members[(tenantId, ownerId)] = true;[m
+[31m-[m
+[31m-        using var connection = Open();[m
+[31m-        using var provider = Build(connection, before: services =>[m
+[31m-        {[m
+[31m-            services.AddSingleton<ICurrentTenant>(new FakeCurrentTenant { Id = tenantId });[m
+[31m-            services.AddSingleton<ITenantMembershipReader>(reader);[m
+[31m-            services.AddSingleton<ICurrentUser>(new FakeCurrentUser { UserId = ownerId });[m
+[31m-        });[m
+[31m-[m
+[31m-        using var scope = provider.CreateScope();[m
+[31m-        scope.ServiceProvider.GetRequiredService<AccessDbContext>().Database.EnsureCreated();[m
+[31m-[m
+[31m-        var roles = scope.ServiceProvider.GetRequiredService<IAccessRoleService>();[m
+[31m-        var created = ResultAssert.Ok(await roles.CreateAsync(new CreateAccessRoleRequest[m
+[31m-        {[m
+[31m-            Name = "Cashier",[m
+[31m-            Permissions = { "sales.create" }[m
+[31m-        }));[m
+[31m-[m
+[31m-        Assert.Equal("Cashier", created.Name);[m
+[31m-        Assert.Single(ResultAssert.Ok(await roles.ListAsync()));[m
+[31m-        Assert.True(await scope.ServiceProvider.GetRequiredService<IPermissionChecker>().HasPermissionAsync("anything.at.all"));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void TheThreeTenantEventHandlersAreRegistered()[m
+[31m-    {[m
+[31m-        using var connection = Open();[m
+[31m-        using var provider = Build(connection);[m
+[31m-        using var scope = provider.CreateScope();[m
+[31m-        var sp = scope.ServiceProvider;[m
+[31m-[m
+[31m-        Assert.Single(sp.GetServices<IEventHandler<TenantCreated>>());[m
+[31m-        Assert.Single(sp.GetServices<IEventHandler<TenantMemberRemoved>>());[m
+[31m-        Assert.Single(sp.GetServices<IEventHandler<TenantDeleted>>());[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void ARegisteredUserIsNotReplacedByTheClaimsFallback()[m
+[31m-    {[m
+[31m-        using var connection = Open();[m
+[31m-        var mine = new FakeCurrentUser { UserId = Guid.NewGuid() };[m
+[31m-        using var provider = Build(connection, before: s => s.AddSingleton<ICurrentUser>(mine));[m
+[31m-        using var scope = provider.CreateScope();[m
+[31m-[m
+[31m-        Assert.Same(mine, scope.ServiceProvider.GetRequiredService<ICurrentUser>());[m
+[31m-    }[m
+[31m-[m
+[31m-    [Theory][m
+[31m-    [InlineData("Access:MaxRolesPerScope", "0")][m
+[31m-    [InlineData("Access:MaxRolesPerUser", "0")][m
+[31m-    [InlineData("Access:CacheSeconds", "-1")][m
+[31m-    [InlineData("Access:UserIdClaimType", "")][m
+[31m-    public void InvalidOptionsAreRejected(string key, string value)[m
+[31m-    {[m
+[31m-        using var connection = Open();[m
+[31m-        using var provider = Build(connection, new Dictionary<string, string?> { [key] = value });[m
+[31m-[m
+[31m-        Assert.Throws<OptionsValidationException>(() => provider.GetRequiredService<IOptions<AccessOptions>>().Value);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void OptionsAreBoundFromConfiguration()[m
+[31m-    {[m
+[31m-        using var connection = Open();[m
+[31m-        using var provider = Build(connection, new Dictionary<string, string?>[m
+[31m-        {[m
+[31m-            ["Access:MaxRolesPerScope"] = "7",[m
+[31m-            ["Access:CacheSeconds"] = "5",[m
+[31m-            ["Access:UserIdClaimType"] = "uid"[m
+[31m-        });[m
+[31m-[m
+[31m-        var options = provider.GetRequiredService<IOptions<AccessOptions>>().Value;[m
+[31m-[m
+[31m-        Assert.Equal(7, options.MaxRolesPerScope);[m
+[31m-        Assert.Equal(5, options.CacheSeconds);[m
+[31m-        Assert.Equal("uid", options.UserIdClaimType);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void ATemplateUsingAnUndeclaredPermission_FailsWhenTheCatalogIsFirstUsed()[m
+[31m-    {[m
+[31m-        var configuration = new ConfigurationBuilder().Build();[m
+[31m-        var services = new ServiceCollection();[m
+[31m-        services.AddLogging();[m
+[31m-        using var connection = Open();[m
+[31m-        services.AddAccess(configuration, db => db.UseSqlite(connection));[m
+[31m-        services.AddAccessPermissions(p => p.AddRoleTemplate("Oops", null, "never.declared"));[m
+[31m-        using var provider = services.BuildServiceProvider();[m
+[31m-[m
+[31m-        Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService<AccessCatalog>());[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void AMissingConnectionString_FailsWithAClearMessage()[m
+[31m-    {[m
+[31m-        var services = new ServiceCollection();[m
+[31m-        services.AddLogging();[m
+[31m-        services.AddAccess(new ConfigurationBuilder().Build());[m
+[31m-        using var provider = services.BuildServiceProvider();[m
+[31m-        using var scope = provider.CreateScope();[m
+[31m-[m
+[31m-        var error = Assert.Throws<InvalidOperationException>([m
+[31m-            () => scope.ServiceProvider.GetRequiredService<AccessDbContext>());[m
+[31m-[m
+[31m-        Assert.Contains("ConnectionStrings:Access", error.Message);[m
+[31m-    }[m
+[31m-}[m
+\ No newline at end of file[m
+[1mdiff --git a/CoreKit.Architecture.Tests/GlobalUsings.cs b/CoreKit.Architecture.Tests/GlobalUsings.cs[m
+[1mdeleted file mode 100644[m
+[1mindex b6ee1c4..0000000[m
+[1m--- a/CoreKit.Architecture.Tests/GlobalUsings.cs[m
+[1m+++ /dev/null[m
+[36m@@ -1,18 +0,0 @@[m
+[31m-﻿global using System.Security.Claims;[m
+[31m-global using CoreKit.Access.Abstractions;[m
+[31m-global using CoreKit.Access.Catalog;[m
+[31m-global using CoreKit.Access.Common;[m
+[31m-global using CoreKit.Access.Constants;[m
+[31m-global using CoreKit.Access.Entities;[m
+[31m-global using CoreKit.Access.Models;[m
+[31m-global using CoreKit.Access.Persistence;[m
+[31m-global using CoreKit.Access.Services;[m
+[31m-global using CoreKit.Access.Settings;[m
+[31m-global using CoreKit.Access.Tests.Support;[m
+[31m-global using CoreKit.SharedKernel;[m
+[31m-global using Microsoft.AspNetCore.Http;[m
+[31m-global using Microsoft.Data.Sqlite;[m
+[31m-global using Microsoft.EntityFrameworkCore;[m
+[31m-global using Microsoft.Extensions.Logging.Abstractions;[m
+[31m-global using Microsoft.Extensions.Options;[m
+[31m-global using Xunit;[m
+\ No newline at end of file[m
+[1mdiff --git a/CoreKit.Architecture.Tests/MaintenanceAndAuditTests.cs b/CoreKit.Architecture.Tests/MaintenanceAndAuditTests.cs[m
+[1mdeleted file mode 100644[m
+[1mindex b09edc2..0000000[m
+[1m--- a/CoreKit.Architecture.Tests/MaintenanceAndAuditTests.cs[m
+[1m+++ /dev/null[m
+[36m@@ -1,353 +0,0 @@[m
+[31m-﻿using CoreKit.Architecture.Tests.Support;[m
+[31m-[m
+[31m-namespace CoreKit.Access.Tests;[m
+[31m-[m
+[31m-public sealed class AccessMaintenanceTests : IDisposable[m
+[31m-{[m
+[31m-    private readonly TestEnv _env = new();[m
+[31m-[m
+[31m-    public void Dispose() => _env.Dispose();[m
+[31m-[m
+[31m-    private AccessMaintenance Svc => _env.CreateMaintenance();[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task RemoveUser_DropsTheirRoles_AndNobodyElses()[m
+[31m-    {[m
+[31m-        var cashier = _env.AddRole("Cashier", new[] { "sales.create" });[m
+[31m-        var leaver = _env.AddMember(roles: new[] { cashier });[m
+[31m-        var stayer = _env.AddMember(roles: new[] { cashier });[m
+[31m-        Assert.True((await _env.Access.GetAccessAsync(leaver, _env.Scope)).Has("sales.create"));[m
+[31m-[m
+[31m-        await Svc.RemoveUserAsync(_env.Scope, leaver);[m
+[31m-[m
+[31m-        Assert.Equal(stayer, Assert.Single(_env.Read(db => db.Assignments.ToList())).UserId);[m
+[31m-        Assert.Contains(_env.Read(db => db.AuditEntries.ToList()), a => a.Action == AccessAuditActions.UserRemoved);[m
+[31m-        Assert.False((await _env.Access.GetAccessAsync(leaver, _env.Scope)).Has("sales.create"));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task RemoveUser_TouchesOnlyThatScope()[m
+[31m-    {[m
+[31m-        var other = AccessScope.ForTenant(Guid.NewGuid());[m
+[31m-        var user = Guid.NewGuid();[m
+[31m-        var here = _env.AddRole("Here");[m
+[31m-        var there = _env.AddRole("There", scope: other);[m
+[31m-        _env.Assign(user, here);[m
+[31m-        _env.Assign(user, there);[m
+[31m-[m
+[31m-        await Svc.RemoveUserAsync(_env.Scope, user);[m
+[31m-[m
+[31m-        Assert.Equal(there.Id, Assert.Single(_env.Read(db => db.Assignments.ToList())).RoleId);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task RemoveUser_IgnoresEmptyInput()[m
+[31m-    {[m
+[31m-        await Svc.RemoveUserAsync(_env.Scope, Guid.Empty);[m
+[31m-        await Svc.RemoveUserAsync(new AccessScope("", Guid.NewGuid()), Guid.NewGuid());[m
+[31m-[m
+[31m-        Assert.Empty(_env.Read(db => db.AuditEntries.ToList()));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task RemoveScope_DeletesEverythingOfThatScope_AndKeepsTheHistory()[m
+[31m-    {[m
+[31m-        var other = AccessScope.ForTenant(Guid.NewGuid());[m
+[31m-        var mine = _env.AddRole("Mine", new[] { "sales.create" });[m
+[31m-        var theirs = _env.AddRole("Theirs", new[] { "sales.create" }, other);[m
+[31m-        _env.AddMember(roles: new[] { mine });[m
+[31m-        _env.Assign(Guid.NewGuid(), theirs);[m
+[31m-        _env.Seed(db => db.AuditEntries.Add(new AccessAuditEntry[m
+[31m-        {[m
+[31m-            Id = Guid.NewGuid(),[m
+[31m-            ScopeType = _env.Scope.Type,[m
+[31m-            ScopeId = _env.Scope.Id,[m
+[31m-            Action = "earlier",[m
+[31m-            OccurredAt = _env.UtcNow[m
+[31m-        }));[m
+[31m-[m
+[31m-        await Svc.RemoveScopeAsync(_env.Scope);[m
+[31m-[m
+[31m-        Assert.Equal(theirs.Id, Assert.Single(_env.Read(db => db.Roles.ToList())).Id);[m
+[31m-        Assert.Equal(1, _env.Read(db => db.RolePermissions.Count()));[m
+[31m-        Assert.Equal(theirs.Id, Assert.Single(_env.Read(db => db.Assignments.ToList())).RoleId);[m
+[31m-[m
+[31m-        var actions = _env.Read(db => db.AuditEntries.Where(a => a.ScopeId == _env.Scope.Id).Select(a => a.Action).ToList());[m
+[31m-        Assert.Contains("earlier", actions);[m
+[31m-        Assert.Contains(AccessAuditActions.ScopeRemoved, actions);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task RemoveScope_ForgetsRememberedPermissions()[m
+[31m-    {[m
+[31m-        var role = _env.AddRole("Cashier", new[] { "sales.create" });[m
+[31m-        var user = _env.AddMember(roles: new[] { role });[m
+[31m-        Assert.True((await _env.Access.GetAccessAsync(user, _env.Scope)).Has("sales.create"));[m
+[31m-[m
+[31m-        await Svc.RemoveScopeAsync(_env.Scope);[m
+[31m-[m
+[31m-        Assert.False((await _env.Access.GetAccessAsync(user, _env.Scope)).Has("sales.create"));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Provision_CopiesTheTemplates_WithTheirPermissions()[m
+[31m-    {[m
+[31m-        await Svc.ProvisionScopeAsync(_env.Scope);[m
+[31m-[m
+[31m-        var roles = _env.Read(db => db.Roles.AsNoTracking().Include(r => r.Permissions).OrderBy(r => r.Name).ToList());[m
+[31m-[m
+[31m-        Assert.Equal(new[] { "Cashier", "Manager" }, roles.Select(r => r.Name));[m
+[31m-        Assert.Equal(new[] { "products.view", "sales.create" }, roles[0].Permissions.Select(p => p.Permission).Order());[m
+[31m-        Assert.Equal(7, roles[1].Permissions.Count);[m
+[31m-        Assert.All(roles, r => Assert.Equal(_env.Scope.Id, r.ScopeId));[m
+[31m-        Assert.Contains(_env.Read(db => db.AuditEntries.ToList()), a => a.Action == AccessAuditActions.ScopeProvisioned);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Provision_RunsOnlyOnce_AndNeverOverwritesExistingRoles()[m
+[31m-    {[m
+[31m-        await Svc.ProvisionScopeAsync(_env.Scope);[m
+[31m-        await Svc.ProvisionScopeAsync(_env.Scope);[m
+[31m-[m
+[31m-        Assert.Equal(2, _env.Read(db => db.Roles.Count()));[m
+[31m-[m
+[31m-        using var env = new TestEnv();[m
+[31m-        env.AddRole("My own role");[m
+[31m-        await env.CreateMaintenance().ProvisionScopeAsync(env.Scope);[m
+[31m-[m
+[31m-        Assert.Equal("My own role", Assert.Single(env.Read(db => db.Roles.ToList())).Name);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Provision_NeedsTemplatesAndAValidScope()[m
+[31m-    {[m
+[31m-        using var env = new TestEnv(catalog: b => b.Add("sales.create", "x"));[m
+[31m-[m
+[31m-        await env.CreateMaintenance().ProvisionScopeAsync(env.Scope);[m
+[31m-        await Svc.ProvisionScopeAsync(new AccessScope("", Guid.NewGuid()));[m
+[31m-[m
+[31m-        Assert.Empty(env.Read(db => db.Roles.ToList()));[m
+[31m-        Assert.Empty(_env.Read(db => db.Roles.ToList()));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task RemoveUser_FailedSave_ThrowsAndLeavesAssignmentPersisted()[m
+[31m-    {[m
+[31m-        var failing = new FailingUnitOfWork(SaveOutcome.ConstraintViolation);[m
+[31m-        using var env = new TestEnv(unitOfWork: failing);[m
+[31m-        var cashier = env.AddRole("Cashier", new[] { "sales.create" });[m
+[31m-        var user = env.AddMember(roles: new[] { cashier });[m
+[31m-[m
+[31m-        var svc = env.CreateMaintenance();[m
+[31m-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.RemoveUserAsync(env.Scope, user));[m
+[31m-        Assert.Contains("user removal", ex.Message);[m
+[31m-        Assert.Contains("ConstraintViolation", ex.Message);[m
+[31m-[m
+[31m-        var remaining = env.Read(db => db.Assignments.ToList());[m
+[31m-        Assert.Single(remaining);[m
+[31m-        Assert.Equal(user, remaining[0].UserId);[m
+[31m-[m
+[31m-        var auditActions = env.Read(db => db.AuditEntries.ToList()).Select(a => a.Action).ToList();[m
+[31m-        Assert.DoesNotContain(AccessAuditActions.UserRemoved, auditActions);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task RemoveUser_FailedSave_DoesNotInvalidateCache()[m
+[31m-    {[m
+[31m-        var failing = new FailingUnitOfWork(SaveOutcome.ConcurrencyConflict);[m
+[31m-        using var env = new TestEnv(unitOfWork: failing);[m
+[31m-        var cashier = env.AddRole("Cashier", new[] { "sales.create" });[m
+[31m-        var user = env.AddMember(roles: new[] { cashier });[m
+[31m-[m
+[31m-        var cached = new EffectiveAccess([m
+[31m-            true, false, new HashSet<string>(StringComparer.Ordinal) { "sales.create" }, new[] { "Cashier" });[m
+[31m-        env.Cache.Set(env.Scope, user, cached);[m
+[31m-        Assert.True(env.Cache.TryGet(env.Scope, user, out var before));[m
+[31m-        Assert.True(before.Has("sales.create"));[m
+[31m-[m
+[31m-        var svc = env.CreateMaintenance();[m
+[31m-        await Assert.ThrowsAsync<InvalidOperationException>(() => svc.RemoveUserAsync(env.Scope, user));[m
+[31m-[m
+[31m-        Assert.True(env.Cache.TryGet(env.Scope, user, out var after));[m
+[31m-        Assert.True(after.Has("sales.create"));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task RemoveScope_FailedSave_ThrowsAndLeavesEverythingPersisted()[m
+[31m-    {[m
+[31m-        var failing = new FailingUnitOfWork(SaveOutcome.ConcurrencyConflict);[m
+[31m-        using var env = new TestEnv(unitOfWork: failing);[m
+[31m-        var mine = env.AddRole("Mine", new[] { "sales.create" });[m
+[31m-        env.AddMember(roles: new[] { mine });[m
+[31m-        env.Seed(db => db.AuditEntries.Add(new AccessAuditEntry[m
+[31m-        {[m
+[31m-            Id = Guid.NewGuid(),[m
+[31m-            ScopeType = env.Scope.Type,[m
+[31m-            ScopeId = env.Scope.Id,[m
+[31m-            Action = "earlier",[m
+[31m-            OccurredAt = env.UtcNow[m
+[31m-        }));[m
+[31m-[m
+[31m-        var svc = env.CreateMaintenance();[m
+[31m-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.RemoveScopeAsync(env.Scope));[m
+[31m-        Assert.Contains("scope removal", ex.Message);[m
+[31m-        Assert.Contains("ConcurrencyConflict", ex.Message);[m
+[31m-[m
+[31m-        Assert.Single(env.Read(db => db.Roles.ToList()));[m
+[31m-        Assert.Single(env.Read(db => db.RolePermissions.ToList()));[m
+[31m-        Assert.Single(env.Read(db => db.Assignments.ToList()));[m
+[31m-[m
+[31m-        var actions = env.Read(db => db.AuditEntries.Where(a => a.ScopeId == env.Scope.Id).Select(a => a.Action).ToList());[m
+[31m-        Assert.Contains("earlier", actions);[m
+[31m-        Assert.DoesNotContain(AccessAuditActions.ScopeRemoved, actions);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Provision_FailedSave_ThrowsAndLeavesNothingPersisted()[m
+[31m-    {[m
+[31m-        var failing = new FailingUnitOfWork(SaveOutcome.ConstraintViolation);[m
+[31m-        using var env = new TestEnv(unitOfWork: failing);[m
+[31m-[m
+[31m-        var svc = env.CreateMaintenance();[m
+[31m-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.ProvisionScopeAsync(env.Scope));[m
+[31m-        Assert.Contains("scope provisioning", ex.Message);[m
+[31m-        Assert.Contains("ConstraintViolation", ex.Message);[m
+[31m-[m
+[31m-        Assert.Empty(env.Read(db => db.Roles.ToList()));[m
+[31m-        var auditActions = env.Read(db => db.AuditEntries.ToList()).Select(a => a.Action).ToList();[m
+[31m-        Assert.DoesNotContain(AccessAuditActions.ScopeProvisioned, auditActions);[m
+[31m-    }[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class TenantEventHandlerTests : IDisposable[m
+[31m-{[m
+[31m-    private readonly TestEnv _env = new();[m
+[31m-    private static readonly DateTime Moment = new(2026, 10, 9, 12, 0, 0, DateTimeKind.Utc);[m
+[31m-[m
+[31m-    public void Dispose() => _env.Dispose();[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task TenantCreated_ProvisionsTheTemplates()[m
+[31m-    {[m
+[31m-        await new TenantCreatedHandler(_env.CreateMaintenance()).HandleAsync(new TenantCreated(_env.Scope.Id, Moment));[m
+[31m-[m
+[31m-        Assert.Equal(2, _env.Read(db => db.Roles.Count(r => r.ScopeId == _env.Scope.Id)));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task TenantMemberRemoved_DropsThatPersonsRoles()[m
+[31m-    {[m
+[31m-        var role = _env.AddRole("Cashier");[m
+[31m-        var user = _env.AddMember(roles: new[] { role });[m
+[31m-[m
+[31m-        await new TenantMemberRemovedHandler(_env.CreateMaintenance())[m
+[31m-            .HandleAsync(new TenantMemberRemoved(_env.Scope.Id, user, Moment));[m
+[31m-[m
+[31m-        Assert.Empty(_env.Read(db => db.Assignments.ToList()));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task TenantDeleted_RemovesTheTenantsRoles()[m
+[31m-    {[m
+[31m-        var role = _env.AddRole("Cashier", new[] { "sales.create" });[m
+[31m-        _env.AddMember(roles: new[] { role });[m
+[31m-[m
+[31m-        await new TenantDeletedHandler(_env.CreateMaintenance()).HandleAsync(new TenantDeleted(_env.Scope.Id, Moment));[m
+[31m-[m
+[31m-        Assert.Empty(_env.Read(db => db.Roles.ToList()));[m
+[31m-        Assert.Empty(_env.Read(db => db.Assignments.ToList()));[m
+[31m-    }[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class AccessAuditLogTests : IDisposable[m
+[31m-{[m
+[31m-    private readonly TestEnv _env = new();[m
+[31m-[m
+[31m-    public void Dispose() => _env.Dispose();[m
+[31m-[m
+[31m-    private async Task MakeSomeHistoryAsync()[m
+[31m-    {[m
+[31m-        var owner = _env.SignInOwner();[m
+[31m-        var roles = _env.CreateRoleService();[m
+[31m-[m
+[31m-        var cashier = ResultAssert.Ok(await roles.CreateAsync(new CreateAccessRoleRequest { Name = "Cashier" }));[m
+[31m-        _env.Time.Advance(TimeSpan.FromMinutes(1));[m
+[31m-        await roles.UpdateAsync(cashier.Id, new UpdateAccessRoleRequest { Name = "Teller" });[m
+[31m-        _env.Time.Advance(TimeSpan.FromMinutes(1));[m
+[31m-        await roles.DeleteAsync(cashier.Id);[m
+[31m-[m
+[31m-        Assert.NotEqual(Guid.Empty, owner);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task List_ShowsNewestFirst_WithTheActor()[m
+[31m-    {[m
+[31m-        await MakeSomeHistoryAsync();[m
+[31m-[m
+[31m-        var page = ResultAssert.Ok(await _env.CreateAuditLog().ListAsync());[m
+[31m-[m
+[31m-        Assert.Equal([m
+[31m-            new[] { AccessAuditActions.RoleDeleted, AccessAuditActions.RoleUpdated, AccessAuditActions.RoleCreated },[m
+[31m-            page.Items.Select(e => e.Action));[m
+[31m-        Assert.Equal(3, page.TotalCount);[m
+[31m-        Assert.All(page.Items, e => Assert.Equal(_env.User.UserId, e.ActorUserId));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task List_Pages()[m
+[31m-    {[m
+[31m-        await MakeSomeHistoryAsync();[m
+[31m-[m
+[31m-        var second = ResultAssert.Ok(await _env.CreateAuditLog().ListAsync(page: 2, pageSize: 2));[m
+[31m-[m
+[31m-        Assert.Equal(new[] { AccessAuditActions.RoleCreated }, second.Items.Select(e => e.Action));[m
+[31m-        Assert.Equal(2, second.TotalPages);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task List_ClampsPaging()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-[m
+[31m-        var page = ResultAssert.Ok(await _env.CreateAuditLog().ListAsync(page: 0, pageSize: 100000));[m
+[31m-[m
+[31m-        Assert.Equal(1, page.Page);[m
+[31m-        Assert.Equal(200, page.PageSize);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task List_ShowsOnlyThisScopesHistory()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        _env.Seed(db => db.AuditEntries.Add(new AccessAuditEntry[m
+[31m-        {[m
+[31m-            Id = Guid.NewGuid(),[m
+[31m-            ScopeType = "tenant",[m
+[31m-            ScopeId = Guid.NewGuid(),[m
+[31m-            Action = "foreign",[m
+[31m-            OccurredAt = _env.UtcNow[m
+[31m-        }));[m
+[31m-[m
+[31m-        var page = ResultAssert.Ok(await _env.CreateAuditLog().ListAsync());[m
+[31m-[m
+[31m-        Assert.Empty(page.Items);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task List_NeedsThePermission()[m
+[31m-    {[m
+[31m-        _env.SignInAs(AccessPermissionNames.RolesRead);[m
+[31m-[m
+[31m-        ResultAssert.Fails(await _env.CreateAuditLog().ListAsync(), AccessErrorKind.Forbidden, "access.denied");[m
+[31m-    }[m
+[31m-}[m
+[31m-[m
+[31m-/// <summary>Test double that reports a non-successful save outcome, so maintenance tests can force a failed save without touching the database.</summary>[m
+[31m-internal sealed class FailingUnitOfWork : IAccessUnitOfWork[m
+[31m-{[m
+[31m-    private readonly SaveOutcome _outcome;[m
+[31m-[m
+[31m-    public FailingUnitOfWork(SaveOutcome outcome) => _outcome = outcome;[m
+[31m-[m
+[31m-    public Task<SaveOutcome> SaveAsync(CancellationToken ct = default) => Task.FromResult(_outcome);[m
+[31m-}[m
+\ No newline at end of file[m
+[1mdiff --git a/CoreKit.Architecture.Tests/ModuleBoundaryTests.cs b/CoreKit.Architecture.Tests/ModuleBoundaryTests.cs[m
+[1mindex 240f5f7..4419e72 100644[m
+[1m--- a/CoreKit.Architecture.Tests/ModuleBoundaryTests.cs[m
+[1m+++ b/CoreKit.Architecture.Tests/ModuleBoundaryTests.cs[m
+[36m@@ -1,3 +1,7 @@[m
+[32m+[m[32musing System;[m
+[32m+[m[32musing System.Collections.Generic;[m
+[32m+[m[32musing System.IO;[m
+[32m+[m[32musing System.Linq;[m
+ using System.Reflection;[m
+ using Xunit;[m
+ [m
+[1mdiff --git a/CoreKit.Architecture.Tests/RoleServiceTests.cs b/CoreKit.Architecture.Tests/RoleServiceTests.cs[m
+[1mdeleted file mode 100644[m
+[1mindex a3df430..0000000[m
+[1m--- a/CoreKit.Architecture.Tests/RoleServiceTests.cs[m
+[1m+++ /dev/null[m
+[36m@@ -1,464 +0,0 @@[m
+[31m-﻿using CoreKit.Architecture.Tests.Support;[m
+[31m-[m
+[31m-namespace CoreKit.Access.Tests;[m
+[31m-[m
+[31m-public sealed class AccessRoleServiceReadTests : IDisposable[m
+[31m-{[m
+[31m-    private readonly TestEnv _env = new();[m
+[31m-[m
+[31m-    public void Dispose() => _env.Dispose();[m
+[31m-[m
+[31m-    private AccessRoleService Svc => _env.CreateRoleService();[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task ListPermissions_ShowsTheCatalog()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-[m
+[31m-        var permissions = ResultAssert.Ok(await Svc.ListPermissionsAsync());[m
+[31m-[m
+[31m-        Assert.Contains(permissions, p => p.Name == "sales.create" && p.Description == "Ring up a sale");[m
+[31m-        Assert.Contains(permissions, p => p.Name == AccessPermissionNames.RolesManage);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task EveryReadNeedsThePermission()[m
+[31m-    {[m
+[31m-        _env.SignInAs("sales.create");[m
+[31m-        var role = _env.AddRole("Cashier");[m
+[31m-[m
+[31m-        ResultAssert.Fails(await Svc.ListPermissionsAsync(), AccessErrorKind.Forbidden, "access.denied");[m
+[31m-        ResultAssert.Fails(await Svc.ListAsync(), AccessErrorKind.Forbidden, "access.denied");[m
+[31m-        ResultAssert.Fails(await Svc.GetAsync(role.Id), AccessErrorKind.Forbidden, "access.denied");[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task CallsWithoutAScopeOrUserAreRefused()[m
+[31m-    {[m
+[31m-        ResultAssert.Fails(await Svc.ListAsync(), AccessErrorKind.Unauthorized);[m
+[31m-[m
+[31m-        _env.SignInOwner();[m
+[31m-        _env.ScopeContext.Current = null;[m
+[31m-        ResultAssert.Fails(await Svc.ListAsync(), AccessErrorKind.Validation, "access.scope_required");[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task List_ShowsOnlyThisScopesRoles_SortedByName_WithMemberCounts()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var zeta = _env.AddRole("Zeta", new[] { "sales.create" });[m
+[31m-        var alpha = _env.AddRole("Alpha");[m
+[31m-        _env.AddRole("Foreign", scope: AccessScope.ForTenant(Guid.NewGuid()));[m
+[31m-        _env.AddMember(roles: new[] { zeta });[m
+[31m-        _env.AddMember(roles: new[] { zeta });[m
+[31m-[m
+[31m-        var roles = ResultAssert.Ok(await Svc.ListAsync());[m
+[31m-[m
+[31m-        Assert.Equal(new[] { "Alpha", "Zeta" }, roles.Select(r => r.Name));[m
+[31m-        Assert.Equal(2, roles.Single(r => r.Name == "Zeta").MemberCount);[m
+[31m-        Assert.Equal(0, roles.Single(r => r.Id == alpha.Id).MemberCount);[m
+[31m-        Assert.Equal(new[] { "sales.create" }, roles.Single(r => r.Name == "Zeta").Permissions);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Get_ReturnsTheRole_ButNeverOneFromAnotherScope()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var own = _env.AddRole("Cashier", new[] { "sales.create" });[m
+[31m-        var foreign = _env.AddRole("Foreign", scope: AccessScope.ForTenant(Guid.NewGuid()));[m
+[31m-[m
+[31m-        Assert.Equal("Cashier", ResultAssert.Ok(await Svc.GetAsync(own.Id)).Name);[m
+[31m-        ResultAssert.Fails(await Svc.GetAsync(foreign.Id), AccessErrorKind.NotFound);[m
+[31m-        ResultAssert.Fails(await Svc.GetAsync(Guid.NewGuid()), AccessErrorKind.NotFound);[m
+[31m-    }[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class AccessRoleServiceCreateTests : IDisposable[m
+[31m-{[m
+[31m-    private readonly TestEnv _env = new();[m
+[31m-[m
+[31m-    public void Dispose() => _env.Dispose();[m
+[31m-[m
+[31m-    private AccessRoleService Svc => _env.CreateRoleService();[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Create_SavesTheRoleInTheCurrentScope()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-[m
+[31m-        var dto = ResultAssert.Ok(await Svc.CreateAsync(new CreateAccessRoleRequest[m
+[31m-        {[m
+[31m-            Name = "  Cashier ",[m
+[31m-            Description = " Rings up sales ",[m
+[31m-            Permissions = { "Sales.Create", "products.view", "sales.create" }[m
+[31m-        }));[m
+[31m-[m
+[31m-        Assert.Equal("Cashier", dto.Name);[m
+[31m-        Assert.Equal("Rings up sales", dto.Description);[m
+[31m-        Assert.Equal(new[] { "products.view", "sales.create" }, dto.Permissions);[m
+[31m-        Assert.Equal(0, dto.MemberCount);[m
+[31m-        Assert.Equal(_env.UtcNow, dto.CreatedAt);[m
+[31m-[m
+[31m-        var row = _env.Read(db => db.Roles.AsNoTracking().Include(r => r.Permissions).Single(r => r.Id == dto.Id));[m
+[31m-        Assert.Equal(_env.Scope.Type, row.ScopeType);[m
+[31m-        Assert.Equal(_env.Scope.Id, row.ScopeId);[m
+[31m-        Assert.Equal("CASHIER", row.NormalizedName);[m
+[31m-        Assert.Equal(2, row.Permissions.Count);[m
+[31m-        Assert.NotEqual(Guid.Empty, row.ConcurrencyStamp);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Create_WritesAnAuditEntryWithTheActor()[m
+[31m-    {[m
+[31m-        var owner = _env.SignInOwner();[m
+[31m-[m
+[31m-        await Svc.CreateAsync(new CreateAccessRoleRequest { Name = "Cashier" });[m
+[31m-[m
+[31m-        var entry = _env.Read(db => db.AuditEntries.Single(a => a.Action == AccessAuditActions.RoleCreated));[m
+[31m-        Assert.Equal(owner, entry.ActorUserId);[m
+[31m-        Assert.Equal(_env.Scope.Id, entry.ScopeId);[m
+[31m-        Assert.Contains("Cashier", entry.Details);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Create_NeedsTheManagePermission()[m
+[31m-    {[m
+[31m-        _env.SignInAs(AccessPermissionNames.RolesRead);[m
+[31m-[m
+[31m-        ResultAssert.Fails([m
+[31m-            await Svc.CreateAsync(new CreateAccessRoleRequest { Name = "Cashier" }), AccessErrorKind.Forbidden, "access.denied");[m
+[31m-        Assert.Empty(_env.Read(db => db.Roles.ToList()));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Theory][m
+[31m-    [InlineData("")][m
+[31m-    [InlineData("   ")][m
+[31m-    public async Task Create_RequiresAName(string name)[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-[m
+[31m-        ResultAssert.Fails(await Svc.CreateAsync(new CreateAccessRoleRequest { Name = name }), AccessErrorKind.Validation);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Create_EnforcesTheTextLimits()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-[m
+[31m-        ResultAssert.Fails([m
+[31m-            await Svc.CreateAsync(new CreateAccessRoleRequest { Name = new string('a', 101) }), AccessErrorKind.Validation);[m
+[31m-        ResultAssert.Fails([m
+[31m-            await Svc.CreateAsync(new CreateAccessRoleRequest { Name = "Ok", Description = new string('a', 501) }),[m
+[31m-            AccessErrorKind.Validation);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Create_RejectsAPermissionNobodyDeclared()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-[m
+[31m-        ResultAssert.Fails([m
+[31m-            await Svc.CreateAsync(new CreateAccessRoleRequest { Name = "Odd", Permissions = { "made.up" } }),[m
+[31m-            AccessErrorKind.Validation);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Create_RejectsADuplicateName_IgnoringCase_ButOnlyWithinTheScope()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        _env.AddRole("Cashier");[m
+[31m-        _env.AddRole("Waiter", scope: AccessScope.ForTenant(Guid.NewGuid()));[m
+[31m-[m
+[31m-        ResultAssert.Fails(await Svc.CreateAsync(new CreateAccessRoleRequest { Name = "CASHIER" }), AccessErrorKind.Conflict);[m
+[31m-        ResultAssert.Ok(await Svc.CreateAsync(new CreateAccessRoleRequest { Name = "Waiter" }));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Create_EnforcesTheRoleLimit()[m
+[31m-    {[m
+[31m-        using var env = new TestEnv(new AccessOptions { MaxRolesPerScope = 1 });[m
+[31m-        env.SignInOwner();[m
+[31m-        env.AddRole("First");[m
+[31m-[m
+[31m-        ResultAssert.Fails([m
+[31m-            await env.CreateRoleService().CreateAsync(new CreateAccessRoleRequest { Name = "Second" }), AccessErrorKind.Conflict);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Create_CannotGrantPermissionsTheCallerLacks()[m
+[31m-    {[m
+[31m-        _env.SignInAs(AccessPermissionNames.RolesManage, "sales.create");[m
+[31m-[m
+[31m-        ResultAssert.Fails([m
+[31m-            await Svc.CreateAsync(new CreateAccessRoleRequest { Name = "Boss", Permissions = { "sales.create", "sales.refund" } }),[m
+[31m-            AccessErrorKind.Forbidden, "access.escalation");[m
+[31m-        ResultAssert.Ok([m
+[31m-            await Svc.CreateAsync(new CreateAccessRoleRequest { Name = "Seller", Permissions = { "sales.create" } }));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Create_AFailedRequestLeavesNoAuditEntry()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-[m
+[31m-        await Svc.CreateAsync(new CreateAccessRoleRequest { Name = "" });[m
+[31m-[m
+[31m-        Assert.Empty(_env.Read(db => db.AuditEntries.ToList()));[m
+[31m-    }[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class AccessRoleServiceChangeTests : IDisposable[m
+[31m-{[m
+[31m-    private readonly TestEnv _env = new();[m
+[31m-[m
+[31m-    public void Dispose() => _env.Dispose();[m
+[31m-[m
+[31m-    private AccessRoleService Svc => _env.CreateRoleService();[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Update_ChangesNameAndDescription()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var role = _env.AddRole("Cashier");[m
+[31m-[m
+[31m-        var dto = ResultAssert.Ok(await Svc.UpdateAsync([m
+[31m-            role.Id, new UpdateAccessRoleRequest { Name = " Till operator ", Description = "At the till" }));[m
+[31m-[m
+[31m-        Assert.Equal("Till operator", dto.Name);[m
+[31m-        Assert.Equal("At the till", dto.Description);[m
+[31m-        Assert.Equal(_env.UtcNow, dto.UpdatedAt);[m
+[31m-[m
+[31m-        var row = _env.Read(db => db.Roles.AsNoTracking().Single(r => r.Id == role.Id));[m
+[31m-        Assert.Equal("TILL OPERATOR", row.NormalizedName);[m
+[31m-        Assert.NotEqual(role.ConcurrencyStamp, row.ConcurrencyStamp);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Update_AnEmptyDescriptionClearsIt_AndNullLeavesItAlone()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var role = _env.AddRole("Cashier");[m
+[31m-        _env.Seed(db => db.Roles.Single(r => r.Id == role.Id).Description = "Keep me");[m
+[31m-[m
+[31m-        await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Name = "Teller" });[m
+[31m-        Assert.Equal("Keep me", _env.Read(db => db.Roles.Single(r => r.Id == role.Id)).Description);[m
+[31m-[m
+[31m-        await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Description = "" });[m
+[31m-        Assert.Null(_env.Read(db => db.Roles.Single(r => r.Id == role.Id)).Description);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Update_ACaseOnlyRename_IsAllowed()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var role = _env.AddRole("cashier");[m
+[31m-[m
+[31m-        var dto = ResultAssert.Ok(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Name = "Cashier" }));[m
+[31m-[m
+[31m-        Assert.Equal("Cashier", dto.Name);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Update_NothingChanged_IsASilentSuccess()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var role = _env.AddRole("Cashier");[m
+[31m-[m
+[31m-        ResultAssert.Ok(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Name = "Cashier" }));[m
+[31m-[m
+[31m-        Assert.Empty(_env.Read(db => db.AuditEntries.ToList()));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Update_RefusesANameAnotherRoleHas_AndChangesNothing()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var role = _env.AddRole("Cashier");[m
+[31m-        _env.AddRole("Waiter");[m
+[31m-[m
+[31m-        ResultAssert.Fails(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Name = "WAITER" }), AccessErrorKind.Conflict);[m
+[31m-        Assert.Equal("Cashier", _env.Read(db => db.Roles.Single(r => r.Id == role.Id)).Name);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Update_AValidationFailureChangesNothing()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var role = _env.AddRole("Cashier");[m
+[31m-[m
+[31m-        ResultAssert.Fails([m
+[31m-            await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Name = "Renamed", Description = new string('a', 501) }),[m
+[31m-            AccessErrorKind.Validation);[m
+[31m-        Assert.Equal("Cashier", _env.Read(db => db.Roles.Single(r => r.Id == role.Id)).Name);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Update_UnknownRoleAndOtherScopesRolesAreNotFound()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var foreign = _env.AddRole("Foreign", scope: AccessScope.ForTenant(Guid.NewGuid()));[m
+[31m-[m
+[31m-        ResultAssert.Fails(await Svc.UpdateAsync(Guid.NewGuid(), new UpdateAccessRoleRequest { Name = "x" }), AccessErrorKind.NotFound);[m
+[31m-        ResultAssert.Fails(await Svc.UpdateAsync(foreign.Id, new UpdateAccessRoleRequest { Name = "x" }), AccessErrorKind.NotFound);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Update_NeedsTheManagePermission_AndCannotTouchAStrongerRole()[m
+[31m-    {[m
+[31m-        var role = _env.AddRole("Boss", new[] { "sales.refund" });[m
+[31m-[m
+[31m-        _env.SignInAs(AccessPermissionNames.RolesRead);[m
+[31m-        ResultAssert.Fails(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Name = "x" }), AccessErrorKind.Forbidden, "access.denied");[m
+[31m-[m
+[31m-        _env.SignInAs(AccessPermissionNames.RolesManage, "sales.create");[m
+[31m-        ResultAssert.Fails(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Name = "x" }), AccessErrorKind.Forbidden, "access.escalation");[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Update_TakesEffectAtOnceForPeopleWhoHoldTheRole()[m
+[31m-    {[m
+[31m-        var owner = _env.SignInOwner();[m
+[31m-        var role = _env.AddRole("Old name", new[] { "sales.create" });[m
+[31m-        var holder = _env.AddMember(roles: new[] { role });[m
+[31m-        Assert.Equal(new[] { "Old name" }, (await _env.Access.GetAccessAsync(holder, _env.Scope)).Roles);[m
+[31m-[m
+[31m-        await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Name = "New name" });[m
+[31m-[m
+[31m-        Assert.Equal(new[] { "New name" }, (await _env.Access.GetAccessAsync(holder, _env.Scope)).Roles);[m
+[31m-        Assert.NotEqual(Guid.Empty, owner);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetPermissions_AddsAndRemoves_AndAuditsBoth()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var role = _env.AddRole("Cashier", new[] { "sales.create", "products.view" });[m
+[31m-[m
+[31m-        var dto = ResultAssert.Ok(await Svc.SetPermissionsAsync([m
+[31m-            role.Id, new SetAccessRolePermissionsRequest { Permissions = { "products.view", "sales.refund" } }));[m
+[31m-[m
+[31m-        Assert.Equal(new[] { "products.view", "sales.refund" }, dto.Permissions);[m
+[31m-[m
+[31m-        var entry = _env.Read(db => db.AuditEntries.Single(a => a.Action == AccessAuditActions.RolePermissionsChanged));[m
+[31m-        Assert.Contains("added: sales.refund", entry.Details);[m
+[31m-        Assert.Contains("removed: sales.create", entry.Details);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetPermissions_CanClearEveryPermission()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var role = _env.AddRole("Cashier", new[] { "sales.create" });[m
+[31m-[m
+[31m-        var dto = ResultAssert.Ok(await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest()));[m
+[31m-[m
+[31m-        Assert.Empty(dto.Permissions);[m
+[31m-        Assert.Empty(_env.Read(db => db.RolePermissions.ToList()));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetPermissions_NothingChanged_IsASilentSuccess()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var role = _env.AddRole("Cashier", new[] { "sales.create" });[m
+[31m-[m
+[31m-        ResultAssert.Ok(await Svc.SetPermissionsAsync([m
+[31m-            role.Id, new SetAccessRolePermissionsRequest { Permissions = { "sales.create" } }));[m
+[31m-[m
+[31m-        Assert.Empty(_env.Read(db => db.AuditEntries.ToList()));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetPermissions_RejectsUnknownPermissions_AndUnknownRoles()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var role = _env.AddRole("Cashier");[m
+[31m-[m
+[31m-        ResultAssert.Fails([m
+[31m-            await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest { Permissions = { "made.up" } }),[m
+[31m-            AccessErrorKind.Validation);[m
+[31m-        ResultAssert.Fails([m
+[31m-            await Svc.SetPermissionsAsync(Guid.NewGuid(), new SetAccessRolePermissionsRequest()), AccessErrorKind.NotFound);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetPermissions_CannotAddAPermissionTheCallerLacks()[m
+[31m-    {[m
+[31m-        _env.SignInAs(AccessPermissionNames.RolesManage, "sales.create");[m
+[31m-        var role = _env.AddRole("Cashier", new[] { "sales.create" });[m
+[31m-[m
+[31m-        ResultAssert.Fails([m
+[31m-            await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest { Permissions = { "sales.create", "sales.refund" } }),[m
+[31m-            AccessErrorKind.Forbidden, "access.escalation");[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetPermissions_CannotStripARoleThatIsStrongerThanTheCaller()[m
+[31m-    {[m
+[31m-        _env.SignInAs(AccessPermissionNames.RolesManage, "sales.create");[m
+[31m-        var role = _env.AddRole("Boss", new[] { "sales.create", "sales.refund" });[m
+[31m-[m
+[31m-        ResultAssert.Fails([m
+[31m-            await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest { Permissions = { "sales.create" } }),[m
+[31m-            AccessErrorKind.Forbidden, "access.escalation");[m
+[31m-        Assert.Equal(2, _env.Read(db => db.RolePermissions.Count(p => p.RoleId == role.Id)));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task SetPermissions_TakesEffectAtOnceForPeopleWhoHoldTheRole()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var role = _env.AddRole("Cashier", new[] { "sales.create" });[m
+[31m-        var holder = _env.AddMember(roles: new[] { role });[m
+[31m-        Assert.True((await _env.Access.GetAccessAsync(holder, _env.Scope)).Has("sales.create"));[m
+[31m-[m
+[31m-        await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest { Permissions = { "products.view" } });[m
+[31m-[m
+[31m-        var after = await _env.Access.GetAccessAsync(holder, _env.Scope);[m
+[31m-        Assert.False(after.Has("sales.create"));[m
+[31m-        Assert.True(after.Has("products.view"));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Delete_RemovesTheRoleAndItsPermissions()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var role = _env.AddRole("Cashier", new[] { "sales.create" });[m
+[31m-[m
+[31m-        ResultAssert.Ok(await Svc.DeleteAsync(role.Id));[m
+[31m-[m
+[31m-        Assert.Empty(_env.Read(db => db.Roles.ToList()));[m
+[31m-        Assert.Empty(_env.Read(db => db.RolePermissions.ToList()));[m
+[31m-        Assert.Contains(_env.Read(db => db.AuditEntries.ToList()), a => a.Action == AccessAuditActions.RoleDeleted);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Delete_RefusesARoleSomeoneStillHolds()[m
+[31m-    {[m
+[31m-        _env.SignInOwner();[m
+[31m-        var role = _env.AddRole("Cashier");[m
+[31m-        _env.AddMember(roles: new[] { role });[m
+[31m-[m
+[31m-        ResultAssert.Fails(await Svc.DeleteAsync(role.Id), AccessErrorKind.Conflict);[m
+[31m-        Assert.Single(_env.Read(db => db.Roles.ToList()));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Delete_UnknownRoleIsNotFound_AndAStrongerRoleCannotBeDeleted()[m
+[31m-    {[m
+[31m-        _env.SignInAs(AccessPermissionNames.RolesManage);[m
+[31m-        var boss = _env.AddRole("Boss", new[] { "sales.refund" });[m
+[31m-[m
+[31m-        ResultAssert.Fails(await Svc.DeleteAsync(Guid.NewGuid()), AccessErrorKind.NotFound);[m
+[31m-        ResultAssert.Fails(await Svc.DeleteAsync(boss.Id), AccessErrorKind.Forbidden, "access.escalation");[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public async Task Delete_NeedsTheManagePermission()[m
+[31m-    {[m
+[31m-        _env.SignInAs(AccessPermissionNames.RolesRead);[m
+[31m-        var role = _env.AddRole("Cashier");[m
+[31m-[m
+[31m-        ResultAssert.Fails(await Svc.DeleteAsync(role.Id), AccessErrorKind.Forbidden, "access.denied");[m
+[31m-    }[m
+[31m-}[m
+\ No newline at end of file[m
+[1mdiff --git a/CoreKit.Architecture.Tests/Support/AccessServiceTests.cs b/CoreKit.Architecture.Tests/Support/AccessServiceTests.cs[m
+[1mdeleted file mode 100644[m
+[1mindex 78c03a8..0000000[m
+[1m--- a/CoreKit.Architecture.Tests/Support/AccessServiceTests.cs[m
+[1m+++ /dev/null[m
+[36m@@ -1,10 +0,0 @@[m
+[31m-﻿using System;[m
+[31m-using System.Collections.Generic;[m
+[31m-using System.Text;[m
+[31m-[m
+[31m-namespace CoreKit.Architecture.Tests.Support[m
+[31m-{[m
+[31m-    internal class AccessServiceTests[m
+[31m-    {[m
+[31m-    }[m
+[31m-}[m
+[1mdiff --git a/CoreKit.Architecture.Tests/Support/Fakes.cs b/CoreKit.Architecture.Tests/Support/Fakes.cs[m
+[1mdeleted file mode 100644[m
+[1mindex e7c6e8d..0000000[m
+[1m--- a/CoreKit.Architecture.Tests/Support/Fakes.cs[m
+[1m+++ /dev/null[m
+[36m@@ -1,82 +0,0 @@[m
+[31m-﻿namespace CoreKit.Architecture.Tests.Support;[m
+[31m-[m
+[31m-public sealed class FixedTimeProvider : TimeProvider[m
+[31m-{[m
+[31m-    private DateTimeOffset _now;[m
+[31m-[m
+[31m-    public FixedTimeProvider(DateTimeOffset now) => _now = now;[m
+[31m-[m
+[31m-    public override DateTimeOffset GetUtcNow() => _now;[m
+[31m-[m
+[31m-    public void Advance(TimeSpan by) => _now += by;[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class FakeCurrentUser : ICurrentUser[m
+[31m-{[m
+[31m-    public Guid? UserId { get; set; }[m
+[31m-[m
+[31m-    public bool IsAuthenticated => UserId is not null;[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class FakeScopeContext : IAccessScopeContext[m
+[31m-{[m
+[31m-    public AccessScope? Current { get; set; }[m
+[31m-}[m
+[31m-[m
+[31m-/// <summary>Membership the test controls directly. Counts lookups, so tests can see what the cache saved.</summary>[m
+[31m-public sealed class FakeMembership : IAccessMembership[m
+[31m-{[m
+[31m-    private readonly Dictionary<(AccessScope, Guid), AccessMember> _members = new();[m
+[31m-[m
+[31m-    public int Lookups { get; private set; }[m
+[31m-[m
+[31m-    public void Set(AccessScope scope, Guid userId, bool isOwner = false)[m
+[31m-        => _members[(scope, userId)] = new AccessMember(isOwner);[m
+[31m-[m
+[31m-    public void Remove(AccessScope scope, Guid userId) => _members.Remove((scope, userId));[m
+[31m-[m
+[31m-    public Task<AccessMember?> FindAsync(AccessScope scope, Guid userId, CancellationToken ct = default)[m
+[31m-    {[m
+[31m-        Lookups++;[m
+[31m-        return Task.FromResult(_members.TryGetValue((scope, userId), out var member) ? member : null);[m
+[31m-    }[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class FakeCurrentTenant : ICurrentTenant[m
+[31m-{[m
+[31m-    public Guid? Id { get; set; }[m
+[31m-[m
+[31m-    public bool IsResolved => Id is not null;[m
+[31m-[m
+[31m-    public Guid RequiredId => Id ?? throw new TenantNotResolvedException();[m
+[31m-[m
+[31m-    public IDisposable Change(Guid? tenantId) => throw new NotSupportedException();[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class FakeTenantMembershipReader : ITenantMembershipReader[m
+[31m-{[m
+[31m-    public Dictionary<(Guid TenantId, Guid UserId), bool> Members { get; } = new();[m
+[31m-[m
+[31m-    public Task<TenantMemberInfo?> FindAsync(Guid tenantId, Guid userId, CancellationToken ct = default)[m
+[31m-        => Task.FromResult(Members.TryGetValue((tenantId, userId), out var isOwner) ? new TenantMemberInfo(isOwner) : null);[m
+[31m-}[m
+[31m-[m
+[31m-internal static class ResultAssert[m
+[31m-{[m
+[31m-    public static T Ok<T>(AccessResult<T> result)[m
+[31m-    {[m
+[31m-        Assert.True(result.IsSuccess, result.Error?.Message);[m
+[31m-        return result.Value;[m
+[31m-    }[m
+[31m-[m
+[31m-    public static void Ok(AccessResult result) => Assert.True(result.IsSuccess, result.Error?.Message);[m
+[31m-[m
+[31m-    public static void Fails(AccessResult result, AccessErrorKind kind, string? code = null)[m
+[31m-    {[m
+[31m-        Assert.True(result.IsFailure, "Expected a failure but the call succeeded.");[m
+[31m-        Assert.Equal(kind, result.Error!.Kind);[m
+[31m-[m
+[31m-        if (code is not null)[m
+[31m-            Assert.Equal(code, result.Error.Code);[m
+[31m-    }[m
+[31m-}[m
+\ No newline at end of file[m
+[1mdiff --git a/CoreKit.Architecture.Tests/Support/RulesTests.cs b/CoreKit.Architecture.Tests/Support/RulesTests.cs[m
+[1mdeleted file mode 100644[m
+[1mindex 7bc6599..0000000[m
+[1m--- a/CoreKit.Architecture.Tests/Support/RulesTests.cs[m
+[1m+++ /dev/null[m
+[36m@@ -1,359 +0,0 @@[m
+[31m-﻿using Microsoft.Extensions.Caching.Memory;[m
+[31m-[m
+[31m-namespace CoreKit.Access.Tests;[m
+[31m-[m
+[31m-public sealed class AccessScopeTests[m
+[31m-{[m
+[31m-    [Fact][m
+[31m-    public void ForTenant_UsesTheTenantType()[m
+[31m-    {[m
+[31m-        var id = Guid.NewGuid();[m
+[31m-[m
+[31m-        var scope = AccessScope.ForTenant(id);[m
+[31m-[m
+[31m-        Assert.Equal("tenant", scope.Type);[m
+[31m-        Assert.Equal(id, scope.Id);[m
+[31m-        Assert.True(scope.IsValid);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Theory][m
+[31m-    [InlineData("", false)][m
+[31m-    [InlineData("   ", false)][m
+[31m-    [InlineData("store", true)][m
+[31m-    public void IsValid_NeedsATypeAndAnId(string type, bool expected)[m
+[31m-        => Assert.Equal(expected, new AccessScope(type, Guid.NewGuid()).IsValid);[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void IsValid_RejectsAnEmptyIdAndATooLongType()[m
+[31m-    {[m
+[31m-        Assert.False(new AccessScope("tenant", Guid.Empty).IsValid);[m
+[31m-        Assert.False(new AccessScope(new string('a', 31), Guid.NewGuid()).IsValid);[m
+[31m-        Assert.True(new AccessScope(new string('a', 30), Guid.NewGuid()).IsValid);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void Scopes_AreComparedByValue_AndRenderWithoutDashes()[m
+[31m-    {[m
+[31m-        var id = Guid.NewGuid();[m
+[31m-[m
+[31m-        Assert.Equal(AccessScope.ForTenant(id), AccessScope.ForTenant(id));[m
+[31m-        Assert.NotEqual(AccessScope.ForTenant(id), new AccessScope("store", id));[m
+[31m-        Assert.Equal($"tenant:{id:N}", AccessScope.ForTenant(id).ToString());[m
+[31m-    }[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class AccessCatalogTests[m
+[31m-{[m
+[31m-    private static AccessCatalog Build(params Action<AccessCatalogBuilder>[] configures)[m
+[31m-        => AccessCatalog.Build(configures.Select(c => new AccessCatalogContribution(c)));[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void EveryCatalogContainsAccessOwnPermissions()[m
+[31m-    {[m
+[31m-        var catalog = Build();[m
+[31m-[m
+[31m-        foreach (var permission in AccessPermissionNames.All)[m
+[31m-            Assert.True(catalog.Contains(permission.Name));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void Add_NormalizesNames_AndKeepsTheFirstDescription()[m
+[31m-    {[m
+[31m-        var catalog = Build(b => b.Add("  Sales.Create ", "first").Add("sales.create", "second"));[m
+[31m-[m
+[31m-        var permission = Assert.Single(catalog.Permissions, p => p.Name == "sales.create");[m
+[31m-        Assert.Equal("first", permission.Description);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Theory][m
+[31m-    [InlineData("")][m
+[31m-    [InlineData("   ")][m
+[31m-    [InlineData("has space")][m
+[31m-    [InlineData(".leading")][m
+[31m-    [InlineData("trailing.")][m
+[31m-    [InlineData("a..b")][m
+[31m-    [InlineData("under$core")][m
+[31m-    public void Add_RejectsInvalidNames(string name)[m
+[31m-        => Assert.Throws<ArgumentException>(() => new AccessCatalogBuilder().Add(name, "x"));[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void Add_RejectsTooLongNames()[m
+[31m-        => Assert.Throws<ArgumentException>(() => new AccessCatalogBuilder().Add(new string('a', 101), "x"));[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void Contributions_AreCombined_AndPermissionsAreSortedByName()[m
+[31m-    {[m
+[31m-        var catalog = Build(b => b.Add("zeta.use", "z"), b => b.Add("alpha.use", "a"));[m
+[31m-[m
+[31m-        var names = catalog.Permissions.Select(p => p.Name).ToList();[m
+[31m-[m
+[31m-        Assert.Contains("zeta.use", names);[m
+[31m-        Assert.Contains("alpha.use", names);[m
+[31m-        Assert.Equal(names.Order(StringComparer.Ordinal).ToList(), names);[m
+[31m-        Assert.Contains("alpha.use", catalog.Names);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void RoleTemplates_AreKept_WithNormalizedDistinctPermissions()[m
+[31m-    {[m
+[31m-        var catalog = Build(b => b.Add("sales.create", "x").AddRoleTemplate("Cashier", "Sells", "Sales.Create", "sales.create"));[m
+[31m-[m
+[31m-        var template = Assert.Single(catalog.RoleTemplates);[m
+[31m-        Assert.Equal("Cashier", template.Name);[m
+[31m-        Assert.Equal(new[] { "sales.create" }, template.Permissions);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void RoleTemplate_WithAnUndeclaredPermission_FailsWhenTheCatalogIsBuilt()[m
+[31m-    {[m
+[31m-        var error = Assert.Throws<InvalidOperationException>([m
+[31m-            () => Build(b => b.AddRoleTemplate("Cashier", null, "never.declared")));[m
+[31m-[m
+[31m-        Assert.Contains("never.declared", error.Message);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void RoleTemplate_NeedsAName()[m
+[31m-        => Assert.Throws<ArgumentException>(() => new AccessCatalogBuilder().AddRoleTemplate("  ", null));[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class AccessValidationTests[m
+[31m-{[m
+[31m-    private static readonly AccessCatalog Catalog = AccessCatalog.Build(new[][m
+[31m-    {[m
+[31m-        new AccessCatalogContribution(b => b.Add("sales.create", "x").Add("sales.refund", "y"))[m
+[31m-    });[m
+[31m-[m
+[31m-    [Theory][m
+[31m-    [InlineData(null)][m
+[31m-    [InlineData("")][m
+[31m-    [InlineData("   ")][m
+[31m-    public void ValidateName_RequiresAName(string? name)[m
+[31m-        => Assert.NotNull(AccessValidation.ValidateName(name, out _));[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void ValidateName_TrimsAndEnforcesTheLimit()[m
+[31m-    {[m
+[31m-        Assert.Null(AccessValidation.ValidateName("  Cashier ", out var cleaned));[m
+[31m-        Assert.Equal("Cashier", cleaned);[m
+[31m-        Assert.Null(AccessValidation.ValidateName(new string('a', 100), out _));[m
+[31m-        Assert.NotNull(AccessValidation.ValidateName(new string('a', 101), out _));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void ValidateDescription_TreatsBlankAsNone_AndEnforcesTheLimit()[m
+[31m-    {[m
+[31m-        Assert.Null(AccessValidation.ValidateDescription("   ", out var cleaned));[m
+[31m-        Assert.Null(cleaned);[m
+[31m-        Assert.Null(AccessValidation.ValidateDescription(new string('a', 500), out _));[m
+[31m-        Assert.NotNull(AccessValidation.ValidateDescription(new string('a', 501), out _));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void ValidatePermissions_NormalizesAndRemovesDuplicates()[m
+[31m-    {[m
+[31m-        Assert.Null(AccessValidation.ValidatePermissions(new[] { " Sales.Create ", "sales.create", "sales.refund" }, Catalog, out var cleaned));[m
+[31m-        Assert.Equal(new[] { "sales.create", "sales.refund" }, cleaned);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void ValidatePermissions_AcceptsNoneAtAll()[m
+[31m-    {[m
+[31m-        Assert.Null(AccessValidation.ValidatePermissions(null, Catalog, out var cleaned));[m
+[31m-        Assert.Empty(cleaned);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void ValidatePermissions_RejectsUnknownAndEmptyNames()[m
+[31m-    {[m
+[31m-        Assert.NotNull(AccessValidation.ValidatePermissions(new[] { "nope.nothing" }, Catalog, out _));[m
+[31m-        Assert.NotNull(AccessValidation.ValidatePermissions(new[] { "  " }, Catalog, out _));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void NormalizeName_IsCaseInsensitive()[m
+[31m-        => Assert.Equal(AccessValidation.NormalizeName("Cashier"), AccessValidation.NormalizeName("  CASHIER "));[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class EffectiveAccessTests[m
+[31m-{[m
+[31m-    [Fact][m
+[31m-    public void None_GrantsNothing()[m
+[31m-    {[m
+[31m-        Assert.False(EffectiveAccess.None.IsMember);[m
+[31m-        Assert.False(EffectiveAccess.None.Has("anything"));[m
+[31m-        Assert.Empty(EffectiveAccess.None.Permissions);[m
+[31m-        Assert.Empty(EffectiveAccess.None.Roles);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void AMember_HasOnlyTheirPermissions()[m
+[31m-    {[m
+[31m-        var access = new EffectiveAccess(true, false, new HashSet<string> { "sales.create" }, new[] { "Cashier" });[m
+[31m-[m
+[31m-        Assert.True(access.Has("sales.create"));[m
+[31m-        Assert.False(access.Has("sales.refund"));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void AnOwner_HasEveryPermission_EvenOnesNobodyDeclared()[m
+[31m-    {[m
+[31m-        var access = new EffectiveAccess(true, true, new HashSet<string>(), Array.Empty<string>());[m
+[31m-[m
+[31m-        Assert.True(access.Has("anything.at.all"));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void ANonMember_HasNothing_EvenWithPermissionsOrOwnerFlag()[m
+[31m-    {[m
+[31m-        var access = new EffectiveAccess(false, true, new HashSet<string> { "sales.create" }, Array.Empty<string>());[m
+[31m-[m
+[31m-        Assert.False(access.Has("sales.create"));[m
+[31m-    }[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class AccessCacheTests[m
+[31m-{[m
+[31m-    private readonly MemoryCache _memory = new(new MemoryCacheOptions());[m
+[31m-[m
+[31m-    private AccessCache Cache(int seconds = 30)[m
+[31m-        => new(_memory, Options.Create(new AccessOptions { CacheSeconds = seconds }));[m
+[31m-[m
+[31m-    private static readonly AccessScope ScopeA = AccessScope.ForTenant(Guid.NewGuid());[m
+[31m-    private static readonly AccessScope ScopeB = AccessScope.ForTenant(Guid.NewGuid());[m
+[31m-[m
+[31m-    private static EffectiveAccess Access(params string[] permissions)[m
+[31m-        => new(true, false, permissions.ToHashSet(), Array.Empty<string>());[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void Set_ThenTryGet_ReturnsTheSameAccess()[m
+[31m-    {[m
+[31m-        var cache = Cache();[m
+[31m-        var user = Guid.NewGuid();[m
+[31m-        var access = Access("a.b");[m
+[31m-[m
+[31m-        cache.Set(ScopeA, user, access);[m
+[31m-[m
+[31m-        Assert.True(cache.TryGet(ScopeA, user, out var found));[m
+[31m-        Assert.Same(access, found);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void TryGet_MissesForOtherUsersAndOtherScopes()[m
+[31m-    {[m
+[31m-        var cache = Cache();[m
+[31m-        var user = Guid.NewGuid();[m
+[31m-        cache.Set(ScopeA, user, Access("a.b"));[m
+[31m-[m
+[31m-        Assert.False(cache.TryGet(ScopeA, Guid.NewGuid(), out _));[m
+[31m-        Assert.False(cache.TryGet(ScopeB, user, out _));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void ZeroSecondsTurnsTheCacheOff()[m
+[31m-    {[m
+[31m-        var cache = Cache(0);[m
+[31m-        var user = Guid.NewGuid();[m
+[31m-[m
+[31m-        cache.Set(ScopeA, user, Access("a.b"));[m
+[31m-[m
+[31m-        Assert.False(cache.TryGet(ScopeA, user, out _));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void InvalidateUser_ForgetsOnlyThatUser()[m
+[31m-    {[m
+[31m-        var cache = Cache();[m
+[31m-        var first = Guid.NewGuid();[m
+[31m-        var second = Guid.NewGuid();[m
+[31m-        cache.Set(ScopeA, first, Access("a.b"));[m
+[31m-        cache.Set(ScopeA, second, Access("a.b"));[m
+[31m-[m
+[31m-        cache.InvalidateUser(ScopeA, first);[m
+[31m-[m
+[31m-        Assert.False(cache.TryGet(ScopeA, first, out _));[m
+[31m-        Assert.True(cache.TryGet(ScopeA, second, out _));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void InvalidateScope_ForgetsEveryoneInThatScopeOnly()[m
+[31m-    {[m
+[31m-        var cache = Cache();[m
+[31m-        var user = Guid.NewGuid();[m
+[31m-        cache.Set(ScopeA, user, Access("a.b"));[m
+[31m-        cache.Set(ScopeB, user, Access("a.b"));[m
+[31m-[m
+[31m-        cache.InvalidateScope(ScopeA);[m
+[31m-[m
+[31m-        Assert.False(cache.TryGet(ScopeA, user, out _));[m
+[31m-        Assert.True(cache.TryGet(ScopeB, user, out _));[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void AfterInvalidateScope_NewEntriesAreRememberedAgain()[m
+[31m-    {[m
+[31m-        var cache = Cache();[m
+[31m-        var user = Guid.NewGuid();[m
+[31m-        cache.Set(ScopeA, user, Access("a.b"));[m
+[31m-        cache.InvalidateScope(ScopeA);[m
+[31m-[m
+[31m-        cache.Set(ScopeA, user, Access("c.d"));[m
+[31m-[m
+[31m-        Assert.True(cache.TryGet(ScopeA, user, out var found));[m
+[31m-        Assert.True(found.Has("c.d"));[m
+[31m-    }[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class AccessResultTests[m
+[31m-{[m
+[31m-    [Fact][m
+[31m-    public void Success_CarriesTheValue()[m
+[31m-    {[m
+[31m-        var result = AccessResult.Success(42);[m
+[31m-[m
+[31m-        Assert.True(result.IsSuccess);[m
+[31m-        Assert.Equal(42, result.Value);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void Failure_HidesTheValue()[m
+[31m-    {[m
+[31m-        AccessResult<int> result = AccessErrors.NotFound("Role");[m
+[31m-[m
+[31m-        Assert.True(result.IsFailure);[m
+[31m-        Assert.Throws<InvalidOperationException>(() => result.Value);[m
+[31m-    }[m
+[31m-[m
+[31m-    [Theory][m
+[31m-    [InlineData(AccessErrorKind.Validation, 400)][m
+[31m-    [InlineData(AccessErrorKind.Unauthorized, 401)][m
+[31m-    [InlineData(AccessErrorKind.Forbidden, 403)][m
+[31m-    [InlineData(AccessErrorKind.NotFound, 404)][m
+[31m-    [InlineData(AccessErrorKind.Conflict, 409)][m
+[31m-    public void StatusCodeFor_MapsEveryKind(AccessErrorKind kind, int expected)[m
+[31m-        => Assert.Equal(expected, CoreKit.Access.Endpoints.AccessResultExtensions.StatusCodeFor(kind));[m
+[31m-[m
+[31m-    [Fact][m
+[31m-    public void TheNamedErrorsHaveStableCodesAndKinds()[m
+[31m-    {[m
+[31m-        Assert.Equal(("access.scope_required", AccessErrorKind.Validation), (AccessErrors.ScopeRequired.Code, AccessErrors.ScopeRequired.Kind));[m
+[31m-        Assert.Equal(("access.not_authenticated", AccessErrorKind.Unauthorized), (AccessErrors.NotAuthenticated.Code, AccessErrors.NotAuthenticated.Kind));[m
+[31m-        Assert.Equal(("access.denied", AccessErrorKind.Forbidden), (AccessErrors.Denied.Code, AccessErrors.Denied.Kind));[m
+[31m-        Assert.Equal(("access.escalation", AccessErrorKind.Forbidden), (AccessErrors.Escalation.Code, AccessErrors.Escalation.Kind));[m
+[31m-        Assert.Equal(("access.save_conflict", AccessErrorKind.Conflict), (AccessErrors.SaveConflict.Code, AccessErrors.SaveConflict.Kind));[m
+[31m-    }[m
+[31m-}[m
+[31m-[m
+[31m-public sealed class AccessOptionsTests[m
+[31m-{[m
+[31m-    [Fact][m
+[31m-    public void Defaults_AreSensible()[m
+[31m-    {[m
+[31m-        var options = new AccessOptions();[m
+[31m-[m
+[31m-        Assert.Equal(50, options.MaxRolesPerScope);[m
+[31m-        Assert.Equal(20, options.MaxRolesPerUser);[m
+[31m-        Assert.Equal(30, options.CacheSeconds);[m
+[31m-        Assert.Equal("sub", options.UserIdClaimType);[m
+[31m-    }[m
+[31m-}[m
+\ No newline at end of file[m
+[1mdiff --git a/CoreKit.Architecture.Tests/Support/TestEnv.cs b/CoreKit.Architecture.Tests/Support/TestEnv.cs[m
+[1mdeleted file mode 100644[m
+[1mindex 7cbda5b..0000000[m
+[1m--- a/CoreKit.Architecture.Tests/Support/TestEnv.cs[m
+[1m+++ /dev/null[m
+[36m@@ -1,189 +0,0 @@[m
+[31m-﻿using CoreKit.Architecture.Tests.Support;[m
+[31m-using Microsoft.Extensions.Caching.Memory;[m
+[31m-[m
+[31m-namespace CoreKit.Access.Tests.Support;[m
+[31m-[m
+[31m-/// <summary>[m
+[31m-/// One real object graph on an in-memory SQLite database, built like a single web request.[m
+[31m-/// Membership, the current user and the scope are fakes the test controls. Seed with one context and read[m
+[31m-/// back with another, so nothing is served from a tracker.[m
+[31m-/// </summary>[m
+[31m-internal sealed class TestEnv : IDisposable[m
+[31m-{[m
+[31m-    private readonly SqliteConnection _connection;[m
+[31m-    private readonly DbContextOptions<AccessDbContext> _dbOptions;[m
+[31m-    private readonly MemoryCache _memory = new(new MemoryCacheOptions());[m
+[31m-[m
+[31m-    public TestEnv(AccessOptions? options = null, Action<AccessCatalogBuilder>? catalog = null, IAccessUnitOfWork? unitOfWork = null)[m
+[31m-    {[m
+[31m-        Config = options ?? new AccessOptions();[m
+[31m-[m
+[31m-        _connection = new SqliteConnection("DataSource=:memory:;Foreign Keys=True");[m
+[31m-        _connection.Open();[m
+[31m-[m
+[31m-        _dbOptions = new DbContextOptionsBuilder<AccessDbContext>().UseSqlite(_connection).Options;[m
+[31m-[m
+[31m-        using (var setup = NewContext())[m
+[31m-            setup.Database.EnsureCreated();[m
+[31m-[m
+[31m-        Db = NewContext();[m
+[31m-        Time = new FixedTimeProvider(new DateTimeOffset(2026, 10, 9, 12, 0, 0, TimeSpan.Zero));[m
+[31m-        Scope = AccessScope.ForTenant(Guid.NewGuid());[m
+[31m-        ScopeContext = new FakeScopeContext { Current = Scope };[m
+[31m-        Membership = new FakeMembership();[m
+[31m-        User = new FakeCurrentUser();[m
+[31m-        Catalog = AccessCatalog.Build(new[] { new AccessCatalogContribution(catalog ?? DefaultCatalog) });[m
+[31m-        Cache = new AccessCache(_memory, Options.Create(Config));[m
+[31m-[m
+[31m-        Roles = new AccessRoleRepository(Db);[m
+[31m-        Assignments = new AccessAssignmentRepository(Db);[m
+[31m-        AuditRepo = new AccessAuditRepository(Db);[m
+[31m-        UnitOfWork = unitOfWork ?? new AccessUnitOfWork(Db, NullLogger<AccessUnitOfWork>.Instance);[m
+[31m-        Audit = new AccessAuditRecorder(AuditRepo, User, Time);[m
+[31m-        Access = new AccessService(Membership, Assignments, Cache, Catalog, ScopeContext, User);[m
+[31m-        Guard = new AccessGuard(ScopeContext, User, Access);[m
+[31m-    }[m
+[31m-[m
+[31m-    public static void DefaultCatalog(AccessCatalogBuilder b)[m
+[31m-    {[m
+[31m-        b.Add("sales.create", "Ring up a sale")[m
+[31m-         .Add("sales.refund", "Refund a sale")[m
+[31m-         .Add("products.view", "See products")[m
+[31m-         .Add("products.manage", "Create and edit products");[m
+[31m-[m
+[31m-        b.AddRoleTemplate([m
+[31m-            "Manager", "Runs the shop",[m
+[31m-            "sales.create", "sales.refund", "products.view", "products.manage",[m
+[31m-            AccessPermissionNames.RolesRead, AccessPermissionNames.AssignmentsRead, AccessPermissionNames.AssignmentsManage);[m
+[31m-[m
+[31m-        b.AddRoleTemplate("Cashier", "Rings up sales", "sales.create", "products.view");[m
+[31m-    }[m
+[31m-[m
+[31m-    public AccessOptions Config { get; }[m
+[31m-[m
+[31m-    public AccessDbContext Db { get; }[m
+[31m-[m
+[31m-    public FixedTimeProvider Time { get; }[m
+[31m-[m
+[31m-    public AccessScope Scope { get; }[m
+[31m-[m
+[31m-    public FakeScopeContext ScopeContext { get; }[m
+[31m-[m
+[31m-    public FakeMembership Membership { get; }[m
+[31m-[m
+[31m-    public FakeCurrentUser User { get; }[m
+[31m-[m
+[31m-    public AccessCatalog Catalog { get; }[m
+[31m-[m
+[31m-    public AccessCache Cache { get; }[m
+[31m-[m
+[31m-    public AccessRoleRepository Roles { get; }[m
+[31m-[m
+[31m-    public AccessAssignmentRepository Assignments { get; }[m
+[31m-[m
+[31m-    public AccessAuditRepository AuditRepo { get; }[m
+[31m-[m
+[31m-    public IAccessUnitOfWork UnitOfWork { get; }[m
+[31m-[m
+[31m-    public AccessAuditRecorder Audit { get; }[m
+[31m-[m
+[31m-    public AccessService Access { get; }[m
+[31m-[m
+[31m-    public AccessGuard Guard { get; }[m
+[31m-[m
+[31m-    public DateTime UtcNow => Time.GetUtcNow().UtcDateTime;[m
+[31m-[m
+[31m-    public AccessDbContext NewContext() => new(_dbOptions);[m
+[31m-[m
+[31m-    public AccessRoleService CreateRoleService() => new([m
+[31m-        Guard, Roles, Assignments, Audit, UnitOfWork, Cache, Catalog, Options.Create(Config), Time);[m
+[31m-[m
+[31m-    public AccessAssignmentService CreateAssignmentService() => new([m
+[31m-        Guard, Membership, Roles, Assignments, Audit, UnitOfWork, Cache, Options.Create(Config), Time);[m
+[31m-[m
+[31m-    public AccessMaintenance CreateMaintenance() => new(Roles, Assignments, Audit, UnitOfWork, Cache, Catalog, Time);[m
+[31m-[m
+[31m-    public AccessAuditLog CreateAuditLog() => new(Guard, AuditRepo);[m
+[31m-[m
+[31m-    // ---- seeding and reading ----[m
+[31m-[m
+[31m-    public void Seed(Action<AccessDbContext> action)[m
+[31m-    {[m
+[31m-        using var db = NewContext();[m
+[31m-        action(db);[m
+[31m-        db.SaveChanges();[m
+[31m-    }[m
+[31m-[m
+[31m-    public T Read<T>(Func<AccessDbContext, T> query)[m
+[31m-    {[m
+[31m-        using var db = NewContext();[m
+[31m-        return query(db);[m
+[31m-    }[m
+[31m-[m
+[31m-    public AccessRole AddRole(string name, string[]? permissions = null, AccessScope? scope = null)[m
+[31m-    {[m
+[31m-        var s = scope ?? Scope;[m
+[31m-[m
+[31m-        var role = new AccessRole[m
+[31m-        {[m
+[31m-            Id = Guid.NewGuid(),[m
+[31m-            ScopeType = s.Type,[m
+[31m-            ScopeId = s.Id,[m
+[31m-            Name = name,[m
+[31m-            NormalizedName = AccessValidation.NormalizeName(name),[m
+[31m-            CreatedAt = UtcNow,[m
+[31m-            ConcurrencyStamp = Guid.NewGuid()[m
+[31m-        };[m
+[31m-[m
+[31m-        foreach (var permission in permissions ?? Array.Empty<string>())[m
+[31m-            role.Permissions.Add(new AccessRolePermission { RoleId = role.Id, Permission = permission });[m
+[31m-[m
+[31m-        Seed(db => db.Roles.Add(role));[m
+[31m-        return role;[m
+[31m-    }[m
+[31m-[m
+[31m-    public void Assign(Guid userId, AccessRole role)[m
+[31m-        => Seed(db => db.Assignments.Add(new AccessAssignment[m
+[31m-        {[m
+[31m-            RoleId = role.Id,[m
+[31m-            UserId = userId,[m
+[31m-            ScopeType = role.ScopeType,[m
+[31m-            ScopeId = role.ScopeId,[m
+[31m-            AssignedAt = UtcNow[m
+[31m-        }));[m
+[31m-[m
+[31m-    /// <summary>A person who belongs to the scope, optionally an owner, optionally holding roles.</summary>[m
+[31m-    public Guid AddMember(bool isOwner = false, AccessRole[]? roles = null, AccessScope? scope = null)[m
+[31m-    {[m
+[31m-        var id = Guid.NewGuid();[m
+[31m-[m
+[31m-        Membership.Set(scope ?? Scope, id, isOwner);[m
+[31m-[m
+[31m-        foreach (var role in roles ?? Array.Empty<AccessRole>())[m
+[31m-            Assign(id, role);[m
+[31m-[m
+[31m-        return id;[m
+[31m-    }[m
+[31m-[m
+[31m-    public Guid SignIn(Guid userId)[m
+[31m-    {[m
+[31m-        User.UserId = userId;[m
+[31m-        return userId;[m
+[31m-    }[m
+[31m-[m
+[31m-    public Guid SignInOwner() => SignIn(AddMember(isOwner: true));[m
+[31m-[m
+[31m-    /// <summary>Signs in a member whose only role holds exactly these permissions.</summary>[m
+[31m-    public Guid SignInAs(params string[] permissions)[m
+[31m-    {[m
+[31m-        var role = AddRole("Test role " + Guid.NewGuid().ToString("N")[..8], permissions);[m
+[31m-        return SignIn(AddMember(roles: new[] { role }));[m
+[31m-    }[m
+[31m-[m
+[31m-    public void Dispose()[m
+[31m-    {[m
+[31m-        Db.Dispose();[m
+[31m-        _memory.Dispose();[m
+[31m-        _connection.Dispose();[m
+[31m-    }[m
+[31m-}[m
+\ No newline at end of file[m
+[1mdiff --git a/Dastarkhwan.slnx b/Dastarkhwan.slnx[m
+[1mindex 7966bea..dc6ac2f 100644[m
+[1m--- a/Dastarkhwan.slnx[m
+[1m+++ b/Dastarkhwan.slnx[m
+[36m@@ -12,6 +12,7 @@[m
+   </Folder>[m
+   <Folder Name="/CoreKit/">[m
+     <Project Path="CoreKit.Access/CoreKit.Access.csproj" Id="5a93a43f-cde6-41dc-a20e-d1650f7b8714" />[m
+[32m+[m[32m    <Project Path="CoreKit.Access.Tests/CoreKit.Access.Tests.csproj" Id="a1b2c3d4-e5f6-7890-abcd-ef1234567890" />[m
+     <Project Path="CoreKit.Architecture.Tests/CoreKit.Architecture.Tests.csproj" Id="7e7ec530-7036-4a8e-9579-a2554bfa4c5c" />[m
+     <Project Path="CoreKit.Identity/CoreKit.Identity.csproj" />[m
+     <Project Path="CoreKit.SampleHost/CoreKit.SampleHost.csproj" />[m

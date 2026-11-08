@@ -1,4 +1,4 @@
-﻿namespace CoreKit.Architecture.Tests.Support;
+﻿namespace CoreKit.Access.Tests.Support;
 
 public sealed class FixedTimeProvider : TimeProvider
 {

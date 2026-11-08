@@ -12,6 +12,7 @@
   </Folder>
   <Folder Name="/CoreKit/">
     <Project Path="CoreKit.Access/CoreKit.Access.csproj" Id="5a93a43f-cde6-41dc-a20e-d1650f7b8714" />
+    <Project Path="CoreKit.Access.Tests/CoreKit.Access.Tests.csproj" Id="a1b2c3d4-e5f6-7890-abcd-ef1234567890" />
     <Project Path="CoreKit.Architecture.Tests/CoreKit.Architecture.Tests.csproj" Id="7e7ec530-7036-4a8e-9579-a2554bfa4c5c" />
     <Project Path="CoreKit.Identity/CoreKit.Identity.csproj" />
     <Project Path="CoreKit.SampleHost/CoreKit.SampleHost.csproj" />

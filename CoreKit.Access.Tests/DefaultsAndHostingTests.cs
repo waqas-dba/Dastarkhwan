@@ -1,6 +1,5 @@
 ﻿using CoreKit.Access.Endpoints;
 using CoreKit.Access.Extensions;
-using CoreKit.Architecture.Tests.Support;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Mvc.Filters;

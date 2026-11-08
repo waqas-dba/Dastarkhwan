@@ -402,7 +402,9 @@ public sealed class ProjectReferenceBoundaryTests
     [Fact]
     public void No_unsupported_internals_visible_to_mechanisms()
     {
-        var violations = IvtMechanismScanner.ScanSolution(SolutionInventory.SolutionDir);
+        var sourceViolations = IvtMechanismScanner.ScanSolution(SolutionInventory.SolutionDir);
+        var projectViolations = IvtMechanismScanner.ScanProjectFilesForIgnoresAccessChecksTo(SolutionInventory.SolutionDir);
+        var violations = sourceViolations.Concat(projectViolations).ToList();
         Assert.True(violations.Count == 0,
             $"Unsupported InternalsVisibleTo mechanisms detected:{Environment.NewLine}" +
             $"{string.Join(Environment.NewLine, violations)}");

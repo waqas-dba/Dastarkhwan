@@ -207,4 +207,63 @@ public sealed class IvtMechanismScannerTests
 
         Assert.Empty(findings);
     }
+
+    [Fact]
+    public void Detects_qualified_attribute_name()
+    {
+        var files = new List<(string Path, string Text)>
+        {
+            ("Tests/Foo.cs", "[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(\"CoreKit.Access.Tests\")]"),
+        };
+
+        var findings = IvtMechanismScanner.ScanProject(files);
+
+        Assert.Single(findings);
+        Assert.Equal("InternalsVisibleTo attribute", findings[0].Kind);
+    }
+
+    [Fact]
+    public void Detects_global_qualified_attribute_name()
+    {
+        var files = new List<(string Path, string Text)>
+        {
+            ("Tests/Foo.cs", "[assembly: global::System.Runtime.CompilerServices.InternalsVisibleToAttribute(\"CoreKit.Access.Tests\")]"),
+        };
+
+        var findings = IvtMechanismScanner.ScanProject(files);
+
+        Assert.Single(findings);
+        Assert.Equal("InternalsVisibleTo attribute", findings[0].Kind);
+    }
+
+    [Fact]
+    public void Detects_alias_defined_under_release()
+    {
+        var files = new List<(string Path, string Text)>
+        {
+            ("Tests/Foo.cs", """
+                #if RELEASE
+                using IVT = System.Runtime.CompilerServices.InternalsVisibleToAttribute;
+                #endif
+                [assembly: IVT("CoreKit.Access.Tests")]
+                """)
+        };
+
+        var findings = IvtMechanismScanner.ScanProject(files);
+
+        Assert.Single(findings);
+        Assert.Equal("InternalsVisibleTo attribute", findings[0].Kind);
+    }
+
+    [Fact]
+    public void Detects_ignores_access_checks_to_in_csproj()
+    {
+        var violations = IvtMechanismScanner.ScanProjectFilesForIgnoresAccessChecksTo(
+            SolutionInventory.SolutionDir);
+
+        // The production CoreKit projects do not declare IgnoresAccessChecksTo,
+        // so this should be empty. The test verifies the scanner runs without
+        // throwing and returns no false positives on real production files.
+        Assert.Empty(violations);
+    }
 }

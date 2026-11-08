@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -31,7 +32,7 @@ internal static class IvtMechanismScanner
     };
 
     private static readonly CSharpParseOptions DebugParseOptions = new(LanguageVersion.Latest, preprocessorSymbols: new[] { "DEBUG", "TRACE" });
-    private static readonly CSharpParseOptions ReleaseParseOptions = new(LanguageVersion.Latest, preprocessorSymbols: new[] { "TRACE" });
+    private static readonly CSharpParseOptions ReleaseParseOptions = new(LanguageVersion.Latest, preprocessorSymbols: new[] { "TRACE", "RELEASE" });
 
     /// <summary>
     /// Scans every project in Dastarkhwan.slnx except the architecture test project itself.
@@ -136,17 +137,22 @@ internal static class IvtMechanismScanner
 
     private static void CollectAliases(string text, Dictionary<string, string> aliases, bool isGlobal)
     {
-        var tree = CSharpSyntaxTree.ParseText(text);
-        foreach (var usingDirective in tree.GetRoot().DescendantNodes().OfType<UsingDirectiveSyntax>())
+        // Parse under both Debug and Release preprocessor symbol sets so aliases declared
+        // inside #if DEBUG / #if RELEASE blocks are both collected.
+        foreach (var options in new[] { DebugParseOptions, ReleaseParseOptions })
         {
-            if (IsGlobalUsing(usingDirective) != isGlobal)
-                continue;
-            if (usingDirective.Alias is null)
-                continue;
+            var tree = CSharpSyntaxTree.ParseText(text, options: options);
+            foreach (var usingDirective in tree.GetRoot().DescendantNodes().OfType<UsingDirectiveSyntax>())
+            {
+                if (IsGlobalUsing(usingDirective) != isGlobal)
+                    continue;
+                if (usingDirective.Alias is null)
+                    continue;
 
-            var name = usingDirective.Name?.ToString();
-            if (name is not null)
-                aliases[usingDirective.Alias.Name.Identifier.ValueText] = name;
+                var name = usingDirective.Name?.ToString();
+                if (name is not null)
+                    aliases[usingDirective.Alias.Name.Identifier.ValueText] = name;
+            }
         }
     }
 
@@ -167,6 +173,18 @@ internal static class IvtMechanismScanner
         if (aliases.TryGetValue(firstSegment, out var resolved))
         {
             text = resolved + (firstDot < 0 ? string.Empty : text[firstDot..]);
+        }
+
+        // When no alias matched, fall back to the last segment of a qualified name
+        // (e.g. "System.Runtime.CompilerServices.InternalsVisibleTo" -> "InternalsVisibleTo").
+        if (text.Contains('.'))
+        {
+            var lastSegment = text[(text.LastIndexOf('.') + 1)..];
+            aliases.TryGetValue(lastSegment, out var aliasResolved);
+            if (aliasResolved != null)
+                text = aliasResolved;
+            else
+                text = lastSegment;
         }
 
         return text;
@@ -205,5 +223,32 @@ internal static class IvtMechanismScanner
     private static bool IsGlobalUsing(UsingDirectiveSyntax usingDirective)
     {
         return usingDirective.GetFirstToken().IsKind(SyntaxKind.GlobalKeyword);
+    }
+
+    /// <summary>
+    /// Scans .csproj files in the solution directory for IgnoresAccessChecksTo references.
+    /// Preserved from the previous text-based scanner to catch provider-level suppression
+    /// of access checks that Roslyn source scanning cannot see.
+    /// </summary>
+    public static IReadOnlyList<IvtFinding> ScanProjectFilesForIgnoresAccessChecksTo(string solutionDir)
+    {
+        var violations = new List<IvtFinding>();
+
+        var csprojFiles = Directory.GetFiles(solutionDir, "*.csproj", SearchOption.AllDirectories)
+            .Where(f => !IsInExcludedDirectory(f, ExcludedDirectoryNames))
+            .ToList();
+
+        foreach (var csprojFile in csprojFiles)
+        {
+            var content = File.ReadAllText(csprojFile);
+            var relativePath = Path.GetRelativePath(solutionDir, csprojFile).Replace('\\', '/');
+
+            if (Regex.IsMatch(content, @"IgnoresAccessChecksTo", RegexOptions.IgnoreCase))
+            {
+                violations.Add(new IvtFinding(relativePath, 0, "IgnoresAccessChecksTo in project file"));
+            }
+        }
+
+        return violations;
     }
 }

@@ -44,6 +44,18 @@ internal static class SolutionInventory
     };
 
     /// <summary>
+    /// Expected evaluated assembly name for each test project, keyed by solution-relative
+    /// project path. Every test project must have exactly one entry.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> ExpectedTestAssemblyNames =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["CoreKit.Architecture.Tests/CoreKit.Architecture.Tests.csproj"] = "CoreKit.Architecture.Tests",
+            ["CoreKit.Access.Tests/CoreKit.Access.Tests.csproj"] = "CoreKit.Access.Tests",
+            ["CoreKit.Tenant.Tests/CoreKit.Tenant.Tests.csproj"] = "CoreKit.Tenant.Tests",
+        };
+
+    /// <summary>
     /// Expected evaluated assembly name for each production project, keyed by solution-relative
     /// project path. Every production project must have exactly one entry.
     /// </summary>
@@ -175,6 +187,27 @@ internal static class SolutionInventory
             errors.Add(
                 $"Duplicate normalized project paths in Dastarkhwan.slnx: " +
                 $"{string.Join(", ", DuplicateSolutionPaths)}");
+
+        // Validate test assembly name mappings.
+        foreach (var testProject in TestProjects)
+        {
+            if (!ExpectedTestAssemblyNames.ContainsKey(testProject))
+            {
+                errors.Add(
+                    $"Test project '{testProject}' has no expected assembly name mapping in " +
+                    $"SolutionInventory.ExpectedTestAssemblyNames.");
+            }
+        }
+
+        foreach (var testProject in ExpectedTestAssemblyNames.Keys)
+        {
+            if (!TestProjects.Contains(testProject, StringComparer.OrdinalIgnoreCase))
+            {
+                errors.Add(
+                    $"ExpectedTestAssemblyNames contains '{testProject}' which is not a " +
+                    $"test project in SolutionInventory.TestProjects.");
+            }
+        }
 
         if (errors.Count > 0)
             throw new InvalidOperationException(

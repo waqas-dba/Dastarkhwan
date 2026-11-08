@@ -44,6 +44,28 @@ public sealed class ProjectReferenceBoundaryTests
     }
 
     [Fact]
+    public void Every_test_project_has_expected_assembly_mapping()
+    {
+        // Every test project must have exactly one expected assembly name.
+        foreach (var testProject in SolutionInventory.TestProjects)
+        {
+            Assert.True(
+                SolutionInventory.ExpectedTestAssemblyNames.ContainsKey(testProject),
+                $"Test project '{testProject}' has no expected assembly name mapping in " +
+                $"SolutionInventory.ExpectedTestAssemblyNames.");
+        }
+
+        // Every expected test assembly mapping must correspond to a test project.
+        foreach (var testProject in SolutionInventory.ExpectedTestAssemblyNames.Keys)
+        {
+            Assert.True(
+                SolutionInventory.TestProjects.Contains(testProject, StringComparer.OrdinalIgnoreCase),
+                $"ExpectedTestAssemblyNames contains '{testProject}' which is not a " +
+                $"test project in SolutionInventory.TestProjects.");
+        }
+    }
+
+    [Fact]
     public void Duplicate_normalized_solution_paths_cause_actionable_failure()
     {
         Assert.True(SolutionInventory.DuplicateSolutionPaths.Count == 0,
@@ -88,6 +110,22 @@ public sealed class ProjectReferenceBoundaryTests
         }
     }
 
+    [Theory]
+    [MemberData(nameof(TestProjectProjectPathsOnly))]
+    public void Evaluated_test_assembly_name_matches_expected_mapping(string projectPath)
+    {
+        var expectedName = SolutionInventory.ExpectedTestAssemblyNames[projectPath];
+
+        foreach (var configuration in new[] { "Debug", "Release" })
+        {
+            var result = Evaluator.Evaluate(projectPath, configuration);
+            Assert.True(
+                string.Equals(result.AssemblyName, expectedName, StringComparison.OrdinalIgnoreCase),
+                $"Test project '{projectPath}' ({configuration}) evaluates to assembly '{result.AssemblyName}', " +
+                $"but expected '{expectedName}'.");
+        }
+    }
+
     [Fact]
     public void Classification_lists_do_not_drift_between_inventory_and_matrix()
     {
@@ -107,6 +145,22 @@ public sealed class ProjectReferenceBoundaryTests
         foreach (var p in ModuleBoundaryMatrix.CompositionRoots) matrixRoots.Add(p);
         Assert.True(inventoryRoots.SetEquals(matrixRoots),
             $"Composition root project paths drift between SolutionInventory and ModuleBoundaryMatrix.");
+    }
+
+    [Fact]
+    public void Test_project_classification_lists_do_not_drift_between_inventory_and_matrix()
+    {
+        // Test project paths from SolutionInventory converted to assembly names must match
+        // ModuleBoundaryMatrix.TestProjects exactly.
+        var inventoryTestAssemblies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in SolutionInventory.TestProjects)
+            inventoryTestAssemblies.Add(Path.GetFileNameWithoutExtension(p));
+        var matrixTestAssemblies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var t in ModuleBoundaryMatrix.TestProjects) matrixTestAssemblies.Add(t);
+        Assert.True(inventoryTestAssemblies.SetEquals(matrixTestAssemblies),
+            $"Test project assembly names drift between SolutionInventory and ModuleBoundaryMatrix." +
+            $" Inventory: {string.Join(", ", inventoryTestAssemblies)}. " +
+            $"Matrix: {string.Join(", ", matrixTestAssemblies)}.");
     }
 
     [Fact]
@@ -169,7 +223,8 @@ public sealed class ProjectReferenceBoundaryTests
     public void Production_modules_and_composition_roots_cannot_reference_test_projects(string projectPath)
     {
         var testProjectSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var tp in ModuleBoundaryMatrix.TestProjects) testProjectSet.Add(tp);
+        foreach (var tp in SolutionInventory.TestProjects)
+            testProjectSet.Add(Path.GetFileNameWithoutExtension(tp));
 
         foreach (var configuration in new[] { "Debug", "Release" })
         {
@@ -314,7 +369,8 @@ public sealed class ProjectReferenceBoundaryTests
     public void IVT_friends_must_be_test_projects()
     {
         var testProjectSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var tp in ModuleBoundaryMatrix.TestProjects) testProjectSet.Add(tp);
+        foreach (var tp in SolutionInventory.TestProjects)
+            testProjectSet.Add(Path.GetFileNameWithoutExtension(tp));
 
         foreach (var projectPath in ModuleBoundaryMatrix.ProductionModuleProjectPaths)
         {
@@ -364,6 +420,12 @@ public sealed class ProjectReferenceBoundaryTests
     public static IEnumerable<object[]> ProductionModuleProjectPathsOnly()
     {
         foreach (var p in ModuleBoundaryMatrix.ProductionModuleProjectPaths)
+            yield return new object[] { p };
+    }
+
+    public static IEnumerable<object[]> TestProjectProjectPathsOnly()
+    {
+        foreach (var p in SolutionInventory.TestProjects)
             yield return new object[] { p };
     }
 

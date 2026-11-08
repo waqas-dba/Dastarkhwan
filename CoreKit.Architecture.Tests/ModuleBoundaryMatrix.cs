@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 
 namespace CoreKit.Architecture.Tests;
 
@@ -72,13 +74,12 @@ internal static class ModuleBoundaryMatrix
     /// <remarks>Sourced from SolutionInventory (canonical classification) to prevent drift.</remarks>
     public static readonly IReadOnlyList<string> CompositionRoots = SolutionInventory.CompositionRoots;
 
-    /// <summary>All test project names (evaluated assembly names or project paths).</summary>
-    public static readonly IReadOnlyList<string> TestProjects = new[]
-    {
-        "CoreKit.Architecture.Tests",
-        "CoreKit.Access.Tests",
-        "CoreKit.Tenant.Tests",
-    };
+    /// <summary>All test project names (evaluated assembly names), sourced from
+    /// SolutionInventory.TestProjects to prevent drift.</summary>
+    public static readonly IReadOnlyList<string> TestProjects =
+        SolutionInventory.TestProjects
+            .Select(Path.GetFileNameWithoutExtension)
+            .ToList();
 
     /// <summary>
     /// D-015 temporary exception: Tenant -> Identity is the only documented temporary

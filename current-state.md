@@ -1,108 +1,178 @@
 # Current State — Dastarkhwan / CoreKit
 
 ## Purpose and evidence rules
-This file records implementation facts, not aspirations. Every statement must be labelled or traceable to evidence. Architecture/decisions documents describe the target unless code evidence confirms implementation.
 
-- **Verified at baseline:** reported as directly inspected at the named commit in the M0 report.
-- **Reported / needs refresh:** taken from a report, but must be rechecked against current HEAD before implementation.
-- **Partial:** some implementation exists; the full acceptance criteria are not met.
-- **Not started:** the M0 report found no product implementation at its baseline.
+This file records implementation facts, not aspirations. Architecture and decisions documents describe the target unless code evidence confirms implementation.
+
+Use these evidence labels consistently:
+
+- **Verified at current snapshot:** directly inspected committed files at the recorded snapshot HEAD. This confirms only the inspected source or documentation, not successful builds, tests, migrations, or database operations.
+- **Reported complete (not independently verified):** reported by an agent, but not independently confirmed against the relevant implementation or artifact.
+- **In progress:** implementation or documentation work has started but its acceptance criteria are not yet met.
+- **Pending:** work has not started or awaits an approval, decision, or required action.
+- **Under review:** an implementation or artifact exists and requires independent review or acceptance.
+- **Blocked:** work cannot safely proceed until a stated dependency or decision is resolved.
 - **Unknown:** not inspected or insufficient evidence.
 
-## Last recorded baseline
+A status must describe the evidence available, not the intended architecture or an agent's confidence.
+
+## Historical M0 baseline
+
 | Field | Value |
 |---|---|
 | Baseline commit | `9555b8c` |
 | Commit date in M0 report | 2026-10-23 |
-| M0 status | Inspection-only baseline reported complete |
+| M0 status | Reported complete (not independently verified) |
 | Evidence source | User-provided M0 inspection report |
-| Current repository HEAD | See "Current repository snapshot" below; verify before every task |
-| Working-tree status | See "Current repository snapshot" below; verify before every task |
+| Scope | Historical, inspection-only baseline |
 
-`9555b8c` is a historical baseline, not a claim that it is the latest commit today. Before relying on any finding, check the real HEAD, commit date, staged/unstaged/untracked changes, and relevant files. Refresh this document only when new evidence is collected.
+`9555b8c` is a historical baseline, not the current repository HEAD. Its findings must not be presented as current implementation facts without checking later changes.
 
 ## Current repository snapshot
+
 | Field | Value |
 |---|---|
-| Snapshot HEAD | `daa732666a497c87c9b9275abe1ed40899c3bf3b` |
-| Commit date | 2026-11-08T14:45:23+05:00 |
+| Snapshot HEAD | `43c21792ff3f7e6ed8bdce15b1246e9c0b060a9c` |
+| Parent commit | `daa732666a497c87c9b9275abe1ed40899c3bf3b` |
 | Branch | `master` |
-| Evidence basis | Local clone inspected at the commit above. Findings below cite committed files only; the remote was not queried, so no GitHub-side verification is implied. |
-| Local working tree (not part of the committed repository) | Reported from the local clone, not verified remotely: it also carries uncommitted migration work — untracked `CoreKit.Access/Migrations/` and `CoreKit.Identity/Migrations/`, a regenerated `CoreKit.Tenant/Migrations/` (`20261108104346_InitialTenant` untracked; the two `init_tenant*` files deleted) and a modified `TenantDbContextModelSnapshot.cs`. This work is uncommitted, unreviewed and must not be treated as approved, complete or ready to merge. |
-| Scope | Point-in-time record. Re-verify HEAD before every task and refresh only when new evidence is collected. |
+| Latest commit message | `Update the .md files to change the roles of models` |
+| Evidence basis | GitHub committed-file inspection at the snapshot HEAD, with source findings from the parent snapshot where the intervening commit did not change those source files |
+| Local working-tree status | Unknown. GitHub committed-file inspection cannot establish local staged, unstaged, or untracked changes. |
+| Scope | Point-in-time record of committed repository evidence |
+
+The historical M0 baseline `9555b8c` remains unchanged.
+
+The commit at `43c2179` includes committed migration artifacts:
+
+- Access: `CoreKit.Access/Migrations/`
+- Identity: `CoreKit.Identity/Migrations/`
+- Tenant: `CoreKit.Tenant/Migrations/`
+
+Their presence in Git does not establish that they are reviewed, compatible with existing databases, successfully applied, or safe for production. No database application is claimed.
+
+Before every implementation task, verify the actual local HEAD, commit date, staged changes, unstaged changes, and untracked files. Do not assume the local working tree matches GitHub.
 
 ## Verified M0 findings at `9555b8c`
+
+These findings are retained as historical evidence from the M0 report.
+
 | Area | Status at baseline | Finding / evidence from M0 report |
 |---|---|---|
-| Repository documentation | Present | `CLAUDE.md`, `roadmap.md`, `current-state.md`, `decisions.md`, `architecture.md`, and `ai-tasks.md` exist at this commit. |
-| Project naming | Updated | Identity and sample host are renamed to `CoreKit.Identity` and `CoreKit.SampleHost`. Do not use old `CoreKit.IAM.SampleHost` name without checking current solution. |
-| SharedKernel | Present | `CoreKit.SharedKernel` exists. |
-| Architecture tests | Partial | `CoreKit.Architecture.Tests` exists; its project reference covered only Access at baseline. Access tests were located inside this project. |
-| Identity | Partial | `CoreKit.Identity` exists. No account lockout was found. Identity still owned roles and permissions, contrary to the target ownership boundary. |
-| Access | Partial | Access implementation exists, but no Access migration was present at baseline. |
-| Tenant | Partial | Tenant implementation exists but directly referenced Identity in six code files at baseline. |
-| Store | Not started | No Store implementation was reported at baseline. |
-| M6–M13 product modules | Not started | No product code was reported for these roadmap areas at baseline. Recheck current HEAD before relying on this. |
-| Development configuration | Security action required | `appsettings.Development.json` was no longer tracked at baseline, but had been tracked in an earlier commit. Treat any secrets ever committed as exposed; rotate them. Removing a file from the current tree does not remove it from Git history. |
+| Repository documentation | Verified at historical baseline | `CLAUDE.md`, `roadmap.md`, `current-state.md`, `decisions.md`, `architecture.md`, and `ai-tasks.md` existed. |
+| Project naming | Verified at historical baseline | Identity and sample host were renamed to `CoreKit.Identity` and `CoreKit.SampleHost`. |
+| SharedKernel | Verified at historical baseline | `CoreKit.SharedKernel` existed. |
+| Architecture tests | In progress | `CoreKit.Architecture.Tests` existed; its project reference covered only Access at that baseline. Access tests were located inside this project. |
+| Identity | In progress | `CoreKit.Identity` existed. No account lockout was found. Identity still owned roles and permissions, contrary to the target ownership boundary. |
+| Access | In progress | Access implementation existed, but no Access migration was present at that baseline. |
+| Tenant | In progress | Tenant implementation existed but directly referenced Identity in six code files at that baseline. |
+| Store | Pending | No Store implementation was reported at that baseline. |
+| M6–M13 product modules | Pending | No product code was reported for these roadmap areas at that baseline. |
+| Development configuration | Under review | M0 reported that `appsettings.Development.json` was no longer tracked at `9555b8c`, but had been tracked in an earlier commit. Treat any secrets ever committed as exposed and rotate them. Removing a file from the current tree does not remove it from Git history. |
 
-## Verified findings at the current snapshot
-| Area | Status | Evidence at `daa7326` |
+## Findings at the current snapshot
+
+The following source findings were inspected at `daa7326` and remain applicable to `43c2179` where the intervening commit did not change the relevant source files.
+
+| Area | Status | Evidence and limitations |
 |---|---|---|
-| Architecture tests | Partial | `ModuleBoundaryTests` covers SharedKernel, Identity, Access and Tenant; Tenant → Identity is an explicit temporary exception citing D-015/S4.3; the test project references Access, Identity and Tenant. Tests were not run, so passing behaviour is unverified. |
-| Architecture test organization | Not started | Access-focused suites (`RoleServiceTests`, `AssignmentServiceTests`, `MaintenanceAndAuditTests`, `DefaultsAndHostingTests`, `Support/RulesTests`) still live in `CoreKit.Architecture.Tests`; no `CoreKit.Access.Tests` project exists (roadmap S2.1). |
-| Access implementation | Partial | Role, permission, assignment, audit-log and scope-guard services plus `/access/*` endpoints exist. Committed recent work: `d60125a`, `70dc435`, `daa7326`. No build or test result is recorded, and **manual verification is still pending**. |
-| Access migrations | Not started | No Access migration is tracked at this commit. The local untracked migration files noted in the snapshot row are unreviewed and unapproved. |
-| Identity | Partial | No account-lockout fields or logic exist (searched `CoreKit.Identity` for failed-attempt and lockout members). Identity still owns roles and permissions, contrary to D-002. |
-| Tenant | Partial | `CoreKit.Tenant.csproj` still references `CoreKit.Identity` directly, so Tenant → Identity decoupling (D-015, S4.3) is incomplete. |
-| Store and M6–M13 | Not started | The solution contains no Store, Catalog, Cart, Orders, Payments, Fulfillment, Website or Marketplace project. |
-| Migrations overall | Partial | Only the two Tenant `init_tenant*` migrations and their snapshot are tracked. Local regeneration is uncommitted; see the snapshot row. |
-| Committed-secret follow-up | Unknown | Carried forward from the M0 finding; no new evidence and no rotation recorded. |
+| Architecture tests | In progress | `CoreKit.Architecture.Tests/ModuleBoundaryTests.cs` covers SharedKernel, Identity, Access and Tenant, with Tenant → Identity as a documented temporary exception under D-015. Tests were not run as part of this inspection. |
+| Architecture test organization | Pending | Access-focused tests remain in `CoreKit.Architecture.Tests`; no dedicated `CoreKit.Access.Tests` project was established in the inspected snapshot. See S2.1. |
+| Access implementation | In progress | Access services, endpoints, audit and scope-related implementation exist. Build, test and manual verification results are not established here. |
+| Access migrations | Under review | Access migration artifacts are committed under `CoreKit.Access/Migrations/` at `43c2179`. Schema correctness, compatibility and database application are not verified. |
+| Identity | In progress | Identity implementation exists. The available evidence does not establish completion of the accepted Identity responsibilities or account lockout. |
+| Identity migrations | Under review | Identity migration artifacts are committed under `CoreKit.Identity/Migrations/`. Schema correctness, compatibility and database application are not verified. |
+| Identity role and permission ownership | Under review | The accepted target assigns roles and permissions to Access. The implementation ownership transfer must be verified against current Identity and Access entities, services, persistence and consumers before claiming completion. |
+| Tenant | In progress | `CoreKit.Tenant/CoreKit.Tenant.csproj` still directly references `CoreKit.Identity`; Tenant → Identity decoupling remains incomplete. |
+| Tenant isolation | In progress | `CoreKit.Tenant/Isolation/TenantAwareDbContext.cs` contains tenant query-filter logic. `CoreKit.Tenant.Tests/IsolationTests.cs` contains isolation test coverage. These files alone do not prove complete enforcement across all application operations. |
+| Tenant migrations | Under review | Tenant migration artifacts have changed and are committed at `43c2179`. Compatibility and database application are not verified. |
+| Store and later product modules | Pending | No implementation completion is established for Store, Catalog, Cart, Orders, Payments, Fulfillment, Website or Marketplace. |
+| Migrations overall | Under review | Access, Identity and Tenant migration artifacts are committed. No successful migration execution or database state is claimed. |
+| Committed-secret follow-up | Unknown | Carried forward from the M0 finding. No new evidence of secret rotation or history remediation is recorded. |
 
 ## Milestone status
+
 | Milestone | Status | Notes |
 |---|---|---|
-| M0 — Repository baseline | Inspection reported complete | Baseline report at `9555b8c`; this was inspection-only. |
-| M1 — Essential decisions | In progress | Decisions are recorded in `decisions.md`; documentation synchronization is S1 and remains in progress until implementation and review finish. Implementation is not implied. |
-| M2 — Module foundation | Partial | Boundary tests cover all four modules; Access tests still sit in the architecture test project (S2.1 open). |
-| M3 — Identity | Partial | Renamed project exists; lockout missing; roles/permissions still in Identity. |
-| M4 — Access | Partial | Access services, endpoints and tests exist; no tracked migration; role ownership transfer (S6.2) not started; manual verification pending. |
-| M5 — Tenant and Store | Partial | Tenant still references Identity directly (S4.3 incomplete); Store not started. |
-| M6–M13 | Not started | No product code is present in the solution at this snapshot. |
+| M0 — Repository baseline | Reported complete (not independently verified) | Historical inspection report at `9555b8c`; inspection-only. |
+| M1 — Essential architecture decisions | In progress | Accepted decisions are recorded in `decisions.md`; S1 documentation synchronization remains in progress. Decision acceptance does not imply implementation completion. |
+| M2 — Module foundation | In progress | Boundary tests cover SharedKernel, Identity, Access and Tenant. Access test organization remains open under S2.1. |
+| M3 — Identity | In progress | Identity exists; completion of lockout and the role/permission ownership transfer is not established. |
+| M4 — Access | In progress | Access services, endpoints and tests exist. Migration artifacts are committed and require review. Role ownership transfer and manual verification remain open. |
+| M5 — Tenant and Store | In progress | Tenant still references Identity directly. Store implementation is pending. |
+| M6–M13 | Pending | Product implementation and acceptance have not been established. |
 
 ## Accepted decisions and implementation status
-Decision statements are recorded in `decisions.md`, which is the single source. They are deliberately not repeated here.
 
-| Decision | Status | Evidence at `daa7326` |
+Decision statements are recorded in `decisions.md`, which remains the single source for accepted decisions. Acceptance of a decision does not mean implementation is complete.
+
+| Decision | Implementation status | Evidence and limitations |
 |---|---|---|
-| D-002 — Identity and Access ownership | Not started | Identity still owns role/permission entities, services and endpoints; roadmap S6.1/S6.2 open |
-| D-011 — Tenant isolation strategy | Partial | Tenant isolation scaffolding exists; cross-module enforcement policy not implemented |
-| D-012 — Session and lockout policy | Partial | Rotation and reuse detection exist; account lockout absent |
-| D-015 — Tenant–Identity dependency | Not started | Direct project reference remains in `CoreKit.Tenant.csproj` |
+| D-002 — Identity and Access ownership | Under review | The target assigns authentication and identity lifecycle to Identity, and roles, permissions, assignments and authorization to Access. Verify current entities, services, persistence and consumers before claiming the ownership transfer is complete. S6.1/S6.2 remain open. |
+| D-011 — Tenant data isolation | In progress | `CoreKit.Tenant/Isolation/TenantAwareDbContext.cs` contains tenant query-filter logic. `CoreKit.Tenant.Tests/IsolationTests.cs` includes tenant-isolation test coverage. Complete enforcement across application services, authorization, background jobs and other access paths is not established by these references alone. |
+| D-012 — Authentication and session approach | Under review | The accepted policy is recorded in `decisions.md`. The available evidence does not establish completion of refresh-token rotation, reuse detection, revocation and account lockout together. Verify the relevant Identity implementation before updating this status. |
+| D-015 — Tenant–Identity dependency | In progress | `CoreKit.Tenant/CoreKit.Tenant.csproj` still directly references `CoreKit.Identity`. Tenant decoupling is not complete. |
 
 ## Deferred decisions
-Do not resolve these prematurely. Decide only when the dependent milestone needs them: single-store vs multi-store checkout, parcel pickup initiation and lifecycle, payment methods/COD and payment provider, detailed country/currency/tax behavior, storefront/website technology, custom-domain verification/HTTPS operations, and marketplace behavior.
+
+Do not resolve these prematurely. Decide only when the dependent milestone needs them:
+
+- Single-store vs multi-store checkout.
+- Parcel pickup initiation and lifecycle details.
+- Payment methods, COD behavior and payment provider.
+- Detailed country, currency and tax behavior.
+- Storefront and website technology.
+- Custom-domain verification and HTTPS operations.
+- Marketplace behavior.
 
 ## Security follow-up — committed secrets
+
 - M0 reported that `appsettings.Development.json` was not tracked at `9555b8c`, but was present in an earlier commit.
-- Treat credentials, signing keys, connection strings, and API keys that may have been committed as compromised, even if the file is now deleted or ignored.
-- Rotate affected secrets and move active values to secure local/user-secret/environment/secret-manager configuration as appropriate.
-- Do not print secret values in reports. History cleanup, if needed, is a user-controlled Git operation and must be planned carefully; rotating secrets is the priority.
-- At the current snapshot no new evidence was collected and no rotation is recorded; this action remains open.
+- Treat credentials, signing keys, connection strings and API keys that may have been committed as compromised, even if the file is now deleted or ignored.
+- Rotate affected secrets and move active values to secure local, user-secret, environment, or secret-manager configuration as appropriate.
+- Do not print secret values in reports.
+- History cleanup, if needed, is a user-controlled Git operation and must be planned carefully. Rotating secrets is the priority.
+- No new evidence of secret rotation or history remediation is recorded at the current snapshot. This action remains open.
+
+## Current agent allocation
+
+The current agreed operating allocation is:
+
+- **DeepSeek Harness — Preparation Engineer:** repository investigation, research, planning and technical handovers.
+- **OpenCode + Nemotron — Implementation:** implement only explicitly approved micro-slices.
+- **ChatGPT Account 2 — Independent Reviewer:** read-only review of implementation, architecture and security.
+- **ChatGPT Account 1 — Project Manager:** coordination, architecture oversight, task definition and acceptance recommendation.
+- **User — Project Owner:** final authority, scope and architecture approval, manual testing, Git operations and acceptance.
+
+Only one agent may modify the shared working tree at a time. All participating agents must verify and report the same baseline SHA.
+
+### Instruction-file discrepancy
+
+`CLAUDE.md`, `ai-tasks.md` and `AGENTS.md` still contain the previous Claude-based role allocation. They have not been synchronized with the current allocation above.
+
+Do not treat their old role assignments as the current operating allocation. Updating those files is a separate documentation task and is not included in S1.
 
 ## Next proposed work
-Use the ordered slices in `roadmap.md`. Each slice is prepared by DeepSeek Harness, implemented by OpenCode + Nemotron, independently reviewed by ChatGPT Account 2, coordinated by ChatGPT Account 1, and approved by the user. S1 (documentation synchronization) remains in progress until implementation and review finish. After S1: a dedicated `CoreKit.Access.Tests` project (S2.1), review and approval of any Access migration (S3), Tenant decoupling (S4.1 → S4.3), Identity lockout (S5.1 → S5.2), and role-ownership transfer (S6.1 → S6.2).
+
+Follow the ordered micro-slices in `roadmap.md`.
+
+S1 remains in progress until the corrected `current-state.md` and `roadmap.md` are manually applied, independently reviewed and accepted by the user.
+
+After S1, follow the approved roadmap queue. Migration artifacts committed at `43c2179` require review; their presence does not authorize database application.
 
 ## Update log
+
 | Date | Change | Evidence |
 |---|---|---|
 | 2026-10-23 | M0 baseline inspection findings recorded | User-provided report for commit `9555b8c` |
-| 2026-11-04 | Documentation package refreshed to reflect M0 report, approved M1 decisions, micro-slice workflow, and Git message guidance | Prepared documentation package; verify against actual repository before applying |
-| 2026-11-08 | Snapshot refresh at `daa7326`: historical M0 baseline preserved; current snapshot recorded separately; accepted decisions separated from implementation; Access, Identity, Tenant and migration statuses updated from direct inspection; S1 left in progress | Section references above; evidence is committed-file inspection at the snapshot HEAD, with local working-tree details labelled as reported and uncommitted |
+| 2026-11-04 | Documentation package refreshed to reflect M0 report, approved M1 decisions, micro-slice workflow and Git message guidance | Prepared documentation package; verify against actual repository before applying |
+| 2026-11-08 | Snapshot refreshed at `daa7326`; historical M0 baseline preserved; current snapshot recorded separately; accepted decisions separated from implementation | Committed-file inspection at `daa7326`; local working-tree details were separately reported and not remotely verified |
+| 2026-11-08 | Current snapshot updated for `43c2179`; committed Access, Identity and Tenant migration artifacts recorded; evidence labels and agent-allocation discrepancy clarified | GitHub committed-file inspection at `43c2179`; local working-tree and database state not verified |
 
 ## Update rules
-- Before updating this file, verify HEAD and working-tree state and inspect relevant code.
-- Record commit hash/date and file paths or test names as evidence where possible.
-- Distinguish target design, accepted decision, and implemented behavior.
-- Do not mark tests/builds/migrations complete unless the result was observed.
-- Never include passwords, tokens, signing keys, connection strings, or secret values.
-- Keep this file concise; detailed architectural rules belong in `architecture.md`, decisions in `decisions.md`, and work queues in `roadmap.md` / `ai-tasks.md`.
+
+- Before updating this file, verify actual HEAD and local working-tree state and inspect relevant code.
+- Record commit hash, date and file paths or test names as evidence where possible.
+- Distinguish target design, accepted decision and implemented behavior.
+- Do not mark tests, builds, migrations or database operations complete unless the result was observed.
+- Never include passwords, tokens, signing keys, connection strings or secret values.
+- Keep this file concise. Detailed architectural rules belong in `architecture.md`, decisions in `decisions.md`, and work queues in `roadmap.md` and `ai-tasks.md`.

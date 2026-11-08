@@ -1,72 +1,159 @@
-# AI Task Workflow — Four-Agent Team and User
+# AI Task Workflow — Dastarkhwan
 
-## 1. Roles
+## 1. Team roles
+
 | Participant | Responsibility | Must avoid |
 |---|---|---|
-| ChatGPT — Project Manager | Coordinates the project; defines tasks and acceptance criteria; oversees architecture; reviews agent reports; recommends acceptance | Editing repository files, performing Git writes, or reopening accepted decisions without evidence |
-| DeepSeek Harness — Preparation Engineer | Researches and explores the repository; prepares implementation plans and technical handovers; investigates errors and dependencies; takes only explicitly approved, isolated, low-risk implementation slices | Replacing Claude 1 or Claude 2, expanding scope, or implementing unapproved work |
-| Claude Account 1 — Primary Developer | Owns primary implementation for one approved slice at a time; implements approved changes; supplies exact diffs and completion reports | Scope expansion, unrelated refactoring, unauthorized commands |
-| Claude Account 2 — Independent Reviewer | Independent read-only review of actual code, architecture, security, and the focused diff/report | Editing implementation files, reimplementing, or reviewing a different/old baseline |
-| User — Project Owner | Architecture approval, scope changes, manual testing, release acceptance, all Git write operations | Treating unverified reports as proof |
+| ChatGPT Account 1 — Project Manager | Coordinates the project, defines tasks and acceptance criteria, maintains roadmap priorities, oversees architecture, evaluates reports, and recommends acceptance. | Editing repository files, Git writes, or independently approving architecture changes. |
+| DeepSeek Harness — Preparation Engineer | Researches the repository, investigates issues, prepares technical plans, implementation instructions, and handovers. May implement only explicitly approved isolated, low-risk tasks. | Taking over the primary implementation or independent review role. |
+| OpenCode + Nemotron — Primary Developer | Owns primary implementation for approved tasks, makes the scoped changes, and supplies exact diffs and completion reports. | Scope expansion, unrelated refactoring, unauthorized commands, or Git writes. |
+| ChatGPT Account 2 — Independent Reviewer | Independently reviews actual implementation, architecture, security, compatibility, and acceptance criteria. Read-only. | Editing implementation files, implementing fixes, or relying only on the developer's report. |
+| User — Project Owner | Approves scope and architecture, controls Git operations, performs manual testing, and makes final acceptance decisions. | Treating an unverified report as proof of completion. |
 
-AI agents do not automatically share chat history, memory, repository access, or files. Supply each agent only the task brief, relevant documents, baseline hash, and relevant diff/files. When DeepSeek prepares a task, its plan and handover become the brief for Claude 1. Do not use multiple agents to duplicate work or bypass service limits or terms.
+The user is the final authority. AI agents coordinate and recommend; they do not independently approve architecture changes or releases.
 
-## 2. Mandatory latest-code verification
+## 2. Source of truth
+
+Use the following repository documents:
+
+- `CLAUDE.md` — engineering rules and restrictions.
+- `AGENTS.md` — short entry point for all agents.
+- `roadmap.md` — milestones and priorities.
+- `current-state.md` — implementation status and evidence.
+- `architecture.md` — target architecture and module boundaries.
+- `decisions.md` — accepted decisions and open questions.
+- `ai-tasks.md` — agent workflow and task templates.
+
+Actual repository code is the strongest evidence of implemented behavior. Approved architecture decisions define intended boundaries. Documentation and agent reports must not override verified code.
+
+If documents conflict, report the exact conflict and request direction before changing architecture, security, persistence, compatibility, or product behavior.
+
+## 3. Mandatory repository verification
+
 Before every task, each participating agent must:
-1. Confirm repository root and relevant document/source paths.
+
+1. Confirm repository root and relevant file paths.
 2. Read current HEAD hash and commit date.
-3. Check staged, unstaged, and untracked files with `git status --short`.
-4. Inspect only relevant files and changes.
-5. State the exact HEAD hash used as baseline.
-6. Stop and ask if the baseline differs from the task brief or relevant uncommitted changes could be affected.
+3. Check staged, unstaged, and untracked changes with `git status --short`.
+4. Inspect only relevant files and diffs.
+5. State the exact baseline hash used.
+6. Stop if the baseline differs from the task brief or relevant uncommitted work could be affected.
 
-The recorded M0 baseline is `9555b8c` dated 2026-10-23. It is not automatically the latest HEAD. Never rely solely on old chat output or old documentation ZIPs. Do not scan all Git history unless the task specifically requires it.
+Do not discard, overwrite, or silently absorb existing work.
 
-## 3. Strict token and context budget
-- One request = one small, measurable outcome.
+The recorded M0 baseline is `9555b8c`, dated 2026-10-23. It is historical and must not be assumed to be the current HEAD.
+
+Git inspection must remain read-only.
+
+## 4. Token and context budget
+
+- One task should have one small, measurable outcome.
 - Read only the files required for that outcome.
-- Do not dump the whole repository or entire documents when a relevant section is sufficient.
-- Do not repeat project context, previous findings, or decisions already recorded.
-- Reuse the last verified report; check only for changes since its baseline where relevant.
-- Load only the skill/agent needed for the current task.
-- Do not run broad audits, speculative research, or parallel agent reviews for trivial changes.
-- Do not investigate later milestones or unresolved product questions prematurely.
-- Prefer concise factual outputs, paths, and line references over long prose.
-- Do not create additional documentation unless the user asks or the task requires it.
-- Stop once the acceptance criteria for the current micro-slice are satisfied.
+- Do not dump the whole repository or repeat existing project context.
+- Reuse verified reports when the relevant source has not changed.
+- Inspect changes since the previous baseline where needed.
+- Do not conduct broad audits or speculative research for a focused task.
+- Do not investigate later milestones prematurely.
+- Do not create additional documentation unless requested or required by the approved task.
+- Keep plans, prompts, and reports concise.
+- Stop when the acceptance criteria are met.
 
-## 4. Micro-slice rules
-A micro-slice should have one primary concern, a small expected file set, and observable acceptance criteria. Split a task further if it changes multiple module boundaries, persistence models, or unrelated behaviors.
+## 5. Task coordination and handover
+
+### Standard workflow
+
+1. **ChatGPT Account 1 — Define**
+   - Identify the milestone and task.
+   - Check prior decisions and dependencies.
+   - Define one implementation owner.
+   - Specify baseline, scope, approved files, exclusions, and acceptance criteria.
+   - Prepare the task prompt.
+
+2. **DeepSeek Harness — Prepare**
+   - Inspect the relevant repository areas.
+   - Investigate dependencies, existing patterns, and risks.
+   - Prepare a concise technical plan and handover for the implementation owner.
+   - Do not implement the same task unless explicitly assigned a separate implementation slice.
+
+3. **OpenCode + Nemotron — Implement**
+   - Verify the same baseline and local working-tree state.
+   - Follow the approved task and DeepSeek handover.
+   - Modify only approved files.
+   - Provide exact diffs and a concise completion report.
+   - Do not run tests, builds, or migrations without specific user authorization.
+
+4. **ChatGPT Account 2 — Review**
+   - Independently inspect the actual implementation and focused diff.
+   - Use the same baseline and task acceptance criteria.
+   - Review security, architecture, correctness, compatibility, and tests.
+   - Remain read-only.
+   - Report actionable findings with severity and file/line references.
+
+5. **OpenCode + Nemotron — Correct**
+   - Address only approved review findings in a separate micro-task.
+   - Provide a new diff and report.
+   - Do not expand the original scope.
+
+6. **ChatGPT Account 1 — Recommend**
+   - Evaluate implementation and independent review evidence.
+   - Record remaining risks and user actions.
+   - Recommend acceptance or further work.
+
+7. **User — Verify and decide**
+   - Run manual tests and any approved verification.
+   - Perform all Git write operations.
+   - Approve or reject the task's final acceptance.
+
+### Coordination rules
+
+- One implementation owner per task.
+- OpenCode + Nemotron is the default primary implementation owner.
+- DeepSeek may implement only an explicitly approved, isolated, low-risk task with its own named owner.
+- ChatGPT Account 2 is always read-only.
+- ChatGPT Account 1 coordinates and recommends; it does not modify the repository.
+- Only one AI agent may modify a shared working tree at a time.
+- Other agents must use read-only access or a supplied diff/report.
+- Every agent must verify its own baseline.
+- Never assume agents share chat history, local files, or working-tree state.
+- Stop on baseline mismatch, unexpected changes, access errors, or security-critical findings.
+- Do not duplicate work or use agents to bypass service limits or terms.
+
+## 6. Micro-task rules
+
+A micro-task must have one primary concern, a small expected file set, and observable acceptance criteria.
 
 For every task:
-1. Verify latest code and working tree.
-2. Inspect relevant files only.
-3. Provide a short plan (goal, expected files, acceptance criteria).
-4. Wait for approval before making changes or running state-changing commands.
-5. Complete only the approved slice.
-6. Report changed files, outcome, tests added/updated but not run, risks, and one next suggested slice.
+
+1. Verify the repository baseline and working tree.
+2. Inspect only relevant files.
+3. Provide a short plan with goal, expected files, and acceptance criteria.
+4. Wait for user approval before editing or executing state-changing commands.
+5. Implement only the approved scope.
+6. Report changed files, outcome, tests added/updated but not run, risks, and one suggested next task.
 7. Stop and wait for the user.
 
-Never proceed automatically to the next slice. Never bundle multiple proposed slices simply to save turns.
+Split tasks that touch multiple module boundaries, persistence models, or unrelated behaviors.
 
-## 5. One-owner and multi-agent coordination
-- One implementation owner per task. Account 1 owns implementation; ChatGPT defines tasks and recommends acceptance; DeepSeek prepares plans and handovers; Account 2 reviews. No agent takes over another's responsibility.
-- DeepSeek prepares the task before Account 1 implements when prior investigation is useful; its plan and handover are the brief. DeepSeek does not implement that same task unless the user separately approves an isolated, low-risk slice.
-- Account 2 is read-only. It receives the same task brief, relevant docs, baseline commit, and the focused diff/report produced by Account 1, and independently checks requirements, security, architecture, compatibility, and acceptance criteria. It does not edit or implement fixes.
-- Only one AI agent may modify the shared working tree at a time. Every other agent uses a read-only copy or a pasted diff.
-- If review finds issues, Account 1 addresses only the approved findings in a separate micro-slice.
-- The user decides which review findings to accept. Do not silently combine contradictory recommendations.
-- Every participating agent verifies and reports its own baseline hash. Do not assume one agent's inspection represents another agent's current repository.
-- No agent may silently expand scope. Preserve existing uncommitted work; security-critical and architectural changes require explicit user approval and independent review.
+## 7. Permission boundaries
 
-## 6. Permission boundaries
-- AI may inspect Git read-only. AI must not stage, commit, push, pull, switch/checkout branches, merge, rebase, reset, cherry-pick, clean, amend, create branches, rewrite history, or change Git configuration/hooks.
-- Do not run tests or builds unless the user explicitly authorizes that specific run. AI may add/update relevant test files; report them as not run.
-- Do not generate/apply migrations or modify a database unless the user explicitly authorizes the specific operation. Creating migration files also requires approval.
-- Do not modify/delete/overwrite existing uncommitted work.
-- Do not expose secret values in logs, reports, or documentation.
+AI agents may inspect Git read-only.
 
-## 7. Implementation task template
+AI agents must not:
+
+- Stage, commit, or push.
+- Pull or change branches.
+- Merge, rebase, reset, cherry-pick, clean, amend, or rewrite history.
+- Change Git configuration or hooks.
+- Run tests or builds without explicit authorization for that specific run.
+- Apply migrations or modify databases without explicit authorization.
+- Create migration files without explicit approval for that task.
+- Discard or overwrite existing uncommitted work.
+- Expose passwords, tokens, API keys, connection strings, or other secrets.
+
+AI may add or update test files, but must report them as not run unless the user explicitly authorized and the result was observed.
+
+## 8. Implementation task template
+
 ```markdown
 # Micro-task: [one measurable outcome]
 
@@ -74,143 +161,130 @@ Never proceed automatically to the next slice. Never bundle multiple proposed sl
 - Repository HEAD: [hash and date]
 - Working tree: [clean / relevant local changes]
 
+## Owner
+- Implementation owner: [OpenCode + Nemotron / DeepSeek Harness]
+- Preparation: [DeepSeek Harness, if applicable]
+- Reviewer: ChatGPT Account 2
+- Coordinator: ChatGPT Account 1
+
 ## Goal
-[One observable outcome only.]
+[One observable outcome.]
 
 ## Read
-[Exact paths or relevant sections only.]
+[Exact files or relevant sections.]
 
 ## Scope
 - Owning module: [module]
 - Expected files: [paths, if known]
-- Acceptance criteria:
-  - [ ] [Observable result]
-  - [ ] [Security/data/compatibility condition]
-  - [ ] Focused tests added/updated if applicable (not run)
-  - [ ] Relevant documentation/status updated if needed
+
+## Acceptance criteria
+- [ ] [Observable result]
+- [ ] [Security/data/compatibility condition]
+- [ ] Focused tests added or updated if applicable (not run)
+- [ ] Relevant documentation/status updated if approved
 
 ## Out of scope
-- Other roadmap slices or future product decisions.
+- Other roadmap slices.
 - Unrelated refactoring.
-- Other modules' private persistence.
+- Unapproved architecture or persistence changes.
+- Git write operations.
 
 ## Constraints
 - Follow CLAUDE.md and accepted decisions.
 - Inspect existing implementation before changing it.
 - Keep the smallest compatible change.
-- Do not run tests/builds/migrations or Git write operations without explicit permission.
+- Do not run tests/builds/migrations without explicit authorization.
 
 ## Completion report
-- Baseline hash / working-tree status:
+- Baseline hash and working-tree status:
 - Files changed:
 - Outcome:
-- Tests added/updated: [not run unless explicitly authorized]
-- Risks/manual verification:
-- Next suggested micro-slice:
+- Tests added/updated: [not run unless authorized]
+- Risks and manual verification:
+- Next suggested micro-task:
 - Suggested manual Git checkpoint/message (optional):
 ```
 
-## 8. Independent review template
+## 9. Independent review template
+
 ```markdown
-Review only this focused change against the task acceptance criteria,
+Review this focused implementation against the approved task,
 CLAUDE.md, architecture.md, and accepted decisions.
 
 Baseline commit: [hash]
 
-Do not edit files, implement fixes, run tests/builds, or perform Git write
-operations. Inspect only the supplied diff and relevant surrounding code.
+Review role: ChatGPT Account 2 — Independent Reviewer.
 
-Report only actionable findings, ordered by severity. For each, provide:
-- Severity (Critical / High / Medium / Low)
+Read-only restrictions:
+- Do not edit files.
+- Do not implement fixes.
+- Do not run tests/builds.
+- Do not perform Git write operations.
+
+Inspect the actual implementation, focused diff, and relevant surrounding code.
+
+Report actionable findings in severity order. For each finding provide:
+- Severity: Critical / High / Medium / Low
 - File and line/reference
 - Concrete failure scenario
 - Smallest suggested correction
 
-Check relevant requirement gaps, authn/authz, tenant/store isolation,
-fail-closed behavior, validation, transactions/idempotency, module coupling,
-compatibility, error handling, and test coverage. Separate confirmed defects
-from questions or speculation. If no material findings exist, say so briefly.
+Check:
+- Acceptance criteria and requirement gaps.
+- Authentication and authorization.
+- Tenant/store isolation and fail-closed behavior.
+- Validation and resource ownership.
+- Transactions and idempotency where relevant.
+- Module boundaries and dependency direction.
+- Persistence and migration compatibility.
+- Error handling and security-sensitive logging.
+- Focused test coverage.
+
+Separate confirmed defects from questions or speculation.
+If no material findings exist, say so briefly.
 ```
 
-## 9. Git commit message guidance (user performs commits)
-AI must never create a commit. After a slice is complete, reviewed, and the user has run any required manual verification, AI may propose a commit subject and body for the user to use.
+## 10. Completion and review statuses
 
-Use a concise Conventional Commit style:
+Use only these statuses:
+
+- **Completed (verified)**
+- **Reported complete (not independently verified)**
+- **In progress**
+- **Pending**
+- **Under review**
+- **Blocked**
+
+Never mark a task completed and verified based only on an agent's report.
+
+An implementation report is not independent verification. A reviewer report is not user manual verification. The user makes the final acceptance decision.
+
+## 11. Git commit message guidance
+
+The user performs all Git write operations. AI may suggest a commit subject and body only after the implementation is complete, review findings are resolved, and required user verification has been performed.
+
+Use:
 
 `<type>(<scope>): <imperative summary>`
 
 Suggested types:
+
 - `docs` — documentation only.
 - `feat` — new behavior.
 - `fix` — defect correction.
 - `refactor` — behavior-preserving restructuring.
 - `test` — test-only changes.
 - `build` — build/package/dependency configuration.
-- `security` — security hardening (use only if consistent with the repository's chosen convention).
+- `security` — security hardening, if consistent with repository convention.
 
-Guidelines:
-- Subject: concise, specific, imperative; avoid vague text such as `updates`, `changes`, or `fixes`.
-- Body: explain **what changed and why**, plus relevant design/security implications. Use short paragraphs or bullets; wrap long lines where practical.
-- Reference a task/slice or issue if the repository uses identifiers.
-- Mention migration compatibility or required manual action when relevant, but never include secrets.
-- Use `BREAKING CHANGE: ...` only when the change truly breaks compatibility.
-- Prefer one commit per coherent reviewed slice; do not combine unrelated slices.
-- Do not recommend a commit while critical review findings remain or verification is incomplete.
+Keep subjects concise and specific. Explain what changed and why in the body. Mention migration compatibility or required manual actions where relevant. Never include secrets.
 
-Examples for this project:
+Do not recommend a commit while critical review findings remain or verification is incomplete.
 
-**Documentation synchronization (S1)**
-```text
-docs(corekit): record approved M1 decisions
+## 12. Final authority
 
-- Record JWT refresh rotation and account lockout policy
-- Document shared-database tenant isolation safeguards
-- Record Tenant and Identity dependency direction
-
-Refs: M1 / S1
-```
-
-**Dedicated Access test project**
-```text
-test(access): separate Access tests from architecture tests
-
-- Add a dedicated Access test project
-- Keep architecture dependency tests focused on module boundaries
-
-Refs: M2 / S2.1
-```
-
-**Tenant decoupling**
-```text
-refactor(tenant): depend on SharedKernel contracts
-
-- Remove direct Identity project references from Tenant
-- Preserve tenant behavior through stable public abstractions
-
-Refs: M5 / S4
-```
-
-**Account lockout**
-```text
-feat(identity): enforce temporary account lockout
-
-- Lock accounts after five failed login attempts
-- Apply the approved fifteen-minute lockout duration
-- Add focused lockout tests
-
-Refs: M3 / S5
-```
-
-These are examples only. Adjust scope and wording to the actual reviewed change. The user decides whether to use them.
-
-## 10. Completion and handoff
-Keep the report short:
-1. Baseline hash and working-tree status.
-2. Files changed or reviewed.
-3. Outcome/findings and acceptance status.
-4. Tests added/updated (not run) or explicitly authorized test result.
-5. Security/data/compatibility risks and manual verification.
-6. One next micro-slice.
-7. Optional suggested manual commit subject/body.
-
-Never claim success for tests, builds, migrations, deployments, or commits unless the user authorized the operation and the result is observed.
+ChatGPT Account 1 coordinates and recommends.
+DeepSeek Harness prepares and investigates.
+OpenCode + Nemotron implements approved tasks.
+ChatGPT Account 2 independently reviews.
+The user owns scope, architecture approval, Git operations, manual testing, and final acceptance.

@@ -20,6 +20,7 @@
     <Project Path="CoreKit.Tenant/CoreKit.Tenant.csproj" Id="e0d47be8-fd8d-4032-98ab-e5e8ba6480a3" />
   </Folder>
   <Folder Name="/docs/">
+    <File Path="AGENTS.md" />
     <File Path="ai-tasks.md" />
     <File Path="architecture.md" />
     <File Path="current-state.md" />

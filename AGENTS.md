@@ -1,46 +1,118 @@
-# AGENTS.md — Shared Entry Point for AI Agents
+# AGENTS.md — Dastarkhwan Shared Agent Instructions
 
-Shared entry point for any AI agent working in this repository. It is **not** a replacement for the authoritative project instructions; it summarizes the approved workflow and points to them. Read those documents before acting. All of them live at the repository root.
+This file is the shared entry point for AI agents working in this repository. It summarizes the approved team workflow and points to the authoritative project documents.
 
-## Team — four AI agents and the user
+Read the relevant instructions before acting. Do not assume another agent has already read these files.
 
-| Agent | Role |
+## 1. Team roles
+
+| Participant | Role |
 |---|---|
-| ChatGPT | Project Manager: defines tasks and acceptance criteria, oversees architecture, reviews agent reports, recommends acceptance. Does not edit repository files or perform Git writes. |
-| DeepSeek Harness | Preparation Engineer: researches the repository, prepares implementation plans and technical handovers, investigates errors and dependencies, and takes only explicitly approved, isolated, low-risk slices. Does not replace Claude 1 or Claude 2. |
-| Claude Account 1 | Primary Developer: owns primary implementation and supplies exact diffs and completion reports. |
-| Claude Account 2 | Independent Reviewer: read-only review of actual code, architecture, and security. Does not modify implementation files. |
-| User | Project Owner: architecture approval, scope changes, Git operations, manual testing, release acceptance. |
+| ChatGPT Account 1 | Project Manager and Architecture Coordinator |
+| DeepSeek Harness | Preparation Engineer |
+| OpenCode + Nemotron | Primary Developer |
+| ChatGPT Account 2 | Independent Reviewer — read-only |
+| User | Project Owner and final decision-maker |
 
-Full role definitions and coordination rules are in `ai-tasks.md` §1 and §5; engineering rules are in `CLAUDE.md`.
+Full responsibilities and coordination rules are defined in `ai-tasks.md`.
 
-## Read first
+## 2. Read first
 
-1. `CLAUDE.md` — engineering instructions, mandatory repository check, prohibitions. Required for every task.
-2. `ai-tasks.md` — roles, coordination rules, task and review templates, commit-message guidance. Required for every task.
-3. `roadmap.md` — milestone order and completion criteria, when the task relates to roadmap progress.
-4. `architecture.md` — target architecture and module boundaries, for design or boundary work.
-5. `decisions.md` — accepted decisions and open questions, before proposing anything that touches one.
-6. `current-state.md` — verified implementation status and evidence, before assuming something is or is not implemented.
+1. `CLAUDE.md` — engineering instructions, architecture constraints, security rules, and prohibitions.
+2. `ai-tasks.md` — roles, handovers, task templates, review process, and Git guidance.
+3. `current-state.md` — implementation status and supporting evidence.
+4. `roadmap.md` — milestone order and acceptance criteria.
+5. `architecture.md` — target architecture and module boundaries.
+6. `decisions.md` — accepted decisions and open questions.
 
-## Non-negotiable rules
+Read only the sections relevant to the assigned task.
 
-- Verify the baseline before any task: repository root, branch, HEAD hash and commit date, and `git status --short`. State the exact HEAD used. Stop and ask if it differs from the brief or if uncommitted work could be disturbed.
-- One implementation owner per task, and only one AI agent may modify the shared working tree at a time.
-- Never stage, commit, push, pull, branch, merge, rebase, reset, cherry-pick, or rewrite history. The user performs all Git write operations.
-- Never run tests, builds, or migrations without explicit authorization for that specific action; report added or updated tests as not run.
-- Never expand scope, modify unapproved files, discard existing uncommitted work, or claim unobserved results.
+## 3. Mandatory baseline check
+
+Before every task:
+
+- Confirm repository root and relevant file paths.
+- Check branch, HEAD hash, and commit date.
+- Check staged, unstaged, and untracked changes using `git status --short`.
+- Inspect only relevant files and diffs.
+- State the exact baseline hash.
+- Stop if the baseline differs from the task brief or relevant uncommitted work may be affected.
+
+Never overwrite or discard existing work.
+
+## 4. Non-negotiable rules
+
+- One implementation owner per task.
+- OpenCode + Nemotron is the default primary implementation owner.
+- DeepSeek Harness prepares plans and handovers; it implements only explicitly approved isolated, low-risk tasks.
+- ChatGPT Account 2 reviews independently and remains read-only.
+- ChatGPT Account 1 coordinates and recommends acceptance; it does not modify repository files.
+- Only one AI agent may modify a shared working tree at a time.
+- The user controls all Git write operations.
+- Never stage, commit, push, pull, switch branches, merge, rebase, reset, cherry-pick, clean, amend, or rewrite history.
+- Never run tests, builds, or migrations without explicit authorization for that specific action.
+- Creating migration files requires explicit approval.
+- Never expand task scope or modify unapproved files.
+- Never claim unobserved results.
 - Security-critical and architectural changes require explicit user approval and independent review.
 - Keep secrets out of files, logs, and reports.
 
-## DeepSeek Harness — this agent's scope
+## 5. Architecture boundaries
 
-- Default work: read-only investigation, implementation plans, technical handovers, dependency and error analysis, and documentation or test preparation that the user approves.
-- Implementation: only explicitly approved, isolated, low-risk slices, one at a time, with the exact diff reported afterwards.
-- Never: take over Claude 1's implementation or Claude 2's review, approve its own work, or expand an approved slice.
+Preserve the approved modular monolith architecture:
 
-## Loading behaviour
+- Identity owns users, authentication, credentials, sessions, and tokens.
+- Access owns roles, permissions, assignments, and authorization.
+- Tenant must not depend directly on Identity.
+- Standalone modules must not require Tenant infrastructure.
+- Modules must not access another module's private DbContext, tables, or internals.
+- Enforce server-side authorization and tenant isolation.
+- Avoid circular dependencies and unnecessary refactoring.
 
-Verified: the DeepSeek Harness session that created this file loaded it automatically as additional agent instructions (observed 2026-11-07). That behaviour is specific to this Harness.
+Consult `architecture.md` and `decisions.md` before proposing boundary changes.
 
-No claim is made that Claude Code, ChatGPT, or any other application loads `AGENTS.md` automatically. Supply it explicitly, together with `CLAUDE.md`, `ai-tasks.md`, the task brief, and the baseline SHA, rather than assuming it was read.
+## 6. DeepSeek Harness
+
+Default responsibilities:
+
+- Read-only repository investigation.
+- Dependency and error analysis.
+- Technical planning and implementation handovers.
+- Preparing focused task prompts and evidence.
+
+Implementation is permitted only when the user explicitly approves a separate, isolated, low-risk task and names DeepSeek as its owner.
+
+## 7. OpenCode + Nemotron
+
+Primary implementation responsibilities:
+
+- Verify the approved baseline and working-tree state.
+- Follow the task brief and approved scope.
+- Implement only the assigned micro-task.
+- Provide exact diffs and a concise completion report.
+- Report tests as not run unless explicitly authorized.
+
+## 8. ChatGPT Account 2
+
+Independent reviewer responsibilities:
+
+- Inspect the actual focused implementation.
+- Use the same baseline and acceptance criteria.
+- Review security, architecture, correctness, compatibility, and test coverage.
+- Report actionable findings with severity and file/line references.
+- Do not edit or implement fixes.
+
+## 9. Completion
+
+Use only the approved project statuses:
+
+- Completed (verified)
+- Reported complete (not independently verified)
+- In progress
+- Pending
+- Under review
+- Blocked
+
+Agent reports do not constitute final acceptance. The user performs manual verification and makes the final decision.
+
+For full procedures, consult `ai-tasks.md` and `CLAUDE.md`.

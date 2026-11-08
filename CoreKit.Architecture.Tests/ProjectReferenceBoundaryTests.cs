@@ -223,7 +223,7 @@ public sealed class ProjectReferenceBoundaryTests
     public void Production_modules_and_composition_roots_cannot_reference_test_projects(string projectPath)
     {
         var testProjectSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var tp in SolutionInventory.ExpectedTestAssemblyNames.Values)
+        foreach (var tp in SolutionInventory.TestProjects)
             testProjectSet.Add(tp);
 
         foreach (var configuration in new[] { "Debug", "Release" })
@@ -232,13 +232,19 @@ public sealed class ProjectReferenceBoundaryTests
 
             foreach (var reference in result.ProjectReferences)
             {
-                var referenceProjectName = Path.GetFileNameWithoutExtension(reference);
-                Assert.False(testProjectSet.Contains(referenceProjectName),
+                var normalizedReference = NormalizeSolutionPath(reference);
+                Assert.False(testProjectSet.Contains(normalizedReference),
                     $"Project '{projectPath}' ({configuration}) references test project '{reference}'. " +
                     "Production modules and composition roots must not reference test projects.");
             }
         }
     }
+
+    /// <summary>
+    /// Normalizes a solution-relative project path for comparison: forward slashes, no trailing slash.
+    /// </summary>
+    private static string NormalizeSolutionPath(string path)
+        => path.Replace('\\', '/').TrimEnd('/');
 
     [Theory]
     [MemberData(nameof(ProductionModuleProjectPathsOnly))]
@@ -268,7 +274,7 @@ public sealed class ProjectReferenceBoundaryTests
     [MemberData(nameof(ProductionModuleProjectPathsOnly))]
     public void InternalsVisibleTo_declarations_match_allowlist(string projectPath)
     {
-        var assemblyName = Path.GetFileNameWithoutExtension(projectPath);
+        var assemblyName = SolutionInventory.ExpectedAssemblyNames[projectPath];
         var allowlist = ModuleBoundaryMatrix.InternalsVisibleToAllowlist;
 
         // An absent allowlist key means no IVT declarations are expected.
@@ -300,14 +306,16 @@ public sealed class ProjectReferenceBoundaryTests
             var assemblyName = kvp.Key;
             var friends = kvp.Value;
 
-            // Find the project that produces this assembly.
-            var producingProject = ModuleBoundaryMatrix.ProductionModuleProjectPaths
-                .FirstOrDefault(p => Path.GetFileNameWithoutExtension(p) == assemblyName);
+            // Find the project that produces this assembly using expected assembly-name mapping.
+            var producingProject = SolutionInventory.ExpectedAssemblyNames
+                .FirstOrDefault(kvp => string.Equals(kvp.Value, assemblyName, StringComparison.OrdinalIgnoreCase))
+                .Key;
 
             if (producingProject == null)
             {
-                // Not a production module - skip (IVT allowlist should only contain production modules)
-                continue;
+                throw new InvalidOperationException(
+                    $"InternalsVisibleToAllowlist contains assembly '{assemblyName}' which is not " +
+                    $"produced by any production project in SolutionInventory.ExpectedAssemblyNames.");
             }
 
             foreach (var configuration in new[] { "Debug", "Release" })
@@ -327,7 +335,7 @@ public sealed class ProjectReferenceBoundaryTests
         // Only production modules with an allowlist entry are expected to declare IVT.
         foreach (var projectPath in ModuleBoundaryMatrix.ProductionModuleProjectPaths)
         {
-            var assemblyName = Path.GetFileNameWithoutExtension(projectPath);
+            var assemblyName = SolutionInventory.ExpectedAssemblyNames[projectPath];
             var allowlist = ModuleBoundaryMatrix.InternalsVisibleToAllowlist;
 
             if (!allowlist.TryGetValue(assemblyName, out var allowedFriends))
@@ -388,7 +396,7 @@ public sealed class ProjectReferenceBoundaryTests
 
         foreach (var projectPath in ModuleBoundaryMatrix.ProductionModuleProjectPaths)
         {
-            var assemblyName = Path.GetFileNameWithoutExtension(projectPath);
+            var assemblyName = SolutionInventory.ExpectedAssemblyNames[projectPath];
             var allowlist = ModuleBoundaryMatrix.InternalsVisibleToAllowlist;
             if (!allowlist.TryGetValue(assemblyName, out var allowedFriends))
                 continue;

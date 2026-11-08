@@ -43,6 +43,22 @@ internal static class SolutionInventory
         "CoreKit.Tenant.Tests/CoreKit.Tenant.Tests.csproj",
     };
 
+    /// <summary>
+    /// Expected evaluated assembly name for each production project, keyed by solution-relative
+    /// project path. Every production project must have exactly one entry.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string> ExpectedAssemblyNames =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["CoreKit.SharedKernel/CoreKit.SharedKernel.csproj"] = "CoreKit.SharedKernel",
+            ["CoreKit.Identity/CoreKit.Identity.csproj"] = "CoreKit.Identity",
+            ["CoreKit.Access/CoreKit.Access.csproj"] = "CoreKit.Access",
+            ["CoreKit.Tenant/CoreKit.Tenant.csproj"] = "CoreKit.Tenant",
+        };
+
+    /// <summary>Duplicate normalized project paths found in Dastarkhwan.slnx.</summary>
+    public static readonly IReadOnlyList<string> DuplicateSolutionPaths;
+
     /// <summary>Solution directory containing Dastarkhwan.slnx.</summary>
     public static readonly string SolutionDir;
 
@@ -72,6 +88,16 @@ internal static class SolutionInventory
         SolutionDir = FindSolutionDirectory(out var attemptedPaths);
         SolutionPath = Path.Combine(SolutionDir, SolutionFileName);
         AllSolutionProjects = GetAllSolutionProjects();
+
+        // Detect duplicate normalized project paths before constructing classification dictionaries.
+        var normalizedPaths = AllSolutionProjects
+            .Select(NormalizeSolutionPath)
+            .ToList();
+        DuplicateSolutionPaths = normalizedPaths
+            .GroupBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
 
         var projectCategories = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         foreach (var p in AllSolutionProjects)
@@ -145,6 +171,11 @@ internal static class SolutionInventory
                 $"Missing matrix entries (project in Dastarkhwan.slnx but not in any matrix category): " +
                 $"{string.Join(", ", MissingMatrixEntries)}");
 
+        if (DuplicateSolutionPaths.Count > 0)
+            errors.Add(
+                $"Duplicate normalized project paths in Dastarkhwan.slnx: " +
+                $"{string.Join(", ", DuplicateSolutionPaths)}");
+
         if (errors.Count > 0)
             throw new InvalidOperationException(
                 "Solution inventory is inconsistent:\n" + string.Join(Environment.NewLine, errors));
@@ -162,6 +193,13 @@ internal static class SolutionInventory
         }
         return result;
     }
+
+    /// <summary>
+    /// Normalizes a solution-relative project path for duplicate detection:
+    /// forward slashes, no trailing slash.
+    /// </summary>
+    private static string NormalizeSolutionPath(string path)
+        => path.Replace('\\', '/').TrimEnd('/');
 
     private static string FindSolutionDirectory(out List<string> attemptedPaths)
     {

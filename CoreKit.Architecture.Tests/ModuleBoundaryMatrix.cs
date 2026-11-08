@@ -65,19 +65,12 @@ internal static class ModuleBoundaryMatrix
         new[] { "CoreKit.SharedKernel", "CoreKit.Identity", "CoreKit.Access", "CoreKit.Tenant" };
 
     /// <summary>All production module project paths, solution-relative forward-slash.</summary>
-    public static readonly IReadOnlyList<string> ProductionModuleProjectPaths = new[]
-    {
-        "CoreKit.SharedKernel/CoreKit.SharedKernel.csproj",
-        "CoreKit.Identity/CoreKit.Identity.csproj",
-        "CoreKit.Access/CoreKit.Access.csproj",
-        "CoreKit.Tenant/CoreKit.Tenant.csproj",
-    };
+    /// <remarks>Sourced from SolutionInventory (canonical classification) to prevent drift.</remarks>
+    public static readonly IReadOnlyList<string> ProductionModuleProjectPaths = SolutionInventory.ProductionModules;
 
     /// <summary>Composition root project paths, solution-relative forward-slash.</summary>
-    public static readonly IReadOnlyList<string> CompositionRoots = new[]
-    {
-        "CoreKit.SampleHost/CoreKit.SampleHost.csproj",
-    };
+    /// <remarks>Sourced from SolutionInventory (canonical classification) to prevent drift.</remarks>
+    public static readonly IReadOnlyList<string> CompositionRoots = SolutionInventory.CompositionRoots;
 
     /// <summary>All test project names (evaluated assembly names or project paths).</summary>
     public static readonly IReadOnlyList<string> TestProjects = new[]

@@ -44,6 +44,72 @@ public sealed class ProjectReferenceBoundaryTests
     }
 
     [Fact]
+    public void Duplicate_normalized_solution_paths_cause_actionable_failure()
+    {
+        Assert.True(SolutionInventory.DuplicateSolutionPaths.Count == 0,
+            $"Duplicate normalized project paths in Dastarkhwan.slnx: " +
+            $"{string.Join(", ", SolutionInventory.DuplicateSolutionPaths)}");
+    }
+
+    [Fact]
+    public void Every_production_project_has_expected_assembly_mapping()
+    {
+        // Every production project must have exactly one expected assembly name.
+        foreach (var projectPath in SolutionInventory.ProductionModules)
+        {
+            Assert.True(
+                SolutionInventory.ExpectedAssemblyNames.ContainsKey(projectPath),
+                $"Production project '{projectPath}' has no expected assembly name mapping in " +
+                $"SolutionInventory.ExpectedAssemblyNames.");
+        }
+
+        // Every expected assembly mapping must correspond to a production project.
+        foreach (var projectPath in SolutionInventory.ExpectedAssemblyNames.Keys)
+        {
+            Assert.True(
+                SolutionInventory.ProductionModules.Contains(projectPath, StringComparer.OrdinalIgnoreCase),
+                $"ExpectedAssemblyNames contains '{projectPath}' which is not a production module project path.");
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(ProductionModuleProjectPathsOnly))]
+    public void Evaluated_assembly_name_matches_expected_mapping(string projectPath)
+    {
+        var expectedName = SolutionInventory.ExpectedAssemblyNames[projectPath];
+
+        foreach (var configuration in new[] { "Debug", "Release" })
+        {
+            var result = Evaluator.Evaluate(projectPath, configuration);
+            Assert.True(
+                string.Equals(result.AssemblyName, expectedName, StringComparison.OrdinalIgnoreCase),
+                $"Project '{projectPath}' ({configuration}) evaluates to assembly '{result.AssemblyName}', " +
+                $"but expected '{expectedName}'.");
+        }
+    }
+
+    [Fact]
+    public void Classification_lists_do_not_drift_between_inventory_and_matrix()
+    {
+        // Production module project paths must match exactly.
+        var inventoryProduction = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in SolutionInventory.ProductionModules) inventoryProduction.Add(p);
+        var matrixProduction = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in ModuleBoundaryMatrix.ProductionModuleProjectPaths) matrixProduction.Add(p);
+        Assert.True(inventoryProduction.SetEquals(matrixProduction),
+            $"Production module project paths drift between SolutionInventory and ModuleBoundaryMatrix." +
+            $" Inventory: {string.Join(", ", inventoryProduction)}. Matrix: {string.Join(", ", matrixProduction)}.");
+
+        // Composition root project paths must match exactly.
+        var inventoryRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in SolutionInventory.CompositionRoots) inventoryRoots.Add(p);
+        var matrixRoots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in ModuleBoundaryMatrix.CompositionRoots) matrixRoots.Add(p);
+        Assert.True(inventoryRoots.SetEquals(matrixRoots),
+            $"Composition root project paths drift between SolutionInventory and ModuleBoundaryMatrix.");
+    }
+
+    [Fact]
     public void Project_reference_allowlist_keys_match_production_and_composition_root_projects()
     {
         var expectedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

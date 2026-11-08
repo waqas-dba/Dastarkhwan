@@ -150,11 +150,11 @@ public sealed class ProjectReferenceBoundaryTests
     [Fact]
     public void Test_project_classification_lists_do_not_drift_between_inventory_and_matrix()
     {
-        // Test project paths from SolutionInventory converted to assembly names must match
+        // Test project assembly names from SolutionInventory.ExpectedTestAssemblyNames must match
         // ModuleBoundaryMatrix.TestProjects exactly.
         var inventoryTestAssemblies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var p in SolutionInventory.TestProjects)
-            inventoryTestAssemblies.Add(Path.GetFileNameWithoutExtension(p));
+        foreach (var name in SolutionInventory.ExpectedTestAssemblyNames.Values)
+            inventoryTestAssemblies.Add(name);
         var matrixTestAssemblies = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var t in ModuleBoundaryMatrix.TestProjects) matrixTestAssemblies.Add(t);
         Assert.True(inventoryTestAssemblies.SetEquals(matrixTestAssemblies),
@@ -223,8 +223,8 @@ public sealed class ProjectReferenceBoundaryTests
     public void Production_modules_and_composition_roots_cannot_reference_test_projects(string projectPath)
     {
         var testProjectSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var tp in SolutionInventory.TestProjects)
-            testProjectSet.Add(Path.GetFileNameWithoutExtension(tp));
+        foreach (var tp in SolutionInventory.ExpectedTestAssemblyNames.Values)
+            testProjectSet.Add(tp);
 
         foreach (var configuration in new[] { "Debug", "Release" })
         {
@@ -365,12 +365,26 @@ public sealed class ProjectReferenceBoundaryTests
         }
     }
 
+    [Theory]
+    [MemberData(nameof(CompositionRootProjectPathsOnly))]
+    public void Composition_roots_do_not_declare_internals_visible_to(string projectPath)
+    {
+        // Composition roots must not declare InternalsVisibleTo in either Debug or Release.
+        foreach (var configuration in new[] { "Debug", "Release" })
+        {
+            var result = Evaluator.Evaluate(projectPath, configuration);
+            Assert.True(result.InternalsVisibleTo.Count == 0,
+                $"Composition root '{projectPath}' ({configuration}) declares InternalsVisibleTo: " +
+                $"{string.Join(", ", result.InternalsVisibleTo)}. Composition roots must not declare IVT.");
+        }
+    }
+
     [Fact]
     public void IVT_friends_must_be_test_projects()
     {
         var testProjectSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var tp in SolutionInventory.TestProjects)
-            testProjectSet.Add(Path.GetFileNameWithoutExtension(tp));
+        foreach (var tp in SolutionInventory.ExpectedTestAssemblyNames.Values)
+            testProjectSet.Add(tp);
 
         foreach (var projectPath in ModuleBoundaryMatrix.ProductionModuleProjectPaths)
         {
@@ -426,6 +440,12 @@ public sealed class ProjectReferenceBoundaryTests
     public static IEnumerable<object[]> TestProjectProjectPathsOnly()
     {
         foreach (var p in SolutionInventory.TestProjects)
+            yield return new object[] { p };
+    }
+
+    public static IEnumerable<object[]> CompositionRootProjectPathsOnly()
+    {
+        foreach (var p in ModuleBoundaryMatrix.CompositionRoots)
             yield return new object[] { p };
     }
 

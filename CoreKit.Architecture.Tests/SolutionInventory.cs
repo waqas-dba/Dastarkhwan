@@ -209,6 +209,30 @@ internal static class SolutionInventory
             }
         }
 
+        // Validate duplicate expected test assembly names.
+        var duplicateTestAssemblyNames = ExpectedTestAssemblyNames
+            .GroupBy(kvp => kvp.Value, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .ToList();
+        foreach (var dup in duplicateTestAssemblyNames)
+        {
+            errors.Add(
+                $"Duplicate expected test assembly name '{dup.Key}' is assigned to multiple " +
+                $"projects: {string.Join(", ", dup.Select(kvp => kvp.Key))}.");
+        }
+
+        // Validate duplicate expected production assembly names.
+        var duplicateProductionAssemblyNames = ExpectedAssemblyNames
+            .GroupBy(kvp => kvp.Value, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .ToList();
+        foreach (var dup in duplicateProductionAssemblyNames)
+        {
+            errors.Add(
+                $"Duplicate expected production assembly name '{dup.Key}' is assigned to " +
+                $"multiple projects: {string.Join(", ", dup.Select(kvp => kvp.Key))}.");
+        }
+
         if (errors.Count > 0)
             throw new InvalidOperationException(
                 "Solution inventory is inconsistent:\n" + string.Join(Environment.NewLine, errors));

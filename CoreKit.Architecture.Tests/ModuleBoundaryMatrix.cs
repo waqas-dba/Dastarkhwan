@@ -75,11 +75,9 @@ internal static class ModuleBoundaryMatrix
     public static readonly IReadOnlyList<string> CompositionRoots = SolutionInventory.CompositionRoots;
 
     /// <summary>All test project names (evaluated assembly names), sourced from
-    /// SolutionInventory.TestProjects to prevent drift.</summary>
+    /// SolutionInventory.ExpectedTestAssemblyNames to prevent drift.</summary>
     public static readonly IReadOnlyList<string> TestProjects =
-        SolutionInventory.TestProjects
-            .Select(Path.GetFileNameWithoutExtension)
-            .ToList();
+        SolutionInventory.ExpectedTestAssemblyNames.Values.ToList();
 
     /// <summary>
     /// D-015 temporary exception: Tenant -> Identity is the only documented temporary

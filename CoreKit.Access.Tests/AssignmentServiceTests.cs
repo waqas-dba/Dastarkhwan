@@ -109,6 +109,19 @@ public sealed class AccessAssignmentServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SetRoles_CannotAssignRoleToUserOutsideScope()
+    {
+        _env.SignInOwner();
+        var cashier = _env.AddRole("Cashier", new[] { "sales.create" });
+        var otherScope = AccessScope.ForTenant(Guid.NewGuid());
+        var foreignMember = _env.AddMember(scope: otherScope);
+
+        ResultAssert.Fails(await Svc.SetRolesAsync(foreignMember, Roles(cashier)), AccessErrorKind.Validation);
+
+        Assert.Empty(_env.Read(db => db.Assignments.Where(a => a.UserId == foreignMember).ToList()));
+    }
+
+    [Fact]
     public async Task SetRoles_EnforcesTheLimitPerPerson()
     {
         using var env = new TestEnv(new AccessOptions { MaxRolesPerUser = 1 });

@@ -83,7 +83,7 @@ internal sealed class TestEnv : IDisposable
 
     public AccessAuditRepository AuditRepo { get; }
 
-    public AccessUnitOfWork UnitOfWork { get; }
+    public IAccessUnitOfWork UnitOfWork { get; }
 
     public AccessAuditRecorder Audit { get; }
 

@@ -7,8 +7,8 @@ Build a secure, reusable modular SaaS platform for food-item delivery and parcel
 - Verify the actual latest commit and working-tree status before each task; `9555b8c` is the recorded M0 baseline, not necessarily today's HEAD.
 - Inspect only relevant files. Do not assume a feature is missing without checking current code.
 - Break work into small, independently reviewable micro-slices; one approved slice per request.
-- Four-agent workflow: ChatGPT (Project Manager) defines tasks and acceptance criteria and recommends acceptance without editing files or performing Git writes; DeepSeek Harness (Preparation Engineer) prepares plans and technical handovers and takes only explicitly approved, isolated, low-risk slices; Claude Account 1 (Primary Developer) implements; Claude Account 2 (Independent Reviewer) reviews read-only. The user is the Project Owner.
-- Only one AI agent modifies the shared working tree at a time, and every participating agent verifies the same baseline SHA. Roles and coordination rules: `ai-tasks.md` §1 and §5.
+- Agreed workflow: DeepSeek Harness prepares plans and technical handovers; OpenCode + Nemotron implement approved slices; ChatGPT Account 2 independently reviews read-only; ChatGPT Account 1 coordinates and recommends acceptance; the user approves, verifies manually and controls all Git operations.
+- Only one agent modifies the shared working tree at a time, and every participating agent verifies the same baseline SHA. Coordination rules: `ai-tasks.md` §5.
 - AI may add/update tests but does not run tests/builds without explicit permission. User performs normal verification.
 - AI does not execute migrations or modify databases without explicit permission.
 - AI never performs Git write operations. It may suggest a manual checkpoint and prepare the commit message for the user.
@@ -20,51 +20,48 @@ Build a secure, reusable modular SaaS platform for food-item delivery and parcel
 **Done when:** solution/module structure, framework, persistence/migrations, Identity/Access, tenancy, tests, and key gaps are recorded with evidence and a safe next task.
 
 ## M1 — Essential architecture decisions
-**Status: Three decisions accepted; documentation synchronization is the next small task.**
-- Short-lived JWT access tokens, rotating refresh tokens, refresh-token reuse detection/revocation, and lockout after 5 failed attempts for 15 minutes.
-- One shared PostgreSQL database; tenant-owned records have explicit `TenantId` ownership and EF Core global query filters, with application-service and authorization enforcement as additional boundaries.
-- Remove Tenant's direct dependency on Identity through stable SharedKernel contracts/abstractions.
+**Status: In progress — accepted decisions are recorded in `decisions.md`; implementation is tracked in `current-state.md` and is not implied by acceptance. S1 (documentation synchronization) remains in progress until implementation and review finish.**
 
-Deferred until needed by the relevant milestone: checkout grouping, parcel pickup initiation details, payment methods/COD, operational currency/market rules beyond the accepted Pakistan-first direction, and website/domain strategy.
+Decision statements live in `decisions.md` and are not repeated here. Deferred decisions are listed in `current-state.md`.
 
 **Done when:** accepted decisions are recorded accurately in `decisions.md` and `current-state.md` distinguishes decisions from implementation status.
 
 ## Near-term execution queue (one micro-slice per request)
-These are the proposed order from the M0 report. Verify the repository before each slice and obtain user approval before implementation or command execution.
+Slices are prepared by DeepSeek Harness, implemented by OpenCode + Nemotron, independently reviewed by ChatGPT Account 2, coordinated by ChatGPT Account 1, and approved by the user. Verify the repository before each slice and obtain user approval before implementation or command execution.
 
-| Slice | Task | Boundary / completion evidence |
-|---|---|---|
-| S1 | Documentation only: record the three accepted M1 decisions and update current-state | Decisions have Accepted status; current-state preserves M0 evidence and clearly labels the baseline commit. |
-| S2.1 | Create a dedicated `CoreKit.Access.Tests` project | Project exists and contains only Access-focused tests moved/created in a controlled, reviewed change. |
-| S2.2 | Update architecture-test coverage/references for every intended module | Architecture rules cover the actual module set; no project references are added speculatively. |
-| S3 | Add the Access migration | Migration files are generated only after explicit approval; do not apply to any database unless separately authorized. |
-| S4.1 | Inventory Tenant-to-Identity references and classify each | Exact six previously reported code-file references are rechecked against current HEAD; list evidence and intended replacement contract. |
-| S4.2 | Define/approve SharedKernel contracts for the dependency | Contract ownership and direction are approved before code changes. |
-| S4.3 | Remove Tenant's direct Identity dependency | Tenant compiles conceptually against stable abstractions; no unrelated refactor. User authorizes any build/test commands separately. |
-| S5.1 | Inspect current Identity login/failed-attempt flow | Focused design for lockout, thresholds, duration, reset behavior, concurrency, and rate limiting. |
-| S5.2 | Implement account lockout | Five failed attempts trigger a 15-minute lockout; focused tests added but not run by AI. |
-| S6.1 | Inventory role/permission ownership and dependencies | Identify all Identity-owned role/permission code, tables, contracts, and consumers. |
-| S6.2 | Move role ownership to Access | Access owns role/permission persistence and behavior; Identity remains responsible for identity/authentication. Migration/data compatibility plan approved. |
+| Slice | Task | Status | Boundary / completion evidence |
+|---|---|---|---|
+| S1 | Documentation only: synchronize `current-state.md` and `roadmap.md` with the accepted decisions and current evidence | In progress | This change; not complete until implementation and review finish |
+| S2.1 | Create a dedicated `CoreKit.Access.Tests` project | Not started | Project exists and contains only Access-focused tests moved/created in a controlled, reviewed change. |
+| S2.2 | Update architecture-test coverage/references for every intended module | Partial | Boundary rules cover SharedKernel, Identity, Access and Tenant with a documented temporary exception; tests not run |
+| S3 | Add the Access migration | Not started | Files are generated only after explicit approval; do not apply to any database unless separately authorized. Local untracked migration files are reported as uncommitted, unreviewed and unapproved. |
+| S4.1 | Inventory Tenant-to-Identity references and classify each | Reported / needs refresh | Inventory and classification reported; not yet recorded as an approved repository artifact |
+| S4.2 | Define/approve SharedKernel contracts for the dependency | Not started | Contract ownership and direction are approved before code changes. |
+| S4.3 | Remove Tenant's direct Identity dependency | Not started | Tenant still references Identity directly in `CoreKit.Tenant.csproj` |
+| S5.1 | Inspect current Identity login/failed-attempt flow | Not started | Focused design for lockout, thresholds, duration, reset behavior, concurrency, and rate limiting. |
+| S5.2 | Implement account lockout | Not started | No lockout fields or logic exist in `CoreKit.Identity` |
+| S6.1 | Inventory role/permission ownership and dependencies | Reported / needs refresh | Inventory and dependency map reported; not yet recorded as an approved repository artifact |
+| S6.2 | Move role ownership to Access | Not started | Identity still owns role/permission persistence; Identity remains responsible for identity/authentication when this starts |
 
 Do not combine adjacent slices automatically. Stop after each slice and wait for user review/approval.
 
 ## M2 — Module foundation
-Align module registration, public contracts, persistence ownership, configuration, errors, and test conventions. Remove circular dependencies and private cross-module database access. Existing SharedKernel and architecture-test projects are present per the M0 report; Access tests currently sit inside the architecture test project and its references cover only Access.
+Align module registration, public contracts, persistence ownership, configuration, errors, and test conventions. Remove circular dependencies and private cross-module database access. Existing SharedKernel and architecture-test projects are present. Boundary tests now cover SharedKernel, Identity, Access and Tenant, with Tenant → Identity as an explicit temporary exception (D-015); Access-focused tests still live inside the architecture test project (S2.1).
 
 **Done when:** module dependency rules and test organization accurately cover the intended modules, with no circular/private persistence access.
 
 ## M3 — Identity
-Identity owns accounts, authentication, credentials, sessions/tokens, lockout, and recovery. Reuse sound existing code; do not reimplement working flows unnecessarily. M0 reported Identity as partial, without lockout, and still containing roles/permissions contrary to the target boundary.
+Identity owns accounts, authentication, credentials, sessions/tokens, lockout, and recovery. Reuse sound existing code; do not reimplement working flows unnecessarily. M0 reported Identity as partial, without lockout, and still containing roles/permissions contrary to the target boundary; at this snapshot no lockout fields or logic exist in `CoreKit.Identity`.
 
 **Done when:** identity lifecycle, login failure/lockout, token issuance/rotation/revocation, and recovery paths have reviewed contracts and focused tests.
 
 ## M4 — Access
-Access owns roles, permissions, assignments, and server-side authorization. It must not access Identity private tables or `DbContext`. M0 reported Access code exists but no migration was present at that baseline.
+Access owns roles, permissions, assignments, and server-side authorization. It must not access Identity private tables or `DbContext`. M0 reported Access code exists but no migration was present at that baseline. At this snapshot Access services and tests exist, no Access migration is tracked, local untracked migration files remain unreviewed, and manual verification is pending.
 
 **Done when:** role/permission ownership and authorization are implemented with positive and negative tests, including tenant/resource-scope cases, and persistence migration is reviewed.
 
 ## M5 — Tenant and Store
-Tenant is implemented partially; M0 reported six code-file references from Tenant to Identity. Store had not started. Remove the Tenant-to-Identity dependency using approved contracts. Define Store separately and its relationship to Tenant; do not put Store behavior inside Tenant.
+Tenant is implemented partially; M0 reported six code-file references from Tenant to Identity. Store had not started. Remove the Tenant-to-Identity dependency using approved contracts. Define Store separately and its relationship to Tenant; do not put Store behavior inside Tenant. At this snapshot `CoreKit.Tenant` still references `CoreKit.Identity` directly, so decoupling is incomplete (D-015 / S4.3).
 
 **Done when:** Tenant is reusable and decoupled, Store ownership/lifecycle is explicit, tenant/store resolution fails closed, and tenant-owned access is enforced and tested.
 

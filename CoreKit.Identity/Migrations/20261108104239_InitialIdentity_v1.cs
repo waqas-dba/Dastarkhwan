@@ -2,10 +2,10 @@
 
 #nullable disable
 
-namespace CoreKit.Tenant.Migrations
+namespace CoreKit.Identity.Migrations
 {
     /// <inheritdoc />
-    public partial class init_tenant2 : Migration
+    public partial class InitialIdentity_v1 : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

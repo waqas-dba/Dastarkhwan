@@ -2,250 +2,458 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Xml.Linq;
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace CoreKit.Architecture.Tests;
 
 /// <summary>
-/// Validates declared project references in .csproj files against the shared architecture boundary matrix.
-/// Parses Dastarkhwan.slnx as the authoritative project inventory, classifies each project, and verifies
-/// that every declared reference is explicitly allowed.
+/// Validates the effective MSBuild project-reference graph against ModuleBoundaryMatrix.
+///
+/// Uses dotnet msbuild -getProperty/-getItem through a subprocess to evaluate each
+/// project in Debug and Release, then enforces the boundary matrix both directions.
+/// Test-project dependency graphs are intentionally left unconstrained in this task.
 /// </summary>
 public sealed class ProjectReferenceBoundaryTests
 {
-    private static readonly string SolutionDir = FindSolutionDirectory();
-    private static readonly string SolutionPath = GetAbsoluteProjectPath("Dastarkhwan.slnx");
+    private static readonly MsBuildProjectEvaluator Evaluator = new(SolutionInventory.SolutionDir);
+
+    // Architecture-test implementation files excluded from alternative-mechanism scanning.
+    private static readonly HashSet<string> ExcludedImplementationFiles = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "SolutionInventory.cs",
+        "MsBuildProjectEvaluator.cs",
+        "ProjectReferenceBoundaryTests.cs",
+        "ModuleBoundaryMatrix.cs",
+        "ModuleBoundaryTests.cs",
+    };
 
     [Fact]
-    public void Every_production_module_in_slnx_has_a_matrix_entry()
+    public void Solution_inventory_is_consistent()
     {
-        var productionModules = GetProductionModulesFromSlnx();
-
-        foreach (var module in productionModules)
-        {
-            Assert.True(
-                ModuleBoundaryMatrix.ProductionModules.Contains(module),
-                $"Production module '{module}' found in Dastarkhwan.slnx has no entry in " +
-                $"ModuleBoundaryMatrix.ProductionModules. Add an explicit matrix entry for the new module.");
-        }
+        SolutionInventory.ValidateConsistency();
     }
 
     [Fact]
-    public void Every_project_reference_declared_by_a_production_module_is_allowed()
+    public void Every_solution_project_belongs_to_exactly_one_category()
     {
-        foreach (var projectPath in GetProductionProjectPathsFromSlnx())
+        Assert.True(SolutionInventory.UnclassifiedProjects.Count == 0,
+            $"Unclassified projects: {string.Join(", ", SolutionInventory.UnclassifiedProjects)}");
+        Assert.True(SolutionInventory.MultiplyClassifiedProjects.Count == 0,
+            $"Multiply classified projects: {string.Join(", ", SolutionInventory.MultiplyClassifiedProjects)}");
+    }
+
+    [Fact]
+    public void Project_reference_allowlist_keys_match_production_and_composition_root_projects()
+    {
+        var expectedKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in ModuleBoundaryMatrix.ProductionModuleProjectPaths) expectedKeys.Add(p);
+        foreach (var p in ModuleBoundaryMatrix.CompositionRoots) expectedKeys.Add(p);
+
+        var actualKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var k in ModuleBoundaryMatrix.ProjectReferenceAllowlist.Keys) actualKeys.Add(k);
+
+        Assert.True(expectedKeys.SetEquals(actualKeys),
+            $"ProjectReferenceAllowlist keys do not match production + composition root projects." +
+            $" Expected: {string.Join(", ", expectedKeys)}. Actual: {string.Join(", ", actualKeys)}.");
+    }
+
+    [Fact]
+    public void Every_allowed_reference_target_exists_in_solution()
+    {
+        var allSolutionProjects = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var p in SolutionInventory.AllSolutionProjects) allSolutionProjects.Add(p);
+
+        foreach (var kvp in ModuleBoundaryMatrix.ProjectReferenceAllowlist)
         {
-            var allowlist = ModuleBoundaryMatrix.ProjectReferenceAllowlist;
+            Assert.True(allSolutionProjects.Contains(kvp.Key),
+                $"ProjectReferenceAllowlist key '{kvp.Key}' is not a project in Dastarkhwan.slnx.");
 
-            Assert.True(
-                allowlist.ContainsKey(projectPath),
-                $"Production project '{projectPath}' has no project-reference allowlist entry in " +
-                $"ModuleBoundaryMatrix.ProjectReferenceAllowlist.");
-
-            var declaredRefs = GetDeclaredProjectReferences(projectPath);
-            var allowedRefs = allowlist[projectPath];
-
-            foreach (var declaredRef in declaredRefs)
+            foreach (var target in kvp.Value)
             {
-                var referencedProjectName = Path.GetFileNameWithoutExtension(declaredRef);
-                Assert.False(
-                    ModuleBoundaryMatrix.TestProjects.Contains(referencedProjectName),
-                    $"Production project '{projectPath}' references test project '{declaredRef}'. " +
-                    "Production modules must not reference test projects.");
+                Assert.True(allSolutionProjects.Contains(target),
+                    $"ProjectReferenceAllowlist target '{target}' (referenced by '{kvp.Key}') " +
+                    "is not a project in Dastarkhwan.slnx.");
+            }
+        }
+    }
 
-                Assert.True(
-                    allowedRefs.Contains(declaredRef),
-                    $"Production project '{projectPath}' declares a forbidden ProjectReference to '{declaredRef}'. " +
-                    $"Allowed references: {string.Join(", ", allowedRefs)}.");
+    [Theory]
+    [MemberData(nameof(ProductionAndCompositionRootProjects))]
+    public void Every_evaluated_reference_is_allowed(string projectPath)
+    {
+        foreach (var configuration in new[] { "Debug", "Release" })
+        {
+            var result = Evaluator.Evaluate(projectPath, configuration);
+            var allowedRefs = ModuleBoundaryMatrix.ProjectReferenceAllowlist[projectPath];
+            var allowedSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var a in allowedRefs) allowedSet.Add(a);
+
+            foreach (var reference in result.ProjectReferences)
+            {
+                Assert.True(allowedSet.Contains(reference),
+                    $"Project '{projectPath}' ({configuration}) declares ProjectReference to '{reference}' " +
+                    $"which is not allowed. Allowed references: {string.Join(", ", allowedRefs)}.");
+            }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(ProductionAndCompositionRootProjects))]
+    public void Production_modules_and_composition_roots_cannot_reference_test_projects(string projectPath)
+    {
+        var testProjectSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var tp in ModuleBoundaryMatrix.TestProjects) testProjectSet.Add(tp);
+
+        foreach (var configuration in new[] { "Debug", "Release" })
+        {
+            var result = Evaluator.Evaluate(projectPath, configuration);
+
+            foreach (var reference in result.ProjectReferences)
+            {
+                var referenceProjectName = Path.GetFileNameWithoutExtension(reference);
+                Assert.False(testProjectSet.Contains(referenceProjectName),
+                    $"Project '{projectPath}' ({configuration}) references test project '{reference}'. " +
+                    "Production modules and composition roots must not reference test projects.");
+            }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(ProductionModuleProjectPathsOnly))]
+    public void Evaluated_assembly_names_match_compiled_assembly_allowlist(string projectPath)
+    {
+        var evaluatedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var configuration in new[] { "Debug", "Release" })
+        {
+            var result = Evaluator.Evaluate(projectPath, configuration);
+            evaluatedNames.Add(result.AssemblyName);
+        }
+
+        var allowlistKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var k in ModuleBoundaryMatrix.CompiledAssemblyAllowlist.Keys) allowlistKeys.Add(k);
+
+        Assert.True(allowlistKeys.Contains(evaluatedNames.First()),
+            $"Evaluated assembly name '{evaluatedNames.First()}' for project '{projectPath}' " +
+            $"is not in CompiledAssemblyAllowlist keys: {string.Join(", ", allowlistKeys)}.");
+
+        // Both Debug and Release must evaluate to the same assembly name.
+        Assert.True(evaluatedNames.Count == 1,
+            $"Project '{projectPath}' evaluates to different assembly names across configurations: " +
+            $"{string.Join(", ", evaluatedNames)}.");
+    }
+
+    [Theory]
+    [MemberData(nameof(ProductionModuleProjectPathsOnly))]
+    public void InternalsVisibleTo_declarations_match_allowlist(string projectPath)
+    {
+        var assemblyName = Path.GetFileNameWithoutExtension(projectPath);
+        var allowlist = ModuleBoundaryMatrix.InternalsVisibleToAllowlist;
+
+        // An absent allowlist key means no IVT declarations are expected.
+        var allowedFriends = allowlist.TryGetValue(assemblyName, out var friends)
+            ? friends
+            : Array.Empty<string>();
+
+        var allowedFriendSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var f in allowedFriends) allowedFriendSet.Add(f);
+
+        foreach (var configuration in new[] { "Debug", "Release" })
+        {
+            var result = Evaluator.Evaluate(projectPath, configuration);
+            foreach (var friend in result.InternalsVisibleTo)
+            {
+                Assert.True(allowedFriendSet.Contains(friend),
+                    $"Project '{projectPath}' ({configuration}) declares InternalsVisibleTo to '{friend}' " +
+                    $"which is not allowed. Allowed friends: {string.Join(", ", allowedFriendSet)}.");
             }
         }
     }
 
     [Fact]
-    public void SampleHost_project_references_match_its_explicit_allowlist()
+    public void InternalsVisibleTo_allowlist_is_complete_both_directions()
     {
-        var sampleHostPath = "CoreKit.SampleHost/CoreKit.SampleHost.csproj";
-        var declaredRefs = GetDeclaredProjectReferences(sampleHostPath);
-        var allowedRefs = ModuleBoundaryMatrix.ProjectReferenceAllowlist[sampleHostPath];
-
-        foreach (var declaredRef in declaredRefs)
+        // Forward: every allowlist entry must be used by at least one project.
+        foreach (var kvp in ModuleBoundaryMatrix.InternalsVisibleToAllowlist)
         {
-            var referencedProjectName = Path.GetFileNameWithoutExtension(declaredRef);
-            Assert.False(
-                ModuleBoundaryMatrix.TestProjects.Contains(referencedProjectName),
-                $"SampleHost references test project '{declaredRef}'. " +
-                "The composition root must not reference test projects.");
+            var assemblyName = kvp.Key;
+            var friends = kvp.Value;
 
-            Assert.True(
-                allowedRefs.Contains(declaredRef),
-                $"SampleHost declares a forbidden ProjectReference to '{declaredRef}'. " +
-                $"Allowed references: {string.Join(", ", allowedRefs)}.");
-        }
-    }
+            // Find the project that produces this assembly.
+            var producingProject = ModuleBoundaryMatrix.ProductionModuleProjectPaths
+                .FirstOrDefault(p => Path.GetFileNameWithoutExtension(p) == assemblyName);
 
-    [Fact]
-    public void Project_reference_includes_are_static_paths()
-    {
-        foreach (var csprojPath in GetAllCsprojPathsFromSlnx())
-        {
-            var absoluteCsprojPath = GetAbsoluteProjectPath(csprojPath);
-            var doc = XDocument.Load(absoluteCsprojPath);
-            var ns = doc.Root?.Name.Namespace ?? XNamespace.None;
-
-            foreach (var pr in doc.Root!.Descendants(ns + "ProjectReference"))
+            if (producingProject == null)
             {
-                var include = pr.Attribute("Include")?.Value ?? string.Empty;
-                Assert.False(
-                    IsDynamicReference(include),
-                    $"Project '{csprojPath}' uses a dynamic ProjectReference Include '{include}'. " +
-                    "Dynamic references bypass boundary checks and are not supported.");
+                // Not a production module - skip (IVT allowlist should only contain production modules)
+                continue;
+            }
+
+            foreach (var configuration in new[] { "Debug", "Release" })
+            {
+                var result = Evaluator.Evaluate(producingProject, configuration);
+                foreach (var friend in friends)
+                {
+                    Assert.True(result.InternalsVisibleTo.Contains(friend, StringComparer.OrdinalIgnoreCase),
+                        $"InternalsVisibleToAllowlist friend '{friend}' for assembly '{assemblyName}' " +
+                        $"is not declared by project '{producingProject}' ({configuration}). " +
+                        $"Declared: {string.Join(", ", result.InternalsVisibleTo)}.");
+                }
+            }
+        }
+
+        // Reverse: every declared IVT friend must be in the allowlist.
+        // Only production modules with an allowlist entry are expected to declare IVT.
+        foreach (var projectPath in ModuleBoundaryMatrix.ProductionModuleProjectPaths)
+        {
+            var assemblyName = Path.GetFileNameWithoutExtension(projectPath);
+            var allowlist = ModuleBoundaryMatrix.InternalsVisibleToAllowlist;
+
+            if (!allowlist.TryGetValue(assemblyName, out var allowedFriends))
+                continue;
+
+            var allowedFriendSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var f in allowedFriends) allowedFriendSet.Add(f);
+
+            foreach (var configuration in new[] { "Debug", "Release" })
+            {
+                var result = Evaluator.Evaluate(projectPath, configuration);
+                foreach (var friend in result.InternalsVisibleTo)
+                {
+                    Assert.True(allowedFriendSet.Contains(friend),
+                        $"Project '{projectPath}' ({configuration}) declares InternalsVisibleTo to '{friend}' " +
+                        $"which is not in the allowlist. Allowed: {string.Join(", ", allowedFriendSet)}.");
+                }
             }
         }
     }
 
     [Fact]
-    public void InternalsVisibleTo_declarations_match_the_friend_assembly_allowlist()
+    public void Only_production_modules_declare_internals_visible_to()
     {
-        foreach (var csprojPath in GetAllCsprojPathsFromSlnx())
+        // Test projects should not declare InternalsVisibleTo (they consume it, not produce it).
+        foreach (var testProject in SolutionInventory.TestProjects)
         {
-            var absoluteCsprojPath = GetAbsoluteProjectPath(csprojPath);
-            var doc = XDocument.Load(absoluteCsprojPath);
-            var ns = doc.Root?.Name.Namespace ?? XNamespace.None;
-
-            var assemblyName = Path.GetFileNameWithoutExtension(csprojPath);
-
-            foreach (var ivt in doc.Root!.Descendants(ns + "InternalsVisibleTo"))
+            foreach (var configuration in new[] { "Debug", "Release" })
             {
-                var include = ivt.Attribute("Include")?.Value ?? string.Empty;
-
-                Assert.True(
-                    ModuleBoundaryMatrix.InternalsVisibleToAllowlist.TryGetValue(assemblyName, out var friends) &&
-                    friends.Contains(include),
-                    $"Assembly '{assemblyName}' declares InternalsVisibleTo '{include}' which is not in " +
-                    $"ModuleBoundaryMatrix.InternalsVisibleToAllowlist.");
+                var result = Evaluator.Evaluate(testProject, configuration);
+                Assert.True(result.InternalsVisibleTo.Count == 0,
+                    $"Test project '{testProject}' ({configuration}) declares InternalsVisibleTo: " +
+                    $"{string.Join(", ", result.InternalsVisibleTo)}. Only production modules may declare IVT.");
             }
         }
+    }
+
+    [Fact]
+    public void IVT_friends_must_be_test_projects()
+    {
+        var testProjectSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var tp in ModuleBoundaryMatrix.TestProjects) testProjectSet.Add(tp);
+
+        foreach (var projectPath in ModuleBoundaryMatrix.ProductionModuleProjectPaths)
+        {
+            var assemblyName = Path.GetFileNameWithoutExtension(projectPath);
+            var allowlist = ModuleBoundaryMatrix.InternalsVisibleToAllowlist;
+            if (!allowlist.TryGetValue(assemblyName, out var allowedFriends))
+                continue;
+
+            foreach (var friend in allowedFriends)
+            {
+                Assert.True(testProjectSet.Contains(friend),
+                    $"InternalsVisibleTo friend '{friend}' (declared by '{assemblyName}') is not a test project. " +
+                    $"Friends must be test projects. Test projects: {string.Join(", ", testProjectSet)}.");
+            }
+        }
+    }
+
+    [Fact]
+    public void No_unsupported_internals_visible_to_mechanisms()
+    {
+        var violations = ScanForAlternativeIvtMechanisms(SolutionInventory.SolutionDir);
+        Assert.True(violations.Count == 0,
+            $"Unsupported InternalsVisibleTo mechanisms detected:{Environment.NewLine}" +
+            $"{string.Join(Environment.NewLine, violations)}");
+    }
+
+    [Fact]
+    public void D015_tenant_identity_exception_remains_until_S4_3()
+    {
+        // Sentinel: the D-015 Tenant -> Identity exception must remain in both allowlists.
+        // If S4.3 (Tenant decoupling) has been implemented, remove this exception and this test.
+        ModuleBoundaryMatrix.AssertD015TenantIdentityExceptionPresent();
     }
 
     // ------------------------------------------------------------------
-    // Helpers
+    // MemberData sources
     // ------------------------------------------------------------------
 
-    /// <summary>Converts a solution-relative project path to an absolute file path.</summary>
-    private static string GetAbsoluteProjectPath(string solutionRelativePath)
+    public static IEnumerable<object[]> ProductionAndCompositionRootProjects()
     {
-        var absolutePath = Path.GetFullPath(Path.Combine(SolutionDir, solutionRelativePath));
-        if (!File.Exists(absolutePath))
+        foreach (var p in ModuleBoundaryMatrix.ProductionModuleProjectPaths)
+            yield return new object[] { p };
+        foreach (var p in ModuleBoundaryMatrix.CompositionRoots)
+            yield return new object[] { p };
+    }
+
+    public static IEnumerable<object[]> ProductionModuleProjectPathsOnly()
+    {
+        foreach (var p in ModuleBoundaryMatrix.ProductionModuleProjectPaths)
+            yield return new object[] { p };
+    }
+
+    // ------------------------------------------------------------------
+    // Alternative IVT mechanism scanning
+    // ------------------------------------------------------------------
+
+    private static List<string> ScanForAlternativeIvtMechanisms(string solutionDir)
+    {
+        var violations = new List<string>();
+
+        // Directories to exclude from scanning.
+        var excludedDirNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
-            throw new FileNotFoundException(
-                $"Project file not found: '{absolutePath}' (from solution-relative path '{solutionRelativePath}'). " +
-                $"Solution directory: '{SolutionDir}'.");
-        }
-        return absolutePath;
-    }
+            "bin", "obj", ".git",
+        };
 
-    private static string FindSolutionDirectory()
-    {
-        var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
-        while (dir != null)
+        var csFiles = Directory.GetFiles(solutionDir, "*.cs", SearchOption.AllDirectories)
+            .Where(f => !IsInExcludedDirectory(f, excludedDirNames))
+            .Where(f => !ExcludedImplementationFiles.Contains(Path.GetFileName(f)))
+            .ToList();
+
+        foreach (var csFile in csFiles)
         {
-            if (File.Exists(Path.Combine(dir.FullName, "Dastarkhwan.slnx")))
-                return dir.FullName;
-            dir = dir.Parent;
+            var content = File.ReadAllText(csFile);
+            var stripped = StripComments(content);
+            var relativePath = Path.GetRelativePath(solutionDir, csFile).Replace('\\', '/');
+
+            // [assembly: InternalsVisibleTo(...)]
+            if (Regex.IsMatch(stripped,
+                @"\[\s*assembly\s*:\s*InternalsVisibleTo\s*\(",
+                RegexOptions.IgnoreCase))
+            {
+                violations.Add($"{relativePath}: source-level [assembly: InternalsVisibleTo(...)] attribute");
+            }
+
+            // IgnoresAccessChecksTo
+            if (Regex.IsMatch(stripped,
+                @"IgnoresAccessChecksTo",
+                RegexOptions.IgnoreCase))
+            {
+                violations.Add($"{relativePath}: IgnoresAccessChecksTo reference");
+            }
+
+            // [assembly: AssemblyMetadata(...)] with InternalsVisibleTo
+            if (Regex.IsMatch(stripped,
+                @"\[\s*assembly\s*:\s*AssemblyMetadata\s*\(.*InternalsVisibleTo",
+                RegexOptions.IgnoreCase | RegexOptions.Singleline))
+            {
+                violations.Add($"{relativePath}: [assembly: AssemblyMetadata(...)] with InternalsVisibleTo");
+            }
         }
-        throw new DirectoryNotFoundException(
-            $"Dastarkhwan.slnx not found by searching upward from '{Directory.GetCurrentDirectory()}'. " +
-            "Tests must be run from within the repository directory tree.");
-    }
 
-    private static IEnumerable<XElement> GetSlnxProjects()
-    {
-        var doc = XDocument.Load(SolutionPath);
-        return doc.Root!.Descendants("Project");
-    }
+        // Scan .csproj files for IgnoresAccessChecksTo
+        var csprojFiles = Directory.GetFiles(solutionDir, "*.csproj", SearchOption.AllDirectories)
+            .Where(f => !IsInExcludedDirectory(f, excludedDirNames))
+            .ToList();
 
-    private static List<string> GetAllCsprojPathsFromSlnx()
-    {
-        var result = new List<string>();
-        foreach (var p in GetSlnxProjects())
+        foreach (var csprojFile in csprojFiles)
         {
-            var path = p.Attribute("Path")?.Value;
-            if (path is not null)
-                result.Add(path);
+            var content = File.ReadAllText(csprojFile);
+            var relativePath = Path.GetRelativePath(solutionDir, csprojFile).Replace('\\', '/');
+
+            if (Regex.IsMatch(content, @"IgnoresAccessChecksTo", RegexOptions.IgnoreCase))
+            {
+                violations.Add($"{relativePath}: IgnoresAccessChecksTo in project file");
+            }
         }
-        return result;
+
+        return violations;
     }
 
-    private static List<string> GetProductionModulesFromSlnx()
+    private static bool IsInExcludedDirectory(string filePath, HashSet<string> excludedDirNames)
     {
-        var result = new List<string>();
-        foreach (var p in GetAllCsprojPathsFromSlnx())
+        var parts = filePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        foreach (var part in parts)
         {
-            if (IsProductionModule(p))
-                result.Add(Path.GetFileNameWithoutExtension(p));
+            if (excludedDirNames.Contains(part))
+                return true;
         }
-        return result;
+        return false;
     }
 
-    private static List<string> GetProductionProjectPathsFromSlnx()
+    /// <summary>
+    /// Strips C# comments (// line comments and /* ... */ block comments) to avoid
+    /// false positives from comment text matching search patterns.
+    /// </summary>
+    private static string StripComments(string input)
     {
-        var result = new List<string>();
-        foreach (var p in GetAllCsprojPathsFromSlnx())
+        var result = new System.Text.StringBuilder(input.Length);
+        var i = 0;
+        while (i < input.Length)
         {
-            if (IsProductionModule(p) || IsCompositionRoot(p))
-                result.Add(p);
+            // Line comment
+            if (i + 1 < input.Length && input[i] == '/' && input[i + 1] == '/')
+            {
+                while (i < input.Length && input[i] != '\n' && input[i] != '\r')
+                    i++;
+                continue;
+            }
+
+            // Block comment
+            if (i + 1 < input.Length && input[i] == '/' && input[i + 1] == '*')
+            {
+                i += 2;
+                while (i + 1 < input.Length && !(input[i] == '*' && input[i + 1] == '/'))
+                    i++;
+                i += 2; // skip */
+                continue;
+            }
+
+            // String literal (verbatim @"""...")
+            if (input[i] == '@' && i + 1 < input.Length && input[i + 1] == '"')
+            {
+                result.Append(input[i]);
+                result.Append(input[i + 1]);
+                i += 2;
+                while (i < input.Length)
+                {
+                    result.Append(input[i]);
+                    if (input[i] == '"' && i + 1 < input.Length && input[i + 1] == '"')
+                    {
+                        i += 2; // skip escaped quote
+                        continue;
+                    }
+                    if (input[i] == '"')
+                        break;
+                    i++;
+                }
+                continue;
+            }
+
+            // Regular string literal
+            if (input[i] == '"')
+            {
+                result.Append(input[i]);
+                i++;
+                while (i < input.Length)
+                {
+                    result.Append(input[i]);
+                    if (input[i] == '\\' && i + 1 < input.Length)
+                    {
+                        result.Append(input[i + 1]);
+                        i += 2;
+                        continue;
+                    }
+                    if (input[i] == '"')
+                        break;
+                    i++;
+                }
+                continue;
+            }
+
+            result.Append(input[i]);
+            i++;
         }
-        return result;
-    }
-
-    private static bool IsProductionModule(string projectPath)
-    {
-        return !IsTestProject(projectPath) && !IsCompositionRoot(projectPath);
-    }
-
-    private static bool IsTestProject(string projectPath)
-    {
-        return projectPath.Contains(".Tests");
-    }
-
-    private static bool IsCompositionRoot(string projectPath)
-    {
-        return projectPath.Equals("CoreKit.SampleHost/CoreKit.SampleHost.csproj", StringComparison.Ordinal);
-    }
-
-    private static List<string> GetDeclaredProjectReferences(string solutionRelativeCsprojPath)
-    {
-        var csprojFullPath = GetAbsoluteProjectPath(solutionRelativeCsprojPath);
-        var doc = XDocument.Load(csprojFullPath);
-        var ns = doc.Root?.Name.Namespace ?? XNamespace.None;
-
-        var refs = new List<string>();
-        foreach (var pr in doc.Root!.Descendants(ns + "ProjectReference"))
-        {
-            var include = pr.Attribute("Include")?.Value ?? string.Empty;
-            refs.Add(ResolveProjectReference(solutionRelativeCsprojPath, include));
-        }
-        return refs;
-    }
-
-    private static string ResolveProjectReference(string solutionRelativeCsprojPath, string include)
-    {
-        var csprojFullPath = GetAbsoluteProjectPath(solutionRelativeCsprojPath);
-        var csprojDir = Path.GetDirectoryName(csprojFullPath)!;
-        var resolvedFullPath = Path.GetFullPath(Path.Combine(csprojDir, include));
-        var relativePath = Path.GetRelativePath(SolutionDir, resolvedFullPath);
-        return relativePath.Replace('\\', '/');
-    }
-
-    private static bool IsDynamicReference(string include)
-    {
-        return include.Contains("$(") ||
-               include.Contains("@(") ||
-               include.Contains("%(") ||
-               include.Contains("*") ||
-               include.Contains("?") ||
-               include.Contains("{") ||
-               include.Contains("}");
+        return result.ToString();
     }
 }

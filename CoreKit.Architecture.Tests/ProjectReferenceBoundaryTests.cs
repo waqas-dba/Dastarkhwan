@@ -224,7 +224,7 @@ public sealed class ProjectReferenceBoundaryTests
     {
         var testProjectSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var tp in SolutionInventory.TestProjects)
-            testProjectSet.Add(tp);
+            testProjectSet.Add(NormalizeSolutionPath(tp));
 
         foreach (var configuration in new[] { "Debug", "Release" })
         {

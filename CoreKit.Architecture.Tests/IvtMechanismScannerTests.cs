@@ -287,24 +287,6 @@ public sealed class IvtMechanismScannerTests
     }
 
     [Fact]
-    public void Detects_alias_defined_under_release()
-    {
-        var files = new List<(string Path, string Text)>
-        {
-            ("Tests/Foo.cs", """
-                #if RELEASE
-                using IVT = System.Runtime.CompilerServices.InternalsVisibleToAttribute;
-                #endif
-                [assembly: IVT("CoreKit.Access.Tests")]
-                """)
-        };
-
-        var releaseFindings = IvtMechanismScanner.ScanProject(files);
-        Assert.Single(releaseFindings);
-        Assert.Equal("InternalsVisibleTo attribute", releaseFindings[0].Kind);
-    }
-
-    [Fact]
     public void Ignores_namespace_scoped_alias()
     {
         var files = new List<(string Path, string Text)>

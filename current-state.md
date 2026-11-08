@@ -148,7 +148,7 @@ Only one agent may modify the shared working tree at a time. All participating a
 
 ### Instruction-file discrepancy
 
-`CLAUDE.md`, `ai-tasks.md` and `AGENTS.md` now state the current allocation (ChatGPT Account 1, DeepSeek Harness, OpenCode + Nemotron, ChatGPT Account 2, User). Verified at `576c84d`.
+`CLAUDE.md`, `ai-tasks.md` and `AGENTS.md` now state the current allocation (ChatGPT Account 1, DeepSeek Harness, OpenCode + Nemotron, ChatGPT Account 2, User) and the mandatory task briefing standard (`ai-tasks.md` §13). Instruction-file verification performed at `ee554189`; the historical snapshot HEAD remains `576c84d`.
 
 ## Next proposed work
 

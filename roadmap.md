@@ -39,7 +39,7 @@ Slices are prepared by DeepSeek Harness, implemented by OpenCode + Nemotron, ind
 
 | Slice | Task | Status | Boundary / completion evidence |
 |---|---|---|---|
-| S1 | Documentation only: synchronize `current-state.md` and `roadmap.md` with accepted decisions, current evidence and current agent allocation | In progress | Corrected content is prepared for manual application. Not complete until the user applies it, the resulting diff is reviewed, and the user accepts it. |
+| S1 | Documentation only: synchronize `current-state.md` and `roadmap.md` with accepted decisions, current evidence and current agent allocation | In progress | Documentation changes applied and committed at `ee554189`. Independent review identified two corrections; focused correction and re-review are pending. Project Owner acceptance remains pending. |
 | S2.1 | Create a dedicated `CoreKit.Access.Tests` project | Under review | `CoreKit.Access.Tests` exists with its Access-focused suites (created in `470d42c`). Independent review and user-run tests pending. File presence alone is not completion. |
 | S2.2 | Update architecture-test coverage and references for intended modules | In progress | Boundary rules cover SharedKernel, Identity, Access and Tenant, with a documented temporary exception. Boundary enforcement now evaluates actual MSBuild project references (imports included), validates solution inventory/classification and the IVT policy. Tests have not been run as part of this documentation task. |
 | S3 | Review the Access migration | Under review | Access migration files are committed under `CoreKit.Access/Migrations/` at `43c2179`. Review schema, constraints, relationships and compatibility. Database application requires separate explicit authorization. |

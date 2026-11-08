@@ -65,22 +65,43 @@ internal static class IvtMechanismScanner
     /// </summary>
     internal static IReadOnlyList<IvtFinding> ScanProject(IReadOnlyList<(string Path, string Text)> files)
     {
-        // Collect global using aliases from all files (project-level aliases).
-        var globalAliases = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var (_, text) in files)
-            CollectAliases(text, globalAliases, isGlobal: true);
+        // Collect global (project-level) aliases per configuration from all files.
+        var globalDebugAliases = new Dictionary<string, string>(StringComparer.Ordinal);
+        var globalReleaseAliases = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        // Collect per-file aliases per configuration.
+        var fileDebugAliases = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+        var fileReleaseAliases = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+
+        foreach (var (path, text) in files)
+        {
+            var debugAliases = new Dictionary<string, string>(StringComparer.Ordinal);
+            var releaseAliases = new Dictionary<string, string>(StringComparer.Ordinal);
+            CollectAliases(text, debugAliases, releaseAliases);
+            fileDebugAliases[path] = debugAliases;
+            fileReleaseAliases[path] = releaseAliases;
+
+            // Merge file-level aliases into global aliases.
+            foreach (var kvp in debugAliases)
+                TryAddAlias(globalDebugAliases, kvp.Key, kvp.Value);
+            foreach (var kvp in releaseAliases)
+                TryAddAlias(globalReleaseAliases, kvp.Key, kvp.Value);
+        }
 
         var findings = new List<IvtFinding>();
 
         foreach (var (relativePath, text) in files)
         {
-            // Combine global aliases with file-level aliases (file-level takes precedence).
-            var allAliases = new Dictionary<string, string>(globalAliases, StringComparer.Ordinal);
-            CollectAliases(text, allAliases, isGlobal: false);
+            var debugAliases = fileDebugAliases[relativePath];
+            var releaseAliases = fileReleaseAliases[relativePath];
 
-            // Parse under two preprocessor symbol sets so #if DEBUG / #if RELEASE blocks are both covered.
             foreach (var options in new[] { DebugParseOptions, ReleaseParseOptions })
             {
+                var isDebug = options.PreprocessorSymbols.Contains("DEBUG");
+                var combinedAliases = isDebug
+                    ? MergeAliases(globalDebugAliases, debugAliases)
+                    : MergeAliases(globalReleaseAliases, releaseAliases);
+
                 var tree = CSharpSyntaxTree.ParseText(text, options: options);
                 var root = tree.GetRoot();
 
@@ -91,7 +112,7 @@ internal static class IvtMechanismScanner
 
                     foreach (var attribute in attributeList.Attributes)
                     {
-                        var attributeName = ResolveAttributeName(attribute.Name, allAliases);
+                        var attributeName = ResolveAttributeName(attribute.Name, combinedAliases);
                         if (attributeName == null)
                             continue;
 
@@ -135,25 +156,68 @@ internal static class IvtMechanismScanner
             .ToList();
     }
 
-    private static void CollectAliases(string text, Dictionary<string, string> aliases, bool isGlobal)
+    /// <summary>
+    /// Collects file-level using aliases from a source file under both Debug and Release
+    /// preprocessor symbol sets. Only compilation-unit-level aliases are collected;
+    /// namespace-scoped aliases do not influence assembly-level attributes.
+    /// </summary>
+    private static void CollectAliases(string text,
+        Dictionary<string, string> debugAliases,
+        Dictionary<string, string> releaseAliases)
     {
-        // Parse under both Debug and Release preprocessor symbol sets so aliases declared
-        // inside #if DEBUG / #if RELEASE blocks are both collected.
         foreach (var options in new[] { DebugParseOptions, ReleaseParseOptions })
         {
             var tree = CSharpSyntaxTree.ParseText(text, options: options);
             foreach (var usingDirective in tree.GetRoot().DescendantNodes().OfType<UsingDirectiveSyntax>())
             {
-                if (IsGlobalUsing(usingDirective) != isGlobal)
+                // Only compilation-unit-level aliases apply to assembly-level attributes.
+                // Aliases declared inside namespace declarations are scoped to that namespace.
+                if (usingDirective.Parent is not CompilationUnitSyntax)
                     continue;
                 if (usingDirective.Alias is null)
                     continue;
 
                 var name = usingDirective.Name?.ToString();
                 if (name is not null)
-                    aliases[usingDirective.Alias.Name.Identifier.ValueText] = name;
+                {
+                    var aliasName = usingDirective.Alias.Name.Identifier.ValueText;
+                    if (options.PreprocessorSymbols.Contains("DEBUG"))
+                        TryAddAlias(debugAliases, aliasName, name);
+                    if (options.PreprocessorSymbols.Contains("RELEASE"))
+                        TryAddAlias(releaseAliases, aliasName, name);
+                }
             }
         }
+    }
+
+    /// <summary>
+    /// Adds an alias to the dictionary. If the alias already exists with a different value,
+    /// the conflicting alias is not added (silent overwrite is prevented).
+    /// </summary>
+    private static void TryAddAlias(Dictionary<string, string> aliases, string name, string value)
+    {
+        if (aliases.TryGetValue(name, out var existing))
+        {
+            if (!string.Equals(existing, value, StringComparison.Ordinal))
+                return; // Conflicting alias - do not silently overwrite
+        }
+        else
+        {
+            aliases[name] = value;
+        }
+    }
+
+    /// <summary>
+    /// Merges file-level aliases into global aliases. File-level aliases take precedence.
+    /// </summary>
+    private static Dictionary<string, string> MergeAliases(
+        Dictionary<string, string> global,
+        Dictionary<string, string> file)
+    {
+        var merged = new Dictionary<string, string>(global, StringComparer.Ordinal);
+        foreach (var kvp in file)
+            TryAddAlias(merged, kvp.Key, kvp.Value);
+        return merged;
     }
 
     private static string? ResolveAttributeName(NameSyntax? name, Dictionary<string, string> aliases)
@@ -172,20 +236,13 @@ internal static class IvtMechanismScanner
         var firstSegment = firstDot < 0 ? text : text[..firstDot];
         if (aliases.TryGetValue(firstSegment, out var resolved))
         {
-            text = resolved + (firstDot < 0 ? string.Empty : text[firstDot..]);
+            // Alias matched - return resolved name
+            return resolved + (firstDot < 0 ? string.Empty : text[firstDot..]);
         }
 
-        // When no alias matched, fall back to the last segment of a qualified name
-        // (e.g. "System.Runtime.CompilerServices.InternalsVisibleTo" -> "InternalsVisibleTo").
+        // No alias matched - use last segment
         if (text.Contains('.'))
-        {
-            var lastSegment = text[(text.LastIndexOf('.') + 1)..];
-            aliases.TryGetValue(lastSegment, out var aliasResolved);
-            if (aliasResolved != null)
-                text = aliasResolved;
-            else
-                text = lastSegment;
-        }
+            return text[(text.LastIndexOf('.') + 1)..];
 
         return text;
     }
@@ -205,6 +262,11 @@ internal static class IvtMechanismScanner
         // Strip trailing Attribute suffix
         if (text.EndsWith("Attribute") && text.Length > "Attribute".Length)
             text = text[..^9];
+
+        // Take last segment
+        var lastDot = text.LastIndexOf('.');
+        if (lastDot >= 0)
+            text = text[(lastDot + 1)..];
 
         return text;
     }

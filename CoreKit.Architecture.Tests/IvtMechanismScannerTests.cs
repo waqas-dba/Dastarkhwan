@@ -266,4 +266,76 @@ public sealed class IvtMechanismScannerTests
         // throwing and returns no false positives on real production files.
         Assert.Empty(violations);
     }
+
+    [Fact]
+    public void Detects_alias_defined_under_debug_only()
+    {
+        // Debug-only alias resolves; Release alias does not.
+        var files = new List<(string Path, string Text)>
+        {
+            ("Tests/Foo.cs", """
+                #if DEBUG
+                using IVT = System.Runtime.CompilerServices.InternalsVisibleToAttribute;
+                #endif
+                [assembly: IVT("CoreKit.Access.Tests")]
+                """)
+        };
+
+        var debugFindings = IvtMechanismScanner.ScanProject(files);
+        Assert.Single(debugFindings);
+        Assert.Equal("InternalsVisibleTo attribute", debugFindings[0].Kind);
+    }
+
+    [Fact]
+    public void Detects_alias_defined_under_release()
+    {
+        var files = new List<(string Path, string Text)>
+        {
+            ("Tests/Foo.cs", """
+                #if RELEASE
+                using IVT = System.Runtime.CompilerServices.InternalsVisibleToAttribute;
+                #endif
+                [assembly: IVT("CoreKit.Access.Tests")]
+                """)
+        };
+
+        var releaseFindings = IvtMechanismScanner.ScanProject(files);
+        Assert.Single(releaseFindings);
+        Assert.Equal("InternalsVisibleTo attribute", releaseFindings[0].Kind);
+    }
+
+    [Fact]
+    public void Ignores_namespace_scoped_alias()
+    {
+        var files = new List<(string Path, string Text)>
+        {
+            ("Tests/Foo.cs", """
+                namespace MyNamespace
+                {
+                    using IVT = SomethingElse.InternalsVisibleToAttribute;
+                }
+
+                [assembly: IVT("CoreKit.Access.Tests")]
+                """)
+        };
+
+        var findings = IvtMechanismScanner.ScanProject(files);
+        Assert.Empty(findings);
+    }
+
+    [Fact]
+    public void Ignores_conflicting_aliases()
+    {
+        var files = new List<(string Path, string Text)>
+        {
+            ("Tests/Foo.cs", """
+                using IVT = Foo.Bar;
+                using IVT = Foo.Baz;
+                [assembly: IVT("CoreKit.Access.Tests")]
+                """)
+        };
+
+        var findings = IvtMechanismScanner.ScanProject(files);
+        Assert.Empty(findings);
+    }
 }

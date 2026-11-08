@@ -22,7 +22,8 @@ internal interface IAccessRoleRepository
 
     void Remove(AccessRole role);
 
-    /// <summary>Deletes every role of the scope at once. Permissions and assignments follow (cascade).</summary>
+    /// <summary>Stages deletion of every role of the scope at once. Role permissions and assignments follow
+    /// through the configured cascade; the unit of work persists the staged deletions together.</summary>
     Task RemoveScopeAsync(AccessScope scope, CancellationToken ct = default);
 }
 
@@ -76,8 +77,10 @@ internal sealed class AccessRoleRepository : IAccessRoleRepository
 
     public async Task RemoveScopeAsync(AccessScope scope, CancellationToken ct = default)
     {
-        await _db.Roles
+        var roles = await _db.Roles
             .Where(r => r.ScopeType == scope.Type && r.ScopeId == scope.Id)
-            .ExecuteDeleteAsync(ct);
+            .ToListAsync(ct);
+        if (roles.Count > 0)
+            _db.Roles.RemoveRange(roles);
     }
 }

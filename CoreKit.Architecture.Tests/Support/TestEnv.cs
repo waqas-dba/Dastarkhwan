@@ -14,7 +14,7 @@ internal sealed class TestEnv : IDisposable
     private readonly DbContextOptions<AccessDbContext> _dbOptions;
     private readonly MemoryCache _memory = new(new MemoryCacheOptions());
 
-    public TestEnv(AccessOptions? options = null, Action<AccessCatalogBuilder>? catalog = null)
+    public TestEnv(AccessOptions? options = null, Action<AccessCatalogBuilder>? catalog = null, IAccessUnitOfWork? unitOfWork = null)
     {
         Config = options ?? new AccessOptions();
 
@@ -38,7 +38,7 @@ internal sealed class TestEnv : IDisposable
         Roles = new AccessRoleRepository(Db);
         Assignments = new AccessAssignmentRepository(Db);
         AuditRepo = new AccessAuditRepository(Db);
-        UnitOfWork = new AccessUnitOfWork(Db, NullLogger<AccessUnitOfWork>.Instance);
+        UnitOfWork = unitOfWork ?? new AccessUnitOfWork(Db, NullLogger<AccessUnitOfWork>.Instance);
         Audit = new AccessAuditRecorder(AuditRepo, User, Time);
         Access = new AccessService(Membership, Assignments, Cache, Catalog, ScopeContext, User);
         Guard = new AccessGuard(ScopeContext, User, Access);

@@ -129,6 +129,94 @@ public sealed class AccessMaintenanceTests : IDisposable
         Assert.Empty(env.Read(db => db.Roles.ToList()));
         Assert.Empty(_env.Read(db => db.Roles.ToList()));
     }
+
+    [Fact]
+    public async Task RemoveUser_FailedSave_ThrowsAndLeavesAssignmentPersisted()
+    {
+        var failing = new FailingUnitOfWork(SaveOutcome.ConstraintViolation);
+        using var env = new TestEnv(unitOfWork: failing);
+        var cashier = env.AddRole("Cashier", new[] { "sales.create" });
+        var user = env.AddMember(roles: new[] { cashier });
+
+        var svc = env.CreateMaintenance();
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.RemoveUserAsync(env.Scope, user));
+        Assert.Contains("user removal", ex.Message);
+        Assert.Contains("ConstraintViolation", ex.Message);
+
+        var remaining = env.Read(db => db.Assignments.ToList());
+        Assert.Single(remaining);
+        Assert.Equal(user, remaining[0].UserId);
+
+        var auditActions = env.Read(db => db.AuditEntries.ToList()).Select(a => a.Action).ToList();
+        Assert.DoesNotContain(AccessAuditActions.UserRemoved, auditActions);
+    }
+
+    [Fact]
+    public async Task RemoveUser_FailedSave_DoesNotInvalidateCache()
+    {
+        var failing = new FailingUnitOfWork(SaveOutcome.ConcurrencyConflict);
+        using var env = new TestEnv(unitOfWork: failing);
+        var cashier = env.AddRole("Cashier", new[] { "sales.create" });
+        var user = env.AddMember(roles: new[] { cashier });
+
+        var cached = new EffectiveAccess(
+            true, false, new HashSet<string>(StringComparer.Ordinal) { "sales.create" }, new[] { "Cashier" });
+        env.Cache.Set(env.Scope, user, cached);
+        Assert.True(env.Cache.TryGet(env.Scope, user, out var before));
+        Assert.True(before.Has("sales.create"));
+
+        var svc = env.CreateMaintenance();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => svc.RemoveUserAsync(env.Scope, user));
+
+        Assert.True(env.Cache.TryGet(env.Scope, user, out var after));
+        Assert.True(after.Has("sales.create"));
+    }
+
+    [Fact]
+    public async Task RemoveScope_FailedSave_ThrowsAndLeavesEverythingPersisted()
+    {
+        var failing = new FailingUnitOfWork(SaveOutcome.ConcurrencyConflict);
+        using var env = new TestEnv(unitOfWork: failing);
+        var mine = env.AddRole("Mine", new[] { "sales.create" });
+        env.AddMember(roles: new[] { mine });
+        env.Seed(db => db.AuditEntries.Add(new AccessAuditEntry
+        {
+            Id = Guid.NewGuid(),
+            ScopeType = env.Scope.Type,
+            ScopeId = env.Scope.Id,
+            Action = "earlier",
+            OccurredAt = env.UtcNow
+        }));
+
+        var svc = env.CreateMaintenance();
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.RemoveScopeAsync(env.Scope));
+        Assert.Contains("scope removal", ex.Message);
+        Assert.Contains("ConcurrencyConflict", ex.Message);
+
+        Assert.Single(env.Read(db => db.Roles.ToList()));
+        Assert.Single(env.Read(db => db.RolePermissions.ToList()));
+        Assert.Single(env.Read(db => db.Assignments.ToList()));
+
+        var actions = env.Read(db => db.AuditEntries.Where(a => a.ScopeId == env.Scope.Id).Select(a => a.Action).ToList());
+        Assert.Contains("earlier", actions);
+        Assert.DoesNotContain(AccessAuditActions.ScopeRemoved, actions);
+    }
+
+    [Fact]
+    public async Task Provision_FailedSave_ThrowsAndLeavesNothingPersisted()
+    {
+        var failing = new FailingUnitOfWork(SaveOutcome.ConstraintViolation);
+        using var env = new TestEnv(unitOfWork: failing);
+
+        var svc = env.CreateMaintenance();
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => svc.ProvisionScopeAsync(env.Scope));
+        Assert.Contains("scope provisioning", ex.Message);
+        Assert.Contains("ConstraintViolation", ex.Message);
+
+        Assert.Empty(env.Read(db => db.Roles.ToList()));
+        var auditActions = env.Read(db => db.AuditEntries.ToList()).Select(a => a.Action).ToList();
+        Assert.DoesNotContain(AccessAuditActions.ScopeProvisioned, auditActions);
+    }
 }
 
 public sealed class TenantEventHandlerTests : IDisposable
@@ -252,4 +340,14 @@ public sealed class AccessAuditLogTests : IDisposable
 
         ResultAssert.Fails(await _env.CreateAuditLog().ListAsync(), AccessErrorKind.Forbidden, "access.denied");
     }
+}
+
+/// <summary>Test double that reports a non-successful save outcome, so maintenance tests can force a failed save without touching the database.</summary>
+internal sealed class FailingUnitOfWork : IAccessUnitOfWork
+{
+    private readonly SaveOutcome _outcome;
+
+    public FailingUnitOfWork(SaveOutcome outcome) => _outcome = outcome;
+
+    public Task<SaveOutcome> SaveAsync(CancellationToken ct = default) => Task.FromResult(_outcome);
 }

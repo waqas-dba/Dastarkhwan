@@ -36,8 +36,10 @@ internal sealed class AccessMaintenance : IAccessMaintenance
         await _assignments.RemoveUserAsync(scope, userId, ct);
 
         _audit.Record(scope, AccessAuditActions.UserRemoved, $"user: {userId}");
-        await _unitOfWork.SaveAsync(ct);
 
+        EnsureSaved(await _unitOfWork.SaveAsync(ct), "user removal");
+
+        // Only invalidate the cache now that the removal and its audit entry are durably persisted.
         _cache.InvalidateUser(scope, userId);
     }
 
@@ -49,8 +51,10 @@ internal sealed class AccessMaintenance : IAccessMaintenance
         await _roles.RemoveScopeAsync(scope, ct); // permissions and assignments follow (cascade)
 
         _audit.Record(scope, AccessAuditActions.ScopeRemoved);
-        await _unitOfWork.SaveAsync(ct);
 
+        EnsureSaved(await _unitOfWork.SaveAsync(ct), "scope removal");
+
+        // Only invalidate the cache now that the removal and its audit entry are durably persisted.
         _cache.InvalidateScope(scope);
     }
 
@@ -82,6 +86,16 @@ internal sealed class AccessMaintenance : IAccessMaintenance
         }
 
         _audit.Record(scope, AccessAuditActions.ScopeProvisioned, $"roles: {_catalog.RoleTemplates.Count}");
-        await _unitOfWork.SaveAsync(ct);
+
+        EnsureSaved(await _unitOfWork.SaveAsync(ct), "scope provisioning");
+    }
+
+    /// <summary>Throws unless the unit of work reports that the change was durably saved, so a failed save
+    /// is never mistaken for a successful no-op.</summary>
+    private static void EnsureSaved(SaveOutcome outcome, string operation)
+    {
+        if (outcome != SaveOutcome.Saved)
+            throw new InvalidOperationException(
+                $"Access {operation} was not persisted: the unit of work reported {outcome}.");
     }
 }

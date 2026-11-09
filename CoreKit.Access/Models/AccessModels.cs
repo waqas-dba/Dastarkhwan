@@ -45,7 +45,7 @@ public sealed class UpdateAccessRoleRequest
     public string? Description { get; set; }
 
     /// <summary>The concurrency stamp the client last read. Required to prevent lost updates.</summary>
-    public Guid? ConcurrencyStamp { get; set; }
+    public Guid ConcurrencyStamp { get; set; }
 }
 
 public sealed class SetAccessRolePermissionsRequest
@@ -53,7 +53,7 @@ public sealed class SetAccessRolePermissionsRequest
     public List<string> Permissions { get; set; } = new();
 
     /// <summary>The concurrency stamp the client last read. Required to prevent lost updates.</summary>
-    public Guid? ConcurrencyStamp { get; set; }
+    public Guid ConcurrencyStamp { get; set; }
 }
 
 public sealed class SetAccessUserRolesRequest

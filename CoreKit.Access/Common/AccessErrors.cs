@@ -20,6 +20,10 @@ public static class AccessErrors
         AccessErrorKind.Conflict, "access.save_conflict",
         "The change conflicts with another change. Please reload and try again.");
 
+    public static readonly AccessError ConcurrencyStampRequired = new(
+        AccessErrorKind.Validation, "access.concurrency_stamp_required",
+        "A concurrency stamp is required. Reload the role and submit its current stamp.");
+
     public static AccessError Validation(string message)
         => new(AccessErrorKind.Validation, "validation.failed", message);
 

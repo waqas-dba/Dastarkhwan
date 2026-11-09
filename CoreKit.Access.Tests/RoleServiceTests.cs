@@ -222,7 +222,7 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         var role = _env.AddRole("Cashier");
 
         var dto = ResultAssert.Ok(await Svc.UpdateAsync(
-            role.Id, new UpdateAccessRoleRequest { Name = " Till operator ", Description = "At the till" }));
+            role.Id, new UpdateAccessRoleRequest { ConcurrencyStamp = role.ConcurrencyStamp, Name = " Till operator ", Description = "At the till" }));
 
         Assert.Equal("Till operator", dto.Name);
         Assert.Equal("At the till", dto.Description);
@@ -240,10 +240,10 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         var role = _env.AddRole("Cashier");
         _env.Seed(db => db.Roles.Single(r => r.Id == role.Id).Description = "Keep me");
 
-        await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Name = "Teller" });
+        var dto = ResultAssert.Ok(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { ConcurrencyStamp = role.ConcurrencyStamp, Name = "Teller" }));
         Assert.Equal("Keep me", _env.Read(db => db.Roles.Single(r => r.Id == role.Id)).Description);
 
-        await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Description = "" });
+        await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { ConcurrencyStamp = dto.ConcurrencyStamp, Description = "" });
         Assert.Null(_env.Read(db => db.Roles.Single(r => r.Id == role.Id)).Description);
     }
 
@@ -253,7 +253,7 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         _env.SignInOwner();
         var role = _env.AddRole("cashier");
 
-        var dto = ResultAssert.Ok(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Name = "Cashier" }));
+        var dto = ResultAssert.Ok(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { ConcurrencyStamp = role.ConcurrencyStamp, Name = "Cashier" }));
 
         Assert.Equal("Cashier", dto.Name);
     }
@@ -264,7 +264,7 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         _env.SignInOwner();
         var role = _env.AddRole("Cashier");
 
-        ResultAssert.Ok(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Name = "Cashier" }));
+        ResultAssert.Ok(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { ConcurrencyStamp = role.ConcurrencyStamp, Name = "Cashier" }));
 
         Assert.Empty(_env.Read(db => db.AuditEntries.ToList()));
     }
@@ -276,7 +276,7 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         var role = _env.AddRole("Cashier");
         _env.AddRole("Waiter");
 
-        ResultAssert.Fails(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Name = "WAITER" }), AccessErrorKind.Conflict);
+        ResultAssert.Fails(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { ConcurrencyStamp = role.ConcurrencyStamp, Name = "WAITER" }), AccessErrorKind.Conflict);
         Assert.Equal("Cashier", _env.Read(db => db.Roles.Single(r => r.Id == role.Id)).Name);
     }
 
@@ -287,7 +287,7 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         var role = _env.AddRole("Cashier");
 
         ResultAssert.Fails(
-            await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Name = "Renamed", Description = new string('a', 501) }),
+            await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { ConcurrencyStamp = role.ConcurrencyStamp, Name = "Renamed", Description = new string('a', 501) }),
             AccessErrorKind.Validation);
         Assert.Equal("Cashier", _env.Read(db => db.Roles.Single(r => r.Id == role.Id)).Name);
     }
@@ -298,8 +298,8 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         _env.SignInOwner();
         var foreign = _env.AddRole("Foreign", scope: AccessScope.ForTenant(Guid.NewGuid()));
 
-        ResultAssert.Fails(await Svc.UpdateAsync(Guid.NewGuid(), new UpdateAccessRoleRequest { Name = "x" }), AccessErrorKind.NotFound);
-        ResultAssert.Fails(await Svc.UpdateAsync(foreign.Id, new UpdateAccessRoleRequest { Name = "x" }), AccessErrorKind.NotFound);
+        ResultAssert.Fails(await Svc.UpdateAsync(Guid.NewGuid(), new UpdateAccessRoleRequest { ConcurrencyStamp = Guid.NewGuid(), Name = "x" }), AccessErrorKind.NotFound);
+        ResultAssert.Fails(await Svc.UpdateAsync(foreign.Id, new UpdateAccessRoleRequest { ConcurrencyStamp = Guid.NewGuid(), Name = "x" }), AccessErrorKind.NotFound);
     }
 
     [Fact]
@@ -308,10 +308,10 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         var role = _env.AddRole("Boss", new[] { "sales.refund" });
 
         _env.SignInAs(AccessPermissionNames.RolesRead);
-        ResultAssert.Fails(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Name = "x" }), AccessErrorKind.Forbidden, "access.denied");
+        ResultAssert.Fails(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { ConcurrencyStamp = role.ConcurrencyStamp, Name = "x" }), AccessErrorKind.Forbidden, "access.denied");
 
         _env.SignInAs(AccessPermissionNames.RolesManage, "sales.create");
-        ResultAssert.Fails(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Name = "x" }), AccessErrorKind.Forbidden, "access.escalation");
+        ResultAssert.Fails(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { ConcurrencyStamp = role.ConcurrencyStamp, Name = "x" }), AccessErrorKind.Forbidden, "access.escalation");
     }
 
     [Fact]
@@ -322,7 +322,7 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         var holder = _env.AddMember(roles: new[] { role });
         Assert.Equal(new[] { "Old name" }, (await _env.Access.GetAccessAsync(holder, _env.Scope)).Roles);
 
-        await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Name = "New name" });
+        await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { ConcurrencyStamp = role.ConcurrencyStamp, Name = "New name" });
 
         Assert.Equal(new[] { "New name" }, (await _env.Access.GetAccessAsync(holder, _env.Scope)).Roles);
         Assert.NotEqual(Guid.Empty, owner);
@@ -335,7 +335,7 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         var role = _env.AddRole("Cashier", new[] { "sales.create", "products.view" });
 
         var dto = ResultAssert.Ok(await Svc.SetPermissionsAsync(
-            role.Id, new SetAccessRolePermissionsRequest { Permissions = { "products.view", "sales.refund" } }));
+            role.Id, new SetAccessRolePermissionsRequest { ConcurrencyStamp = role.ConcurrencyStamp, Permissions = { "products.view", "sales.refund" } }));
 
         Assert.Equal(new[] { "products.view", "sales.refund" }, dto.Permissions);
 
@@ -350,7 +350,7 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         _env.SignInOwner();
         var role = _env.AddRole("Cashier", new[] { "sales.create" });
 
-        var dto = ResultAssert.Ok(await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest()));
+        var dto = ResultAssert.Ok(await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest { ConcurrencyStamp = role.ConcurrencyStamp }));
 
         Assert.Empty(dto.Permissions);
         Assert.Empty(_env.Read(db => db.RolePermissions.ToList()));
@@ -363,7 +363,7 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         var role = _env.AddRole("Cashier", new[] { "sales.create" });
 
         ResultAssert.Ok(await Svc.SetPermissionsAsync(
-            role.Id, new SetAccessRolePermissionsRequest { Permissions = { "sales.create" } }));
+            role.Id, new SetAccessRolePermissionsRequest { ConcurrencyStamp = role.ConcurrencyStamp, Permissions = { "sales.create" } }));
 
         Assert.Empty(_env.Read(db => db.AuditEntries.ToList()));
     }
@@ -375,10 +375,10 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         var role = _env.AddRole("Cashier");
 
         ResultAssert.Fails(
-            await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest { Permissions = { "made.up" } }),
+            await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest { ConcurrencyStamp = role.ConcurrencyStamp, Permissions = { "made.up" } }),
             AccessErrorKind.Validation);
         ResultAssert.Fails(
-            await Svc.SetPermissionsAsync(Guid.NewGuid(), new SetAccessRolePermissionsRequest()), AccessErrorKind.NotFound);
+            await Svc.SetPermissionsAsync(Guid.NewGuid(), new SetAccessRolePermissionsRequest { ConcurrencyStamp = Guid.NewGuid() }), AccessErrorKind.NotFound);
     }
 
     [Fact]
@@ -388,7 +388,7 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         var role = _env.AddRole("Cashier", new[] { "sales.create" });
 
         ResultAssert.Fails(
-            await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest { Permissions = { "sales.create", "sales.refund" } }),
+            await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest { ConcurrencyStamp = role.ConcurrencyStamp, Permissions = { "sales.create", "sales.refund" } }),
             AccessErrorKind.Forbidden, "access.escalation");
     }
 
@@ -399,7 +399,7 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         var role = _env.AddRole("Boss", new[] { "sales.create", "sales.refund" });
 
         ResultAssert.Fails(
-            await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest { Permissions = { "sales.create" } }),
+            await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest { ConcurrencyStamp = role.ConcurrencyStamp, Permissions = { "sales.create" } }),
             AccessErrorKind.Forbidden, "access.escalation");
         Assert.Equal(2, _env.Read(db => db.RolePermissions.Count(p => p.RoleId == role.Id)));
     }
@@ -412,7 +412,7 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         var holder = _env.AddMember(roles: new[] { role });
         Assert.True((await _env.Access.GetAccessAsync(holder, _env.Scope)).Has("sales.create"));
 
-        await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest { Permissions = { "products.view" } });
+        await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest { ConcurrencyStamp = role.ConcurrencyStamp, Permissions = { "products.view" } });
 
         var after = await _env.Access.GetAccessAsync(holder, _env.Scope);
         Assert.False(after.Has("sales.create"));
@@ -460,5 +460,269 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         var role = _env.AddRole("Cashier");
 
         ResultAssert.Fails(await Svc.DeleteAsync(role.Id), AccessErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task Update_DefaultConcurrencyStamp_IsRequired()
+    {
+        _env.SignInOwner();
+        var role = _env.AddRole("Cashier");
+
+        ResultAssert.Fails(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest { Name = "Teller" }),
+            AccessErrorKind.Validation, "access.concurrency_stamp_required");
+    }
+
+    [Fact]
+    public async Task Update_EmptyConcurrencyStamp_IsRequired()
+    {
+        _env.SignInOwner();
+        var role = _env.AddRole("Cashier");
+
+        ResultAssert.Fails(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest
+        {
+            ConcurrencyStamp = Guid.Empty,
+            Name = "Teller"
+        }), AccessErrorKind.Validation, "access.concurrency_stamp_required");
+    }
+
+    [Fact]
+    public async Task Update_StaleConcurrencyStamp_ReturnsSaveConflict()
+    {
+        _env.SignInOwner();
+        var role = _env.AddRole("Cashier");
+
+        ResultAssert.Fails(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest
+        {
+            ConcurrencyStamp = Guid.NewGuid(),
+            Name = "Teller"
+        }), AccessErrorKind.Conflict, "access.save_conflict");
+    }
+
+    [Fact]
+    public async Task Update_CurrentConcurrencyStamp_PermitsOperation_AndRotatesStamp()
+    {
+        _env.SignInOwner();
+        var role = _env.AddRole("Cashier");
+
+        var dto = ResultAssert.Ok(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest
+        {
+            ConcurrencyStamp = role.ConcurrencyStamp,
+            Name = "Teller"
+        }));
+
+        Assert.Equal("Teller", dto.Name);
+        Assert.NotEqual(role.ConcurrencyStamp, dto.ConcurrencyStamp);
+    }
+
+    [Fact]
+    public async Task Update_SuccessfulMutation_RotatesConcurrencyStamp()
+    {
+        _env.SignInOwner();
+        var role = _env.AddRole("Cashier");
+
+        var dto1 = ResultAssert.Ok(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest
+        {
+            ConcurrencyStamp = role.ConcurrencyStamp,
+            Name = "Teller"
+        }));
+
+        var dto2 = ResultAssert.Ok(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest
+        {
+            ConcurrencyStamp = dto1.ConcurrencyStamp,
+            Name = "Clerk"
+        }));
+
+        Assert.NotEqual(dto1.ConcurrencyStamp, dto2.ConcurrencyStamp);
+    }
+
+    [Fact]
+    public async Task Update_NoopWithCorrectStamp_PreservesNoopBehavior()
+    {
+        _env.SignInOwner();
+        var role = _env.AddRole("Cashier");
+
+        ResultAssert.Ok(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest
+        {
+            ConcurrencyStamp = role.ConcurrencyStamp,
+            Name = "Cashier"
+        }));
+
+        Assert.Empty(_env.Read(db => db.AuditEntries.ToList()));
+        Assert.Equal(role.ConcurrencyStamp, _env.Read(db => db.Roles.Single(r => r.Id == role.Id)).ConcurrencyStamp);
+    }
+
+    [Fact]
+    public async Task Update_StaleStamp_LeavesRoleAndAuditUnchanged()
+    {
+        _env.SignInOwner();
+        var role = _env.AddRole("Cashier");
+
+        ResultAssert.Fails(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest
+        {
+            ConcurrencyStamp = Guid.NewGuid(),
+            Name = "Teller"
+        }), AccessErrorKind.Conflict, "access.save_conflict");
+
+        Assert.Equal("Cashier", _env.Read(db => db.Roles.Single(r => r.Id == role.Id)).Name);
+        Assert.Empty(_env.Read(db => db.AuditEntries.ToList()));
+    }
+
+    [Fact]
+    public async Task Update_AuthorizationCheckedBeforeConcurrency()
+    {
+        _env.SignInAs(AccessPermissionNames.RolesRead);
+        var role = _env.AddRole("Cashier");
+
+        ResultAssert.Fails(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest
+        {
+            ConcurrencyStamp = Guid.Empty,
+            Name = "Teller"
+        }), AccessErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task Update_ConcurrencyCheckedBeforeEscalation()
+    {
+        _env.SignInAs(AccessPermissionNames.RolesManage, "sales.create");
+        var role = _env.AddRole("Boss", new[] { "sales.refund" });
+
+        ResultAssert.Fails(await Svc.UpdateAsync(role.Id, new UpdateAccessRoleRequest
+        {
+            ConcurrencyStamp = Guid.NewGuid(),
+            Name = "Teller"
+        }), AccessErrorKind.Conflict, "access.save_conflict");
+    }
+
+    [Fact]
+    public async Task SetPermissions_DefaultConcurrencyStamp_IsRequired()
+    {
+        _env.SignInOwner();
+        var role = _env.AddRole("Cashier", new[] { "sales.create" });
+
+        ResultAssert.Fails(await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest
+        {
+            Permissions = { "sales.refund" }
+        }), AccessErrorKind.Validation, "access.concurrency_stamp_required");
+    }
+
+    [Fact]
+    public async Task SetPermissions_EmptyConcurrencyStamp_IsRequired()
+    {
+        _env.SignInOwner();
+        var role = _env.AddRole("Cashier", new[] { "sales.create" });
+
+        ResultAssert.Fails(await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest
+        {
+            ConcurrencyStamp = Guid.Empty,
+            Permissions = { "sales.refund" }
+        }), AccessErrorKind.Validation, "access.concurrency_stamp_required");
+    }
+
+    [Fact]
+    public async Task SetPermissions_StaleConcurrencyStamp_ReturnsSaveConflict()
+    {
+        _env.SignInOwner();
+        var role = _env.AddRole("Cashier", new[] { "sales.create" });
+
+        ResultAssert.Fails(await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest
+        {
+            ConcurrencyStamp = Guid.NewGuid(),
+            Permissions = { "sales.refund" }
+        }), AccessErrorKind.Conflict, "access.save_conflict");
+    }
+
+    [Fact]
+    public async Task SetPermissions_CurrentConcurrencyStamp_PermitsOperation_AndRotatesStamp()
+    {
+        _env.SignInOwner();
+        var role = _env.AddRole("Cashier", new[] { "sales.create" });
+
+        var dto = ResultAssert.Ok(await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest
+        {
+            ConcurrencyStamp = role.ConcurrencyStamp,
+            Permissions = { "sales.refund" }
+        }));
+
+        Assert.Contains("sales.refund", dto.Permissions);
+        Assert.NotEqual(role.ConcurrencyStamp, dto.ConcurrencyStamp);
+    }
+
+    [Fact]
+    public async Task SetPermissions_SuccessfulMutation_RotatesConcurrencyStamp()
+    {
+        _env.SignInOwner();
+        var role = _env.AddRole("Cashier", new[] { "sales.create" });
+
+        var dto1 = ResultAssert.Ok(await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest
+        {
+            ConcurrencyStamp = role.ConcurrencyStamp,
+            Permissions = { "sales.create", "sales.refund" }
+        }));
+
+        var dto2 = ResultAssert.Ok(await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest
+        {
+            ConcurrencyStamp = dto1.ConcurrencyStamp,
+            Permissions = { "sales.create" }
+        }));
+
+        Assert.NotEqual(dto1.ConcurrencyStamp, dto2.ConcurrencyStamp);
+    }
+
+    [Fact]
+    public async Task SetPermissions_NoopWithCorrectStamp_PreservesNoopBehavior()
+    {
+        _env.SignInOwner();
+        var role = _env.AddRole("Cashier", new[] { "sales.create" });
+
+        ResultAssert.Ok(await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest
+        {
+            ConcurrencyStamp = role.ConcurrencyStamp,
+            Permissions = { "sales.create" }
+        }));
+
+        Assert.Empty(_env.Read(db => db.AuditEntries.ToList()));
+        Assert.Equal(role.ConcurrencyStamp, _env.Read(db => db.Roles.Single(r => r.Id == role.Id)).ConcurrencyStamp);
+    }
+
+    [Fact]
+    public async Task SetPermissions_StaleStamp_LeavesRoleAndAuditUnchanged()
+    {
+        _env.SignInOwner();
+        var role = _env.AddRole("Cashier", new[] { "sales.create" });
+
+        ResultAssert.Fails(await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest
+        {
+            ConcurrencyStamp = Guid.NewGuid(),
+            Permissions = { "sales.refund" }
+        }), AccessErrorKind.Conflict, "access.save_conflict");
+
+        Assert.Single(_env.Read(db => db.RolePermissions.Where(p => p.RoleId == role.Id)));
+        Assert.Empty(_env.Read(db => db.AuditEntries.ToList()));
+    }
+
+    [Fact]
+    public async Task SetPermissions_AuthorizationCheckedBeforeConcurrency()
+    {
+        _env.SignInAs(AccessPermissionNames.RolesRead);
+        var role = _env.AddRole("Cashier", new[] { "sales.create" });
+
+        ResultAssert.Fails(await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest
+        {
+            ConcurrencyStamp = Guid.Empty,
+            Permissions = { "sales.refund" }
+        }), AccessErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task SetPermissions_ConcurrencyCheckedBeforeEscalation()
+    {
+        _env.SignInAs(AccessPermissionNames.RolesManage, "sales.create");
+        var role = _env.AddRole("Boss", new[] { "sales.create", "sales.refund" });
+
+        ResultAssert.Fails(await Svc.SetPermissionsAsync(role.Id, new SetAccessRolePermissionsRequest
+        {
+            ConcurrencyStamp = Guid.NewGuid(),
+            Permissions = { "sales.create" }
+        }), AccessErrorKind.Conflict, "access.save_conflict");
     }
 }

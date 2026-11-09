@@ -125,6 +125,8 @@ namespace CoreKit.Access.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasAlternateKey("Id", "ScopeType", "ScopeId");
+
                     b.HasIndex("ScopeType", "ScopeId", "NormalizedName")
                         .IsUnique()
                         .HasDatabaseName("UX_ACCESS_Roles_Scope_Name");
@@ -150,10 +152,12 @@ namespace CoreKit.Access.Migrations
                 {
                     b.HasOne("CoreKit.Access.Entities.AccessRole", "Role")
                         .WithMany()
-                        .HasForeignKey("RoleId")
+                        .HasForeignKey("RoleId", "ScopeType", "ScopeId")
+                        .HasPrincipalKey("Id", "ScopeType", "ScopeId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasIndex("RoleId", "ScopeType", "ScopeId");
                     b.Navigation("Role");
                 });
 

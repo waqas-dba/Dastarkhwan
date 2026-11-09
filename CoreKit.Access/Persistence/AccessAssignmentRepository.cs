@@ -32,6 +32,7 @@ internal sealed class AccessAssignmentRepository : IAccessAssignmentRepository
         AccessScope scope, Guid userId, CancellationToken ct = default)
         => await _db.Roles.AsNoTracking()
             .Include(r => r.Permissions)
+            .Where(r => r.ScopeType == scope.Type && r.ScopeId == scope.Id)
             .Where(r => _db.Assignments.Any(a =>
                 a.RoleId == r.Id && a.ScopeType == scope.Type && a.ScopeId == scope.Id && a.UserId == userId))
             .OrderBy(r => r.NormalizedName)

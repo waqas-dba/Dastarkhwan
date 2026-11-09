@@ -32,12 +32,14 @@ public sealed class AccessDbContext : DbContext
             b.HasIndex(x => new { x.ScopeType, x.ScopeId, x.NormalizedName })
                 .IsUnique().HasDatabaseName("UX_ACCESS_Roles_Scope_Name");
 
+            // Alternate key to support composite foreign key from AccessAssignment.
+            b.HasAlternateKey(x => new { x.Id, x.ScopeType, x.ScopeId });
+
             b.HasMany(x => x.Permissions).WithOne(x => x.Role)
                 .HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<AccessRolePermission>(b =>
-        {
+        modelBuilder.Entity<AccessRolePermission>(b =>        {
             b.ToTable("ACCESS_RolePermissions");
             b.HasKey(x => new { x.RoleId, x.Permission });
             b.Property(x => x.Permission).IsRequired().HasMaxLength(100);
@@ -49,9 +51,12 @@ public sealed class AccessDbContext : DbContext
             b.HasKey(x => new { x.RoleId, x.UserId });
             b.Property(x => x.ScopeType).IsRequired().HasMaxLength(AccessScope.MaxTypeLength);
             b.HasIndex(x => new { x.ScopeType, x.ScopeId, x.UserId });
+            b.HasIndex(x => new { x.RoleId, x.ScopeType, x.ScopeId });
 
             b.HasOne(x => x.Role).WithMany()
-                .HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Cascade);
+                .HasForeignKey(x => new { x.RoleId, x.ScopeType, x.ScopeId })
+                .HasPrincipalKey(x => new { x.Id, x.ScopeType, x.ScopeId })
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<AccessAuditEntry>(b =>

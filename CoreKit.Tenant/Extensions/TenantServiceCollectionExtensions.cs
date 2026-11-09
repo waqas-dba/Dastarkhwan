@@ -1,4 +1,4 @@
-﻿using CoreKit.Identity.Hooks;
+﻿using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Integration;
 
 namespace CoreKit.Tenant.Extensions;
@@ -60,7 +60,7 @@ public static class TenantServiceCollectionExtensions
         services.AddScoped<ITenantContextSetter>(sp => sp.GetRequiredService<CurrentTenant>());
 
         // Who is acting, and the tenant boundary. TryAdd: a host without Identity can register its own actor first.
-        services.TryAddScoped<ITenantActor, IdentityTenantActor>();
+        services.TryAddScoped<ITenantActor, TenantActor>();
         services.AddScoped<ITenantPlatformAccess, TenantPlatformAccess>();
         services.AddScoped<TenantAccessGuard>();
 
@@ -82,7 +82,7 @@ public static class TenantServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITenantResolutionStrategy, ClaimTenantResolutionStrategy>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITenantResolutionStrategy, HeaderTenantResolutionStrategy>());
 
-        // Identity puts the tenant claim in every access token it issues.
+        // Tenant adds its tenant claim to every access token Identity issues.
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IAccessTokenClaimsContributor, TenantClaimsContributor>());
 
         return services;

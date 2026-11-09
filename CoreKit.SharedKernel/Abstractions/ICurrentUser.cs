@@ -9,4 +9,7 @@ public interface ICurrentUser
     Guid? UserId { get; }
 
     bool IsAuthenticated { get; }
+
+    /// <summary>The permissions the caller holds, if known.</summary>
+    IReadOnlyCollection<string> Permissions { get; }
 }

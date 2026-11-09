@@ -1,4 +1,4 @@
-﻿using CoreKit.Identity.Constants;
+﻿using CoreKit.SharedKernel.Abstractions;
 using System.Security;
 
 namespace CoreKit.Tenant.Integration;

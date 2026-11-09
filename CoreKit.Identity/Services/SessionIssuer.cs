@@ -1,8 +1,8 @@
 ﻿using System.Security.Claims;
 using CoreKit.Identity.Entities;
-using CoreKit.Identity.Hooks;
 using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Models;
+using CoreKit.SharedKernel.Abstractions;
 
 namespace CoreKit.Identity.Services;
 
@@ -34,7 +34,7 @@ public sealed class SessionIssuer : ISessionIssuer
 
         var extraClaims = new List<Claim>();
         foreach (var contributor in _contributors)
-            extraClaims.AddRange(await contributor.GetClaimsAsync(user, ct));
+            extraClaims.AddRange(await contributor.GetClaimsAsync(user.Id, access.Roles, access.Permissions, ct));
 
         var accessToken = _tokens.CreateAccessToken(user, access.Roles, access.Permissions, extraClaims);
         var refreshToken = _tokens.CreateRefreshToken();

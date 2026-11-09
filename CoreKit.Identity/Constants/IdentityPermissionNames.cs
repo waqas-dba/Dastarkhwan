@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using CoreKit.SharedKernel.Abstractions;
 
 namespace CoreKit.Identity.Constants;
-
-public sealed record PermissionSeed(string Name, string Description);
 
 /// <summary>
 /// The generic permissions Idenitty itself needs. Other modules define their own permission

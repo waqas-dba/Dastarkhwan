@@ -32,5 +32,4 @@ global using System.Text.Json;
 global using Microsoft.AspNetCore.Identity;
 
 global using CoreKit.Identity.Authorization;
-global using CoreKit.Identity.Hooks;
 global using CoreKit.Identity.Seeding;

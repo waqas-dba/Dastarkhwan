@@ -265,7 +265,7 @@ public sealed class AccessCacheGenerationMetadataTests
         cache.InvalidateUser(Scope, user2);
 
         // After rollover, old metadata is cleared.
-        Assert.LessOrEqual(cache.GenerationEntryCount, 2);
+        Assert.True(cache.GenerationEntryCount <= 2);
 
         // New entries work after rollover.
         var token = cache.Begin(Scope, user3);
@@ -338,7 +338,7 @@ public sealed class AccessCacheGenerationMetadataTests
             cache.InvalidateUser(scope, Guid.NewGuid());
         }
 
-        Assert.LessOrEqual(cache.GenerationEntryCount, 5);
+        Assert.True(cache.GenerationEntryCount <= 5);
     }
 
     [Fact]
@@ -410,8 +410,8 @@ public sealed class AccessCacheConcurrencyTests
         // Pre-populate entries.
         foreach (var user in users)
         {
-            var token = cache.Begin(scope, user);
-            cache.Set(scope, user, Access("initial"), token);
+            var populateToken = cache.Begin(scope, user);
+            cache.Set(scope, user, Access("initial"), populateToken);
         }
 
         // Multiple threads concurrently invalidate and store.
@@ -425,13 +425,13 @@ public sealed class AccessCacheConcurrencyTests
                 {
                     for (int j = 0; j < 50; j++)
                     {
-                        var token = cache.Begin(scope, users[userIndex]);
+                        var taskToken = cache.Begin(scope, users[userIndex]);
                         if (j % 3 == 0)
                             cache.InvalidateScope(scope);
                         else if (j % 3 == 1)
                             cache.InvalidateUser(scope, users[userIndex]);
                         else
-                            cache.Set(scope, users[userIndex], Access("stress"), token);
+                            cache.Set(scope, users[userIndex], Access("stress"), taskToken);
                     }
                 }
                 catch (Exception ex)
@@ -441,7 +441,9 @@ public sealed class AccessCacheConcurrencyTests
             });
         }
 
+#pragma warning disable xUnit1031 // Blocking wait is intentional for concurrent stress testing.
         Task.WaitAll(tasks);
+#pragma warning restore xUnit1031
 
         // No exceptions from concurrent access.
         Assert.Empty(exceptions);

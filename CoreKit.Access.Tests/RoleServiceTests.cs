@@ -725,4 +725,43 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
             Permissions = { "sales.create" }
         }), AccessErrorKind.Conflict, "access.save_conflict");
     }
+
+    [Fact]
+    public async Task Update_DatabaseConcurrencyRace_ReturnsSaveConflict()
+    {
+        _env.SignInOwner();
+        var role = _env.AddRole("Cashier", new[] { "sales.create" });
+
+        // Context A loads the role with its original stamp.
+        using var contextA = _env.NewContext();
+        var roleA = contextA.Roles.Single(r => r.Id == role.Id);
+        var originalStamp = roleA.ConcurrencyStamp;
+
+        // Context B successfully updates the role and changes its concurrency stamp.
+        using var contextB = _env.NewContext();
+        var roleB = contextB.Roles.Single(r => r.Id == role.Id);
+        roleB.Name = "Updated by B";
+        await contextB.SaveChangesAsync();
+
+        // Context A attempts its mutation using the original (now-stale) stamp.
+        roleA.Name = "Updated by A";
+
+        var uowA = new AccessUnitOfWork(contextA, NullLogger<AccessUnitOfWork>.Instance);
+        var result = await uowA.SaveAsync();
+
+        // The first request returns access.save_conflict through the EF Core concurrency exception path.
+        Assert.Equal(SaveOutcome.ConcurrencyConflict, result);
+        var error = result.ToError();
+        Assert.Equal(AccessErrorKind.Conflict, error.Kind);
+        Assert.Equal("access.save_conflict", error.Code);
+
+        // The first request's intended role mutation is not persisted.
+        // Its audit entry is not persisted (nothing was staged through the audit recorder).
+        // The competing context's committed update remains intact.
+        var roleInDb = _env.Read(db => db.Roles.Single(r => r.Id == role.Id));
+        Assert.Equal("Updated by B", roleInDb.Name);
+        Assert.NotEqual(originalStamp, roleInDb.ConcurrencyStamp);
+        Assert.DoesNotContain(_env.Read(db => db.AuditEntries.ToList()),
+            a => a.Action == AccessAuditActions.RoleUpdated);
+    }
 }

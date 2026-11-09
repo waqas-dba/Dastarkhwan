@@ -8,11 +8,13 @@ using Xunit;
 namespace CoreKit.Access.Tests;
 
 /// <summary>
-/// What this protects: the EF Core model snapshot stays in sync with the AccessDbContext model
-/// and the latest migration target model. Specifically the composite alternate key on AccessRole
-/// (Id, ScopeType, ScopeId) that supports the composite foreign key from AccessAssignment.
-/// Why it matters: if the snapshot loses the alternate key, EF would generate a different migration
-/// or fail to detect model changes, breaking the scope-consistency constraint at the database level.
+/// What this protects: the EF Core model metadata stays consistent across both the committed
+/// migration snapshot and the live AccessDbContext model. Specifically the composite alternate key
+/// on AccessRole (Id, ScopeType, ScopeId) that supports the composite foreign key from
+/// AccessAssignment.
+/// Why it matters: if either the snapshot or the live model loses the alternate key, EF would
+/// generate a different migration or fail to detect model changes, breaking the scope-consistency
+/// constraint at the database level.
 /// The rule under test (see AccessDbContext.OnModelCreating and the 20261110090000 migration):
 /// AccessRole has a composite alternate key (Id, ScopeType, ScopeId), AccessAssignment references
 /// it through a composite foreign key (RoleId, ScopeType, ScopeId), and AccessRole has a unique
@@ -23,8 +25,26 @@ public sealed class MigrationSnapshotTests
     [Fact]
     public void AccessRole_HasCompositeAlternateKey_Id_ScopeType_ScopeId()
     {
-        var model = BuildModel();
+        AssertCompositeAlternateKey(BuildSnapshotModel());
+        AssertCompositeAlternateKey(BuildLiveModel());
+    }
 
+    [Fact]
+    public void AccessAssignment_HasCompositeForeignKey_RoleId_ScopeType_ScopeId_To_AccessRole()
+    {
+        AssertCompositeForeignKey(BuildSnapshotModel());
+        AssertCompositeForeignKey(BuildLiveModel());
+    }
+
+    [Fact]
+    public void AccessRole_HasUniqueIndex_ScopeType_ScopeId_NormalizedName()
+    {
+        AssertUniqueIndex(BuildSnapshotModel());
+        AssertUniqueIndex(BuildLiveModel());
+    }
+
+    private static void AssertCompositeAlternateKey(IModel model)
+    {
         var role = model.FindEntityType("CoreKit.Access.Entities.AccessRole");
         Assert.NotNull(role);
 
@@ -35,11 +55,8 @@ public sealed class MigrationSnapshotTests
         Assert.NotNull(alternateKey);
     }
 
-    [Fact]
-    public void AccessAssignment_HasCompositeForeignKey_RoleId_ScopeType_ScopeId_To_AccessRole()
+    private static void AssertCompositeForeignKey(IModel model)
     {
-        var model = BuildModel();
-
         var assignment = model.FindEntityType("CoreKit.Access.Entities.AccessAssignment");
         Assert.NotNull(assignment);
 
@@ -60,11 +77,8 @@ public sealed class MigrationSnapshotTests
         Assert.NotNull(foreignKey);
     }
 
-    [Fact]
-    public void AccessRole_HasUniqueIndex_ScopeType_ScopeId_NormalizedName()
+    private static void AssertUniqueIndex(IModel model)
     {
-        var model = BuildModel();
-
         var role = model.FindEntityType("CoreKit.Access.Entities.AccessRole");
         Assert.NotNull(role);
 
@@ -76,7 +90,7 @@ public sealed class MigrationSnapshotTests
         Assert.NotNull(index);
     }
 
-    private static IModel BuildModel()
+    private static IModel BuildSnapshotModel()
     {
         var options = new DbContextOptionsBuilder<AccessDbContext>()
             .UseSqlite("DataSource=:memory:")
@@ -84,5 +98,14 @@ public sealed class MigrationSnapshotTests
         using var db = new AccessDbContext(options);
         var migrationsAssembly = db.GetService<IMigrationsAssembly>();
         return migrationsAssembly.ModelSnapshot!.Model;
+    }
+
+    private static IModel BuildLiveModel()
+    {
+        var options = new DbContextOptionsBuilder<AccessDbContext>()
+            .UseSqlite("DataSource=:memory:")
+            .Options;
+        using var db = new AccessDbContext(options);
+        return db.Model;
     }
 }

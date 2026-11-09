@@ -29,13 +29,19 @@ internal sealed class AccessGuard
         if (_actor.UserId is not { } userId)
             return AccessErrors.NotAuthenticated;
 
-        var access = await _access.GetAccessAsync(userId, scope, ct);
+        // Changing roles or assignments is decided on the person's permissions right now. Reading is fine from the cache.
+        var access = RequiresFreshAuthority(permission) && _access is IFreshAccessSource fresh
+            ? await fresh.GetFreshAccessAsync(userId, scope, ct)
+            : await _access.GetAccessAsync(userId, scope, ct);
 
         if (!access.Has(permission))
             return AccessErrors.Denied;
 
         return AccessResult.Success(new AccessCall(scope, userId, access));
     }
+
+    private static bool RequiresFreshAuthority(string permission)
+        => permission is AccessPermissionNames.RolesManage or AccessPermissionNames.AssignmentsManage;
 
     /// <summary>Nobody can hand out or change a permission they do not hold. Owners hold all of them.</summary>
     public static bool Holds(EffectiveAccess actor, IEnumerable<string> permissions)

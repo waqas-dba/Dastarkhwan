@@ -46,6 +46,8 @@ namespace CoreKit.Access.Migrations
 
                     b.HasKey("RoleId", "UserId");
 
+                    b.HasIndex("RoleId", "ScopeType", "ScopeId");
+
                     b.HasIndex("ScopeType", "ScopeId", "UserId");
 
                     b.ToTable("ACCESS_Assignments", (string)null);
@@ -125,8 +127,6 @@ namespace CoreKit.Access.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("Id", "ScopeType", "ScopeId");
-
                     b.HasIndex("ScopeType", "ScopeId", "NormalizedName")
                         .IsUnique()
                         .HasDatabaseName("UX_ACCESS_Roles_Scope_Name");
@@ -157,7 +157,6 @@ namespace CoreKit.Access.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasIndex("RoleId", "ScopeType", "ScopeId");
                     b.Navigation("Role");
                 });
 

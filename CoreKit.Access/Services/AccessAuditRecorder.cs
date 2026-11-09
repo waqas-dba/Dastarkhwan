@@ -29,7 +29,21 @@ internal sealed class AccessAuditRecorder : IAccessAuditRecorder
             ScopeId = scope.Id,
             Action = action,
             ActorUserId = _actor.UserId,
-            Details = details is { Length: > MaxDetailsLength } ? details[..MaxDetailsLength] : details,
+            Details = Clean(details),
             OccurredAt = _time.GetUtcNow().UtcDateTime
         });
+
+    /// <summary>
+    /// Details can contain names typed by users. Line breaks and other control characters are replaced, so one
+    /// entry can never look like several, and the text is cut to the column length.
+    /// </summary>
+    private static string? Clean(string? details)
+    {
+        if (details is null)
+            return null;
+
+        var cleaned = new string(details.Select(c => char.IsControl(c) ? ' ' : c).ToArray());
+
+        return cleaned.Length > MaxDetailsLength ? cleaned[..MaxDetailsLength] : cleaned;
+    }
 }

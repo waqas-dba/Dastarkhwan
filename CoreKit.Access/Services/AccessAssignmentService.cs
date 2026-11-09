@@ -106,10 +106,18 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
                 AssignedBy = actorId
             });
 
+        // The entry says who ends up with which roles, and also exactly what this call added and removed.
+        var namesById = changedRoles.ToDictionary(r => r.Id, r => r.Name);
+
+        string NamesOf(IEnumerable<Guid> ids)
+            => string.Join(", ", ids.Select(id => namesById.TryGetValue(id, out var name) ? name : id.ToString("N"))
+                .Order(StringComparer.Ordinal));
+
         _audit.Record(
             scope,
             AccessAuditActions.RolesAssigned,
-            $"user: {userId}; roles: {string.Join(", ", wantedRoles.Select(r => r.Name).Order(StringComparer.Ordinal))}");
+            $"user: {userId}; roles: {string.Join(", ", wantedRoles.Select(r => r.Name).Order(StringComparer.Ordinal))}; " +
+            $"added: {NamesOf(addedIds)}; removed: {NamesOf(removedIds)}");
 
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
             return saveError;

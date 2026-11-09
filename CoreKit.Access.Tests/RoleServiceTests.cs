@@ -1,4 +1,4 @@
-namespace CoreKit.Access.Tests;
+﻿namespace CoreKit.Access.Tests;
 
 public sealed class AccessRoleServiceReadTests : IDisposable
 {
@@ -744,6 +744,7 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
         competitor.Configure(
             env.NewContext,
             new AccessUnitOfWork(env.Db, NullLogger<AccessUnitOfWork>.Instance),
+            env.Db,
             role.Id,
             "Updated by B");
 
@@ -773,11 +774,14 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
 /// role change with a rotated concurrency stamp from a separate context, then delegates to the real
 /// unit of work. Because the competing stamp no longer matches context A's original stamp, the
 /// service's own save loses the optimistic concurrency check and must return save_conflict.
+/// Before that save it asserts that the service already staged its RoleUpdated audit entry, so the
+/// post-conflict check proves the entry was rolled back rather than never created.
 /// </summary>
 internal sealed class CompetingWriterUnitOfWork : IAccessUnitOfWork
 {
     private Func<AccessDbContext>? _newContext;
     private IAccessUnitOfWork? _inner;
+    private AccessDbContext? _serviceContext;
     private Guid _roleId;
     private string _competingName = "Updated by B";
 
@@ -785,10 +789,16 @@ internal sealed class CompetingWriterUnitOfWork : IAccessUnitOfWork
 
     public Guid CompetingStamp { get; private set; }
 
-    public void Configure(Func<AccessDbContext> newContext, IAccessUnitOfWork inner, Guid roleId, string competingName)
+    public void Configure(
+        Func<AccessDbContext> newContext,
+        IAccessUnitOfWork inner,
+        AccessDbContext serviceContext,
+        Guid roleId,
+        string competingName)
     {
         _newContext = newContext;
         _inner = inner;
+        _serviceContext = serviceContext;
         _roleId = roleId;
         _competingName = competingName;
     }
@@ -811,6 +821,19 @@ internal sealed class CompetingWriterUnitOfWork : IAccessUnitOfWork
             Committed = true;
         }
 
+        // The service must have staged its audit entry before the save; the failing concurrency
+        // save is what discards it. This proves the post-conflict database assertion below is
+        // about rollback, not about the entry never having existed.
+        AssertAuditEntryWasStaged();
+
         return await _inner!.SaveAsync(ct);
+    }
+
+    private void AssertAuditEntryWasStaged()
+    {
+        Assert.Contains(
+            _serviceContext!.ChangeTracker.Entries<AccessAuditEntry>(),
+            entry => entry.State == EntityState.Added
+                && entry.Entity.Action == AccessAuditActions.RoleUpdated);
     }
 }

@@ -48,6 +48,8 @@ public sealed class MigrationSnapshotTests
         var role = model.FindEntityType("CoreKit.Access.Entities.AccessRole");
         Assert.NotNull(role);
 
+        // Primary key on AccessRole is {Id} (1 property), so any key with 3 properties
+        // cannot be the primary key. The count check serves as the non-primary-key filter.
         var alternateKey = role.GetKeys()
             .FirstOrDefault(k => k.Properties.Count == 3 &&
                 k.Properties.Select(p => p.Name).SequenceEqual(new[] { "Id", "ScopeType", "ScopeId" }));
@@ -63,6 +65,8 @@ public sealed class MigrationSnapshotTests
         var role = model.FindEntityType("CoreKit.Access.Entities.AccessRole");
         Assert.NotNull(role);
 
+        // Primary key on AccessRole is {Id} (1 property), so any key with 3 properties
+        // cannot be the primary key. The count check serves as the non-primary-key filter.
         var principalKey = role.GetKeys()
             .FirstOrDefault(k => k.Properties.Count == 3 &&
                 k.Properties.Select(p => p.Name).SequenceEqual(new[] { "Id", "ScopeType", "ScopeId" }));
@@ -71,8 +75,8 @@ public sealed class MigrationSnapshotTests
         var foreignKey = assignment.GetForeignKeys()
             .FirstOrDefault(f => f.Properties.Count == 3 &&
                 f.Properties.Select(p => p.Name).SequenceEqual(new[] { "RoleId", "ScopeType", "ScopeId" }) &&
-                f.PrincipalKey.Properties.Count == 3 &&
-                f.PrincipalKey.Properties.Select(p => p.Name).SequenceEqual(new[] { "Id", "ScopeType", "ScopeId" }));
+                f.PrincipalEntityType == role &&
+                f.PrincipalKey == principalKey);
 
         Assert.NotNull(foreignKey);
     }

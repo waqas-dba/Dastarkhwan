@@ -1,4 +1,8 @@
-﻿using Microsoft.Extensions.Caching.Memory;
+﻿using System;
+using System.Collections.Generic;
+using System.Threading;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 
 namespace CoreKit.Access.Services;
 
@@ -6,7 +10,7 @@ namespace CoreKit.Access.Services;
 /// Which cache generation a permission lookup started in. If a role or an assignment changes while the lookup
 /// reads the database, the generation moves on and the (now stale) result is not stored.
 /// </summary>
-internal readonly record struct AccessCacheToken(long ScopeVersion, long UserVersion);
+internal readonly record struct AccessCacheToken(long Epoch, long ScopeVersion, long UserVersion);
 
 internal interface IAccessCache
 {
@@ -28,36 +32,63 @@ internal interface IAccessCache
 }
 
 /// <summary>
-/// Remembers resolved permissions for a short time. A per-scope version and a per-user version are part of every
+/// Remembers resolved permissions for a short time. A per-scope generation and a per-user generation are part of every
 /// key, so changing a role can forget a whole scope, and changing one person's roles can forget just them,
-/// without listing entries. The version counters expire when unused, so they do not pile up.
+/// without listing entries. Generation metadata lives outside <see cref="IMemoryCache"/> so it never expires
+/// unexpectedly, and is bounded by capacity; when exhausted, the epoch advances and all previous entries become
+/// unreachable.
 /// </summary>
-internal sealed class AccessCache : IAccessCache
+internal sealed class AccessCache : IAccessCache, IDisposable
 {
-    private readonly object _gate = new();
+    private const int DefaultMaxGenerationEntries = 10_000;
+
+    private readonly ReaderWriterLockSlim _gate = new();
     private readonly IMemoryCache _cache;
     private readonly TimeSpan _ttl;
-    private readonly MemoryCacheEntryOptions _versionOptions;
+    private readonly int _maxGenerationEntries;
+
+    // Generation metadata lives outside IMemoryCache so it never expires unexpectedly.
+    private long _epoch;
+    private long _sequence;
+    private readonly Dictionary<AccessScope, long> _scopeGenerations = new();
+    private readonly Dictionary<(AccessScope Scope, Guid UserId), long> _userGenerations = new();
 
     public AccessCache(IMemoryCache cache, IOptions<AccessOptions> options)
+        : this(cache, options, DefaultMaxGenerationEntries)
+    {
+    }
+
+    /// <summary>Internal test seam to inject a small generation metadata capacity.</summary>
+    internal AccessCache(IMemoryCache cache, IOptions<AccessOptions> options, int maxGenerationEntries)
     {
         _cache = cache;
         _ttl = TimeSpan.FromSeconds(Math.Max(options.Value.CacheSeconds, 0));
-
-        // A counter must outlive every entry made under it, so it can never fall back to 0 while an older entry
-        // keyed with a smaller number is still remembered. Every lookup refreshes it (sliding expiration).
-        var lifetime = _ttl * 2 > TimeSpan.FromMinutes(1) ? _ttl * 2 : TimeSpan.FromMinutes(1);
-        _versionOptions = new MemoryCacheEntryOptions { SlidingExpiration = lifetime };
+        _maxGenerationEntries = maxGenerationEntries;
     }
 
     public bool TryGet(AccessScope scope, Guid userId, out EffectiveAccess access)
     {
-        if (_ttl > TimeSpan.Zero &&
-            _cache.TryGetValue(UserKey(scope, userId, Begin(scope, userId)), out EffectiveAccess? cached) &&
-            cached is not null)
+        if (_ttl <= TimeSpan.Zero)
         {
-            access = cached;
-            return true;
+            access = EffectiveAccess.None;
+            return false;
+        }
+
+        _gate.EnterReadLock();
+        try
+        {
+            var token = GetCurrentToken(scope, userId);
+            var key = MakeKey(scope, userId, token);
+
+            if (_cache.TryGetValue(key, out EffectiveAccess? cached) && cached is not null)
+            {
+                access = cached;
+                return true;
+            }
+        }
+        finally
+        {
+            _gate.ExitReadLock();
         }
 
         access = EffectiveAccess.None;
@@ -68,51 +99,121 @@ internal sealed class AccessCache : IAccessCache
         => Set(scope, userId, access, Begin(scope, userId));
 
     public AccessCacheToken Begin(AccessScope scope, Guid userId)
-        => _ttl > TimeSpan.Zero
-            ? new AccessCacheToken(ReadVersion(ScopeVersionKey(scope)), ReadVersion(UserVersionKey(scope, userId)))
-            : default;
+    {
+        if (_ttl <= TimeSpan.Zero)
+            return default;
+
+        _gate.EnterReadLock();
+        try
+        {
+            return GetCurrentToken(scope, userId);
+        }
+        finally
+        {
+            _gate.ExitReadLock();
+        }
+    }
 
     public void Set(AccessScope scope, Guid userId, EffectiveAccess access, AccessCacheToken token)
     {
         if (_ttl <= TimeSpan.Zero)
             return;
 
-        lock (_gate)
+        _gate.EnterReadLock();
+        try
         {
             // Something was invalidated after the lookup began: the result may be stale, so do not keep it.
-            if (Begin(scope, userId) != token)
+            if (GetCurrentToken(scope, userId) != token)
                 return;
 
-            _cache.Set(UserKey(scope, userId, token), access, _ttl);
+            _cache.Set(MakeKey(scope, userId, token), access, _ttl);
+        }
+        finally
+        {
+            _gate.ExitReadLock();
         }
     }
 
     public void InvalidateScope(AccessScope scope)
     {
-        if (_ttl > TimeSpan.Zero)
-            Bump(ScopeVersionKey(scope));
+        if (_ttl <= TimeSpan.Zero)
+            return;
+
+        _gate.EnterWriteLock();
+        try
+        {
+            if (_scopeGenerations.ContainsKey(scope))
+            {
+                _scopeGenerations[scope] = NextSequence();
+            }
+            else
+            {
+                EnsureCapacityForNewEntry();
+                _scopeGenerations[scope] = NextSequence();
+            }
+        }
+        finally
+        {
+            _gate.ExitWriteLock();
+        }
     }
 
     public void InvalidateUser(AccessScope scope, Guid userId)
     {
-        if (_ttl > TimeSpan.Zero)
-            Bump(UserVersionKey(scope, userId));
-    }
+        if (_ttl <= TimeSpan.Zero)
+            return;
 
-    private long ReadVersion(string key) => _cache.TryGetValue(key, out long version) ? version : 0L;
+        var userKey = (scope, userId);
 
-    private void Bump(string key)
-    {
-        lock (_gate)
+        _gate.EnterWriteLock();
+        try
         {
-            _cache.Set(key, ReadVersion(key) + 1, _versionOptions);
+            if (_userGenerations.ContainsKey(userKey))
+            {
+                _userGenerations[userKey] = NextSequence();
+            }
+            else
+            {
+                EnsureCapacityForNewEntry();
+                _userGenerations[userKey] = NextSequence();
+            }
+        }
+        finally
+        {
+            _gate.ExitWriteLock();
         }
     }
 
-    private static string UserKey(AccessScope scope, Guid userId, AccessCacheToken token)
-        => $"corekit.access:{scope}:v{token.ScopeVersion}:u{token.UserVersion}:{userId:N}";
+    public void Dispose()
+    {
+        _gate.Dispose();
+    }
 
-    private static string ScopeVersionKey(AccessScope scope) => $"corekit.access.version:{scope}";
+    private AccessCacheToken GetCurrentToken(AccessScope scope, Guid userId)
+    {
+        long scopeGen = _scopeGenerations.TryGetValue(scope, out var sg) ? sg : 0L;
+        long userGen = _userGenerations.TryGetValue((scope, userId), out var ug) ? ug : 0L;
+        return new AccessCacheToken(_epoch, scopeGen, userGen);
+    }
 
-    private static string UserVersionKey(AccessScope scope, Guid userId) => $"corekit.access.userversion:{scope}:{userId:N}";
+    private static string MakeKey(AccessScope scope, Guid userId, AccessCacheToken token)
+        => $"corekit.access:{scope}:e{token.Epoch}:v{token.ScopeVersion}:u{token.UserVersion}:{userId:N}";
+
+    private long NextSequence()
+    {
+        checked { return ++_sequence; }
+    }
+
+    private void EnsureCapacityForNewEntry()
+    {
+        if (_scopeGenerations.Count + _userGenerations.Count >= _maxGenerationEntries)
+        {
+            checked { _epoch++; }
+            _scopeGenerations.Clear();
+            _userGenerations.Clear();
+        }
+    }
+
+    /// <summary>Test-only seam: combined count of scope and user generation entries.</summary>
+    internal int GenerationEntryCount => _scopeGenerations.Count + _userGenerations.Count;
 }

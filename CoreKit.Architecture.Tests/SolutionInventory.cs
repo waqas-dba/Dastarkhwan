@@ -41,6 +41,7 @@ internal static class SolutionInventory
         "CoreKit.Architecture.Tests/CoreKit.Architecture.Tests.csproj",
         "CoreKit.Access.Tests/CoreKit.Access.Tests.csproj",
         "CoreKit.Tenant.Tests/CoreKit.Tenant.Tests.csproj",
+        "CoreKit.Identity.Tests/CoreKit.Identity.Tests.csproj",
     };
 
     /// <summary>
@@ -53,6 +54,7 @@ internal static class SolutionInventory
             ["CoreKit.Architecture.Tests/CoreKit.Architecture.Tests.csproj"] = "CoreKit.Architecture.Tests",
             ["CoreKit.Access.Tests/CoreKit.Access.Tests.csproj"] = "CoreKit.Access.Tests",
             ["CoreKit.Tenant.Tests/CoreKit.Tenant.Tests.csproj"] = "CoreKit.Tenant.Tests",
+            ["CoreKit.Identity.Tests/CoreKit.Identity.Tests.csproj"] = "CoreKit.Identity.Tests",
         };
 
     /// <summary>

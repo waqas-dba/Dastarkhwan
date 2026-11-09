@@ -400,7 +400,7 @@ public sealed class AccessCacheConcurrencyTests
     }
 
     [Fact]
-    public void ConcurrencyStressTest_VerifiesInvariants()
+    public async Task ConcurrencyStressTest_VerifiesInvariants()
     {
         var cache = Cache(50);
         var scope = Scope;
@@ -441,9 +441,7 @@ public sealed class AccessCacheConcurrencyTests
             });
         }
 
-#pragma warning disable xUnit1031 // Blocking wait is intentional for concurrent stress testing.
-        Task.WaitAll(tasks);
-#pragma warning restore xUnit1031
+        await Task.WhenAll(tasks);
 
         // No exceptions from concurrent access.
         Assert.Empty(exceptions);
@@ -454,4 +452,136 @@ public sealed class AccessCacheConcurrencyTests
         Assert.True(cache.TryGet(scope, users[0], out var found));
         Assert.True(found.Has("final"));
     }
+
+    [Fact]
+    public async Task ConcurrentSetWithOldToken_RejectedAfterInvalidation()
+    {
+        var cache = Cache();
+        var user = Guid.NewGuid();
+
+        // Store an entry.
+        var token = cache.Begin(Scope, user);
+        cache.Set(Scope, user, Access("a.b"), token);
+        Assert.True(cache.TryGet(Scope, user, out var before));
+        Assert.True(before.Has("a.b"));
+
+        // Invalidate synchronously.
+        cache.InvalidateScope(Scope);
+
+        // Old token cannot store after invalidation completes.
+        cache.Set(Scope, user, Access("stale"), token);
+        Assert.False(cache.TryGet(Scope, user, out _));
+
+        // New token works.
+        var newToken = cache.Begin(Scope, user);
+        cache.Set(Scope, user, Access("fresh"), newToken);
+        Assert.True(cache.TryGet(Scope, user, out var after));
+        Assert.True(after.Has("fresh"));
+    }
+
+    [Fact]
+    public async Task ConcurrentSetWithOldToken_StoredBeforeInvalidation_Succeeds()
+    {
+        var cache = Cache();
+        var user = Guid.NewGuid();
+
+        // Store an entry.
+        var token = cache.Begin(Scope, user);
+        cache.Set(Scope, user, Access("a.b"), token);
+        Assert.True(cache.TryGet(Scope, user, out var before));
+        Assert.True(before.Has("a.b"));
+
+        // Store completes using old token BEFORE invalidation.
+        cache.Set(Scope, user, Access("in-flight"), token);
+        Assert.True(cache.TryGet(Scope, user, out var stored));
+        Assert.True(stored.Has("in-flight"));
+
+        // After invalidation completes, lookups start with the new generation.
+        cache.InvalidateScope(Scope);
+        Assert.False(cache.TryGet(Scope, user, out _));
+    }
+
+    [Fact]
+    public void ConcurrentRollover_RejectsOldEpochTokens()
+    {
+        var cache = Cache(1);
+        var user = Guid.NewGuid();
+
+        // First invalidation fills the capacity.
+        cache.InvalidateScope(Scope);
+        Assert.Equal(1, cache.GenerationEntryCount);
+
+        // Get a token before rollover.
+        var oldToken = cache.Begin(Scope, user);
+
+        // Trigger rollover by invalidating a different scope.
+        var other = AccessScope.ForTenant(Guid.NewGuid());
+        cache.InvalidateScope(other);
+
+        // Old token cannot store after rollover.
+        cache.Set(Scope, user, Access("stale"), oldToken);
+        Assert.False(cache.TryGet(Scope, user, out _));
+
+        // New token works.
+        var newToken = cache.Begin(Scope, user);
+        cache.Set(Scope, user, Access("fresh"), newToken);
+        Assert.True(cache.TryGet(Scope, user, out var found));
+        Assert.True(found.Has("fresh"));
+    }
+
+    [Fact]
+    public void ExistingEntryInvalidationAtFullCapacity_NoUnnecessaryRollover()
+    {
+        var cache = Cache(2);
+        var user = Guid.NewGuid();
+
+        // Fill capacity with two entries.
+        cache.InvalidateScope(Scope);
+        cache.InvalidateUser(Scope, user);
+        Assert.Equal(2, cache.GenerationEntryCount);
+
+        // Capture current scope generation.
+        var tokenBefore = cache.Begin(Scope, user);
+        var scopeGenBefore = tokenBefore.ScopeVersion;
+
+        // Invalidate the existing entry again → generation bumps, no rollover.
+        cache.InvalidateScope(Scope);
+        Assert.Equal(2, cache.GenerationEntryCount);
+
+        // A new token reflects the new generation.
+        var tokenAfter = cache.Begin(Scope, user);
+        Assert.NotEqual(scopeGenBefore, tokenAfter.ScopeVersion);
+    }
+
+    [Fact]
+    public void NewEntryInsertionAtCapacity_TriggersExactlyOneRollover()
+    {
+        var cache = Cache(1);
+        var user = Guid.NewGuid();
+
+        // Fill capacity with one entry.
+        cache.InvalidateScope(Scope);
+        Assert.Equal(1, cache.GenerationEntryCount);
+
+        // Get a token before rollover (current epoch).
+        var oldToken = cache.Begin(Scope, user);
+
+        // New-entry insertion at capacity triggers exactly one rollover.
+        var otherUser = Guid.NewGuid();
+        cache.InvalidateUser(Scope, otherUser);
+
+        // After rollover, only the new entry exists.
+        Assert.Equal(1, cache.GenerationEntryCount);
+
+        // Old token cannot store after rollover.
+        cache.Set(Scope, user, Access("stale"), oldToken);
+        Assert.False(cache.TryGet(Scope, user, out _));
+
+        // New token works.
+        var newToken = cache.Begin(Scope, user);
+        cache.Set(Scope, user, Access("fresh"), newToken);
+        Assert.True(cache.TryGet(Scope, user, out var found));
+        Assert.True(found.Has("fresh"));
+    }
+}
 }

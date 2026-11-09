@@ -1,4 +1,4 @@
-﻿namespace CoreKit.Access.Tests;
+namespace CoreKit.Access.Tests;
 
 public sealed class AccessRoleServiceReadTests : IDisposable
 {
@@ -696,7 +696,7 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
             Permissions = { "sales.refund" }
         }), AccessErrorKind.Conflict, "access.save_conflict");
 
-        Assert.Single(_env.Read(db => db.RolePermissions.Where(p => p.RoleId == role.Id)));
+        Assert.Single(_env.Read(db => db.RolePermissions.Where(p => p.RoleId == role.Id).ToList()));
         Assert.Empty(_env.Read(db => db.AuditEntries.ToList()));
     }
 
@@ -729,39 +729,88 @@ public sealed class AccessRoleServiceChangeTests : IDisposable
     [Fact]
     public async Task Update_DatabaseConcurrencyRace_ReturnsSaveConflict()
     {
-        _env.SignInOwner();
-        var role = _env.AddRole("Cashier", new[] { "sales.create" });
+        // Context A is the service's request context: it reads the role with the stamp below.
+        // A competing writer (context B) commits a name change and a fresh stamp while the service
+        // is between its read and its save. The injected unit of work performs that competing
+        // commit deterministically, immediately before the real save runs.
+        var competitor = new CompetingWriterUnitOfWork();
+        using var env = new TestEnv(unitOfWork: competitor);
+        env.SignInOwner();
+        var role = env.AddRole("Cashier", new[] { "sales.create" });
 
-        // Context A loads the role with its original stamp.
-        using var contextA = _env.NewContext();
-        var roleA = contextA.Roles.Single(r => r.Id == role.Id);
-        var originalStamp = roleA.ConcurrencyStamp;
+        // Context A keeps the original stamp and sends it with the request.
+        var originalStamp = env.Read(db => db.Roles.Single(r => r.Id == role.Id)).ConcurrencyStamp;
 
-        // Context B successfully updates the role and changes its concurrency stamp.
-        using var contextB = _env.NewContext();
-        var roleB = contextB.Roles.Single(r => r.Id == role.Id);
-        roleB.Name = "Updated by B";
-        await contextB.SaveChangesAsync();
+        competitor.Configure(
+            env.NewContext,
+            new AccessUnitOfWork(env.Db, NullLogger<AccessUnitOfWork>.Instance),
+            role.Id,
+            "Updated by B");
 
-        // Context A attempts its mutation using the original (now-stale) stamp.
-        roleA.Name = "Updated by A";
+        var result = await env.CreateRoleService().UpdateAsync(role.Id, new UpdateAccessRoleRequest
+        {
+            ConcurrencyStamp = originalStamp,
+            Name = "Updated by A"
+        });
 
-        var uowA = new AccessUnitOfWork(contextA, NullLogger<AccessUnitOfWork>.Instance);
-        var result = await uowA.SaveAsync();
+        // The losing request is answered from the EF Core concurrency exception path.
+        ResultAssert.Fails(result, AccessErrorKind.Conflict, "access.save_conflict");
+        Assert.True(competitor.Committed);
 
-        // The first request returns access.save_conflict through the EF Core concurrency exception path.
-        Assert.Equal(SaveOutcome.ConcurrencyConflict, result);
-        var error = result.ToError();
-        Assert.Equal(AccessErrorKind.Conflict, error.Kind);
-        Assert.Equal("access.save_conflict", error.Code);
-
-        // The first request's intended role mutation is not persisted.
-        // Its audit entry is not persisted (nothing was staged through the audit recorder).
-        // The competing context's committed update remains intact.
-        var roleInDb = _env.Read(db => db.Roles.Single(r => r.Id == role.Id));
+        // Context A's change and the audit entry it staged are rolled back; context B's update stands.
+        var roleInDb = env.Read(db => db.Roles.Single(r => r.Id == role.Id));
         Assert.Equal("Updated by B", roleInDb.Name);
+        Assert.Equal(competitor.CompetingStamp, roleInDb.ConcurrencyStamp);
         Assert.NotEqual(originalStamp, roleInDb.ConcurrencyStamp);
-        Assert.DoesNotContain(_env.Read(db => db.AuditEntries.ToList()),
-            a => a.Action == AccessAuditActions.RoleUpdated);
+
+        var auditActions = env.Read(db => db.AuditEntries.Select(a => a.Action).ToList());
+        Assert.DoesNotContain(AccessAuditActions.RoleUpdated, auditActions);
+    }
+}
+
+/// <summary>
+/// Deterministic seam for the service-level database race: on the first save it commits a competing
+/// role change with a rotated concurrency stamp from a separate context, then delegates to the real
+/// unit of work. Because the competing stamp no longer matches context A's original stamp, the
+/// service's own save loses the optimistic concurrency check and must return save_conflict.
+/// </summary>
+internal sealed class CompetingWriterUnitOfWork : IAccessUnitOfWork
+{
+    private Func<AccessDbContext>? _newContext;
+    private IAccessUnitOfWork? _inner;
+    private Guid _roleId;
+    private string _competingName = "Updated by B";
+
+    public bool Committed { get; private set; }
+
+    public Guid CompetingStamp { get; private set; }
+
+    public void Configure(Func<AccessDbContext> newContext, IAccessUnitOfWork inner, Guid roleId, string competingName)
+    {
+        _newContext = newContext;
+        _inner = inner;
+        _roleId = roleId;
+        _competingName = competingName;
+    }
+
+    public async Task<SaveOutcome> SaveAsync(CancellationToken ct = default)
+    {
+        if (!Committed)
+        {
+            CompetingStamp = Guid.NewGuid();
+
+            using var competing = _newContext!();
+            var role = await competing.Roles.SingleAsync(r => r.Id == _roleId, ct);
+
+            // Context B must rotate the stamp; otherwise the database would still hold context A's
+            // original value and the losing save would succeed instead of conflicting.
+            role.Name = _competingName;
+            role.ConcurrencyStamp = CompetingStamp;
+
+            await competing.SaveChangesAsync(ct);
+            Committed = true;
+        }
+
+        return await _inner!.SaveAsync(ct);
     }
 }

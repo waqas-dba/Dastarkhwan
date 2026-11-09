@@ -165,4 +165,59 @@ public sealed class RoleServiceTests : IDisposable
         ResultAssert.Fails(await _env.RoleService.DeleteAsync(_env.StaffRoleId),
             IdentityErrorKind.Conflict, "conflict");
     }
+
+    // ---- Authorization ----
+
+    [Fact]
+    public async Task CreateRole_WithoutRolesCreatePermission_Fails()
+    {
+        _env.SignInStaff();
+
+        ResultAssert.Fails(await _env.RoleService.CreateAsync(new CreateRoleRequest
+        {
+            Name = "Auditor",
+            PermissionIds = new List<Guid> { _env.UserPermissionId }
+        }), IdentityErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task GetRole_WithoutRolesReadPermission_Fails()
+    {
+        _env.SignInStaff();
+
+        ResultAssert.Fails(await _env.RoleService.GetAsync(_env.AdministratorRoleId),
+            IdentityErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task UpdateRole_WithoutRolesUpdatePermission_Fails()
+    {
+        _env.SignInStaff();
+
+        ResultAssert.Fails(await _env.RoleService.UpdateAsync(_env.ManagerRoleId, new UpdateRoleRequest
+        {
+            Name = "Supervisor"
+        }), IdentityErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task DeleteRole_WithoutRolesDeletePermission_Fails()
+    {
+        _env.SignInStaff();
+
+        ResultAssert.Fails(await _env.RoleService.DeleteAsync(_env.StaffRoleId),
+            IdentityErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task SetPermissions_WithoutRolesUpdatePermission_Fails()
+    {
+        _env.SignInStaff();
+
+        ResultAssert.Fails(await _env.RoleService.SetPermissionsAsync(_env.StaffRoleId,
+            new SetRolePermissionsRequest
+            {
+                PermissionIds = new List<Guid> { _env.UserCreatePermissionId }
+            }), IdentityErrorKind.Forbidden, "access.denied");
+    }
 }

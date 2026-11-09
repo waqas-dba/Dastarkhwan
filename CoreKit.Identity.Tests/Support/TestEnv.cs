@@ -1,5 +1,10 @@
 using CoreKit.Identity.Repositories;
+using CoreKit.Identity.Security;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using System.Security.Claims;
+using System.Threading;
 
 namespace CoreKit.Identity.Tests.Support;
 
@@ -161,7 +166,14 @@ internal sealed class TestEnv : IDisposable
             UserRepository, RoleRepository, RefreshTokenRepository,
             AccessResolver, AdministratorGuard, Hasher, CurrentUser, Time);
 
-        RoleService = new RoleService(RoleRepository, PermissionRepository);
+        RoleService = new RoleService(RoleRepository, PermissionRepository, CurrentUser);
+
+        var emailOptions = Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false });
+        AuthService = new AuthService(
+            UserRepository, RefreshTokenRepository, Hasher,
+            new FakeTokenService(), new FakeSessionIssuer(),
+            AccessResolver, CurrentUser, emailOptions, Time,
+            NullLogger<AuthService>.Instance);
     }
 
     public IdentityDbContext Db { get; }
@@ -187,6 +199,8 @@ internal sealed class TestEnv : IDisposable
     public IUserService UserService { get; }
 
     public IRoleService RoleService { get; }
+
+    public IAuthService AuthService { get; }
 
     public Guid OwnerUserId { get; }
 
@@ -237,4 +251,42 @@ internal sealed class TestEnv : IDisposable
         Db.Dispose();
         _connection.Dispose();
     }
+}
+
+/// <summary>Minimal fake ITokenService for tests.</summary>
+internal sealed class FakeTokenService : ITokenService
+{
+    public AccessTokenResult CreateAccessToken(
+        User user, IReadOnlyCollection<string> roles, IReadOnlyCollection<string> permissions,
+        IEnumerable<Claim>? extraClaims = null)
+        => new("fake-access-token", DateTime.UtcNow.AddMinutes(5));
+
+    public GeneratedRefreshToken CreateRefreshToken()
+        => new("raw-token", "hash-token", DateTime.UtcNow.AddDays(7));
+
+    public string HashRefreshToken(string rawToken)
+        => "hash-" + rawToken;
+}
+
+/// <summary>Minimal fake ISessionIssuer for tests.</summary>
+internal sealed class FakeSessionIssuer : ISessionIssuer
+{
+    public Task<LoginResponse> IssueAsync(User user, CancellationToken ct = default)
+        => Task.FromResult(new LoginResponse
+        {
+            AccessToken = "fake-access-token",
+            AccessTokenExpiresAt = DateTime.UtcNow.AddMinutes(5),
+            RefreshToken = "fake-refresh-token",
+            RefreshTokenExpiresAt = DateTime.UtcNow.AddDays(7),
+            User = new UserDto
+            {
+                Id = user.Id,
+                Email = user.Email,
+                DisplayName = user.DisplayName,
+                IsActive = user.IsActive,
+                EmailConfirmed = user.EmailConfirmed,
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt
+            }
+        });
 }

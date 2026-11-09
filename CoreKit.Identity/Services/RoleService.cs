@@ -1,4 +1,5 @@
 ﻿using CoreKit.Identity.Common;
+using CoreKit.Identity.Constants;
 using CoreKit.Identity.Entities;
 using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Models;
@@ -11,18 +12,28 @@ public sealed class RoleService : IRoleService
 {
     private readonly IRoleRepository _roleRepository;
     private readonly IPermissionRepository _permissionRepository;
+    private readonly ICurrentUserService _currentUser;
 
-    public RoleService(IRoleRepository roleRepository, IPermissionRepository permissionRepository)
+    public RoleService(IRoleRepository roleRepository, IPermissionRepository permissionRepository, ICurrentUserService currentUser)
     {
         _roleRepository = roleRepository;
         _permissionRepository = permissionRepository;
+        _currentUser = currentUser;
     }
 
     public async Task<IdentityResult<IReadOnlyList<RoleDto>>> ListAsync(CancellationToken ct = default)
-        => Common.IdentityResult.Success(await _roleRepository.ListAsync(ct));
+    {
+        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.RolesRead))
+            return IdentityErrors.Forbidden("You cannot view roles.");
+
+        return Common.IdentityResult.Success(await _roleRepository.ListAsync(ct));
+    }
 
     public async Task<IdentityResult<RoleDto>> GetAsync(Guid id, CancellationToken ct = default)
     {
+        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.RolesRead))
+            return IdentityErrors.Forbidden("You cannot view roles.");
+
         var role = await _roleRepository.GetDetailsAsync(id, ct);
 
         return role is null ? IdentityErrors.NotFound("Role") : Common.IdentityResult.Success(role);
@@ -30,6 +41,9 @@ public sealed class RoleService : IRoleService
 
     public async Task<IdentityResult<RoleDto>> CreateAsync(CreateRoleRequest request, CancellationToken ct = default)
     {
+        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.RolesCreate))
+            return IdentityErrors.Forbidden("You cannot create roles.");
+
         var nameError = RoleInputValidator.ValidateName(request.Name, out var name);
 
         if (nameError is not null)
@@ -70,6 +84,9 @@ public sealed class RoleService : IRoleService
 
     public async Task<IdentityResult<RoleDto>> UpdateAsync(Guid id, UpdateRoleRequest request, CancellationToken ct = default)
     {
+        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.RolesUpdate))
+            return IdentityErrors.Forbidden("You cannot update roles.");
+
         var role = await _roleRepository.FindByIdAsync(id, ct);
 
         if (role is null)
@@ -119,6 +136,9 @@ public sealed class RoleService : IRoleService
 
     public async Task<Common.IdentityResult> DeleteAsync(Guid id, CancellationToken ct = default)
     {
+        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.RolesDelete))
+            return IdentityErrors.Forbidden("You cannot delete roles.");
+
         var role = await _roleRepository.FindByIdAsync(id, ct);
 
         if (role is null)
@@ -140,6 +160,9 @@ public sealed class RoleService : IRoleService
     public async Task<IdentityResult<RoleDto>> SetPermissionsAsync(
         Guid id, SetRolePermissionsRequest request, CancellationToken ct = default)
     {
+        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.RolesUpdate))
+            return IdentityErrors.Forbidden("You cannot update role permissions.");
+
         var role = await _roleRepository.FindByIdWithPermissionsAsync(id, ct);
 
         if (role is null)

@@ -70,13 +70,34 @@ public sealed class AuthService : IAuthService
             return IdentityErrors.InvalidCredentials;
         }
 
+        // If the account is locked out, refuse login without revealing lockout status.
+        var now = Now();
+        if (user.LockoutEnd is { } lockoutEnd && lockoutEnd > now)
+        {
+            _logger.LogInformation("Login blocked for user {UserId}: account locked until {LockoutEnd}.", user.Id, lockoutEnd);
+            return IdentityErrors.InvalidCredentials;
+        }
+
         var check = _hasher.Verify(user.PasswordHash, password);
 
         if (check == PasswordCheckResult.Failed || !user.IsActive)
         {
-            _logger.LogInformation("Login failed for user {UserId}.", user.Id);
+            // Increment failed attempt counter and lock out after 5 failures.
+            user.AccessFailedCount++;
+            if (user.AccessFailedCount >= 5)
+            {
+                user.LockoutEnd = now.AddMinutes(15);
+            }
+            await _userRepository.UpdateAsync(user, ct);
+
+            _logger.LogInformation("Login failed for user {UserId}. Failed attempts: {Count}.", user.Id, user.AccessFailedCount);
             return IdentityErrors.InvalidCredentials;
         }
+
+        // Successful login: reset failed attempt counter and lockout.
+        user.AccessFailedCount = 0;
+        user.LockoutEnd = null;
+        await _userRepository.UpdateAsync(user, ct);
 
         // Only reached with the right password, so this message cannot be used to discover accounts.
         if (_emailOptions.RequireConfirmedEmail && !user.EmailConfirmed)

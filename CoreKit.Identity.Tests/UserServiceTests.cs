@@ -268,4 +268,198 @@ public sealed class UserServiceTests : IDisposable
             RoleIds = new List<Guid> { Guid.NewGuid() }
         }), IdentityErrorKind.Validation, "validation.failed");
     }
+
+    // ---- Authorization ----
+
+    [Fact]
+    public async Task CreateUser_WithoutUsersCreatePermission_Fails()
+    {
+        _env.SignInStaff();
+
+        ResultAssert.Fails(await _env.UserService.CreateAsync(new CreateUserRequest
+        {
+            Email = "newuser@example.com",
+            Password = "NewUserPass123!"
+        }), IdentityErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task GetUser_WithoutUsersReadPermission_Fails()
+    {
+        _env.SignInStaff();
+
+        ResultAssert.Fails(await _env.UserService.GetAsync(_env.StaffUserId),
+            IdentityErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task UpdateUser_WithoutUsersUpdatePermission_Fails()
+    {
+        _env.SignInStaff();
+
+        ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
+        {
+            DisplayName = "New Display Name"
+        }), IdentityErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task DeleteUser_WithoutUsersDeletePermission_Fails()
+    {
+        _env.SignInStaff();
+
+        ResultAssert.Fails(await _env.UserService.DeleteAsync(_env.StaffUserId),
+            IdentityErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task CreateUser_NonAdmin_CannotGrantAdministrator_Fails()
+    {
+        _env.SignInStaff();
+
+        ResultAssert.Fails(await _env.UserService.CreateAsync(new CreateUserRequest
+        {
+            Email = "newadmin@example.com",
+            Password = "NewAdminPass123!",
+            RoleIds = new List<Guid> { _env.AdministratorRoleId }
+        }), IdentityErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task SetRoles_NonAdmin_CannotGrantAdministrator_Fails()
+    {
+        _env.SignInStaff();
+
+        ResultAssert.Fails(await _env.UserService.SetRolesAsync(_env.StaffUserId, new SetUserRolesRequest
+        {
+            RoleIds = new List<Guid> { _env.AdministratorRoleId }
+        }), IdentityErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task UpdateUser_NonAdmin_CannotChangeAnotherAdminEmail_Fails()
+    {
+        _env.SignInStaff();
+
+        ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.OwnerUserId, new UpdateUserRequest
+        {
+            Email = "newemail@example.com"
+        }), IdentityErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task UpdateUser_NonAdmin_CannotChangeAnotherAdminPassword_Fails()
+    {
+        _env.SignInStaff();
+
+        ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.OwnerUserId, new UpdateUserRequest
+        {
+            Password = "NewAdminPass456!"
+        }), IdentityErrorKind.Forbidden, "access.denied");
+    }
+
+    // ---- Account lockout ----
+
+    [Fact]
+    public async Task Login_FiveFailedAttempts_LocksAccountFor15Minutes()
+    {
+        var user = _env.StaffUserId;
+
+        // 5 failed login attempts
+        for (int i = 0; i < 5; i++)
+        {
+            var result = await _env.AuthService.LoginAsync(new LoginRequest
+            {
+                Email = "staff@example.com",
+                Password = "wrong-password"
+            }, CancellationToken.None);
+
+            ResultAssert.Fails(result, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
+        }
+
+        // Verify account is locked out in the database
+        using var db = _env.NewContext();
+        var lockedUser = await db.Users.FirstOrDefaultAsync(u => u.Id == user);
+        Assert.NotNull(lockedUser);
+        Assert.Equal(5, lockedUser.AccessFailedCount);
+        Assert.True(lockedUser.LockoutEnd.HasValue);
+        Assert.True(lockedUser.LockoutEnd.Value > _env.Time.GetUtcNow());
+    }
+
+    [Fact]
+    public async Task Login_WhileLockedOut_Rejected()
+    {
+        var user = _env.StaffUserId;
+
+        // Lock the account by failing 5 times
+        for (int i = 0; i < 5; i++)
+        {
+            await _env.AuthService.LoginAsync(new LoginRequest
+            {
+                Email = "staff@example.com",
+                Password = "wrong-password"
+            }, CancellationToken.None);
+        }
+
+        // 6th attempt should still fail (account locked)
+        var result = await _env.AuthService.LoginAsync(new LoginRequest
+        {
+            Email = "staff@example.com",
+            Password = "wrong-password"
+        }, CancellationToken.None);
+
+        ResultAssert.Fails(result, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
+    }
+
+    [Fact]
+    public async Task Login_AfterLockoutExpires_ResetsAttempts()
+    {
+        var user = _env.StaffUserId;
+
+        // Lock the account
+        for (int i = 0; i < 5; i++)
+        {
+            await _env.AuthService.LoginAsync(new LoginRequest
+            {
+                Email = "staff@example.com",
+                Password = "wrong-password"
+            }, CancellationToken.None);
+        }
+
+        // Advance time past lockout (15 minutes)
+        _env.Time.Advance(TimeSpan.FromMinutes(16));
+
+        // Successful login should reset the counter
+        var result = await _env.AuthService.LoginAsync(new LoginRequest
+        {
+            Email = "staff@example.com",
+            Password = "StaffPass123!"
+        }, CancellationToken.None);
+
+        ResultAssert.Ok(result);
+
+        using var db = _env.NewContext();
+        var unlockedUser = await db.Users.FirstOrDefaultAsync(u => u.Id == user);
+        Assert.NotNull(unlockedUser);
+        Assert.Equal(0, unlockedUser.AccessFailedCount);
+        Assert.Null(unlockedUser.LockoutEnd);
+    }
+
+    [Fact]
+    public async Task Login_InvalidCredentials_IncrementsFailedCount()
+    {
+        var user = _env.StaffUserId;
+
+        await _env.AuthService.LoginAsync(new LoginRequest
+        {
+            Email = "staff@example.com",
+            Password = "wrong-password"
+        }, CancellationToken.None);
+
+        using var db = _env.NewContext();
+        var failedUser = await db.Users.FirstOrDefaultAsync(u => u.Id == user);
+        Assert.NotNull(failedUser);
+        Assert.Equal(1, failedUser.AccessFailedCount);
+        Assert.Null(failedUser.LockoutEnd);
+    }
 }

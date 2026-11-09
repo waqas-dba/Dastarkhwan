@@ -1,4 +1,5 @@
 ﻿using CoreKit.Identity.Common;
+using CoreKit.Identity.Constants;
 using CoreKit.Identity.Entities;
 using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Models;
@@ -57,6 +58,9 @@ public sealed class UserService : IUserService
 
     public async Task<IdentityResult<UserDto>> GetAsync(Guid id, CancellationToken ct = default)
     {
+        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.UsersRead))
+            return IdentityErrors.Forbidden("You cannot view users.");
+
         var user = await _userRepository.FindByIdWithRolesAsync(id, ct);
 
         if (user is null)
@@ -69,6 +73,9 @@ public sealed class UserService : IUserService
 
     public async Task<IdentityResult<UserDto>> CreateAsync(CreateUserRequest request, CancellationToken ct = default)
     {
+        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.UsersCreate))
+            return IdentityErrors.Forbidden("You cannot create users.");
+
         var email = request.Email?.Trim() ?? string.Empty;
 
         if (!EmailValidator.IsValid(email))
@@ -89,6 +96,11 @@ public sealed class UserService : IUserService
 
         if (roles.Count != roleIds.Count)
             return IdentityErrors.Validation("One or more roles do not exist.");
+
+        // Only an administrator can grant the Administrator role
+        var wantsAdministrator = roles.Any(r => AdministratorRole.Is(r));
+        if (wantsAdministrator && !_currentUser.Roles.Contains(IdentityRoleNames.Administrator))
+            return IdentityErrors.Forbidden("You cannot grant administrator privileges.");
 
         var normalizedEmail = IdentityNormalizer.NormalizeEmail(email);
 
@@ -118,10 +130,22 @@ public sealed class UserService : IUserService
 
     public async Task<IdentityResult<UserDto>> UpdateAsync(Guid id, UpdateUserRequest request, CancellationToken ct = default)
     {
+        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.UsersUpdate))
+            return IdentityErrors.Forbidden("You cannot update users.");
+
         var user = await _userRepository.FindForUpdateAsync(id, ct);
 
         if (user is null)
             return IdentityErrors.NotFound("User");
+
+        // Only an administrator can change another administrator's password or email
+        var isChangingCredentials = request.Password is not null || request.Email is not null;
+        if (isChangingCredentials && id != _currentUser.UserId)
+        {
+            var isTargetAdmin = user.UserRoles.Any(ur => AdministratorRole.Is(ur.Role));
+            if (isTargetAdmin && !_currentUser.Roles.Contains(IdentityRoleNames.Administrator))
+                return IdentityErrors.Forbidden("You cannot change another administrator's credentials.");
+        }
 
         var now = Now();
         var endSessions = false;
@@ -197,6 +221,9 @@ public sealed class UserService : IUserService
 
     public async Task<Common.IdentityResult> DeleteAsync(Guid id, CancellationToken ct = default)
     {
+        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.UsersDelete))
+            return IdentityErrors.Forbidden("You cannot delete users.");
+
         if (_currentUser.UserId == id)
             return IdentityErrors.Forbidden("You cannot delete your own account.");
 
@@ -215,6 +242,9 @@ public sealed class UserService : IUserService
 
     public async Task<IdentityResult<UserDto>> SetRolesAsync(Guid id, SetUserRolesRequest request, CancellationToken ct = default)
     {
+        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.UsersUpdate))
+            return IdentityErrors.Forbidden("You cannot update user roles.");
+
         var user = await _userRepository.FindForUpdateAsync(id, ct);
 
         if (user is null)
@@ -225,6 +255,11 @@ public sealed class UserService : IUserService
 
         if (roles.Count != wanted.Count)
             return IdentityErrors.Validation("One or more roles do not exist.");
+
+        // Only an administrator can grant the Administrator role
+        var wantsAdministrator = roles.Any(r => AdministratorRole.Is(r));
+        if (wantsAdministrator && !_currentUser.Roles.Contains(IdentityRoleNames.Administrator))
+            return IdentityErrors.Forbidden("You cannot grant administrator privileges.");
 
         var losesAdministrator =
             user.UserRoles.Any(ur => AdministratorRole.Is(ur.Role)) &&

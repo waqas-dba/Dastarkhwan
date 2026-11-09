@@ -22,6 +22,10 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.PasswordHash).IsRequired().HasMaxLength(500);
         builder.Property(x => x.DisplayName).HasMaxLength(200);
 
+        builder.Property(x => x.AccessFailedCount).IsRequired();
+
+        builder.Property(x => x.LockoutEnd);
+
         // The database itself refuses a second account with the same email,
         // even if two requests race past the application check.
         builder.HasIndex(x => x.NormalizedEmail)

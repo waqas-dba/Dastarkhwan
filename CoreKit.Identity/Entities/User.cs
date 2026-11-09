@@ -25,6 +25,12 @@ public sealed class User
 
     public DateTime? UpdatedAt { get; set; }
 
+    /// <summary>Number of consecutive failed login attempts. Resets to 0 on successful login.</summary>
+    public int AccessFailedCount { get; set; }
+
+    /// <summary>Lockout end time. When set and in the future, login is refused.</summary>
+    public DateTime? LockoutEnd { get; set; }
+
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
 
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();

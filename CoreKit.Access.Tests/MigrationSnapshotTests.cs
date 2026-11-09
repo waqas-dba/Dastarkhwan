@@ -1,6 +1,8 @@
 using CoreKit.Access.Persistence;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Xunit;
 
 namespace CoreKit.Access.Tests;
@@ -80,6 +82,7 @@ public sealed class MigrationSnapshotTests
             .UseSqlite("DataSource=:memory:")
             .Options;
         using var db = new AccessDbContext(options);
-        return db.GetService<IModel>();
+        var migrationsAssembly = db.GetService<IMigrationsAssembly>();
+        return migrationsAssembly.ModelSnapshot!.Model;
     }
 }

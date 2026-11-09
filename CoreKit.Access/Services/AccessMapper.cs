@@ -11,6 +11,7 @@ internal static class AccessMapper
         Permissions = role.Permissions.Select(p => p.Permission).Order(StringComparer.Ordinal).ToList(),
         MemberCount = memberCount,
         CreatedAt = role.CreatedAt,
-        UpdatedAt = role.UpdatedAt
+        UpdatedAt = role.UpdatedAt,
+        ConcurrencyStamp = role.ConcurrencyStamp
     };
 }

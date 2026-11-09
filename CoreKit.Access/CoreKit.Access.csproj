@@ -20,8 +20,5 @@
     <InternalsVisibleTo Include="CoreKit.Access.Tests" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\CoreKit.SharedKernel\CoreKit.SharedKernel.csproj" />
-  </ItemGroup>
 
 </Project>

@@ -169,6 +169,10 @@ internal sealed class AccessRoleService : IAccessRoleService
         if (role is null)
             return AccessErrors.NotFound("Role");
 
+        // Optimistic concurrency: refuse if the client's stamp doesn't match the current one.
+        if (request.ConcurrencyStamp is { } stamp && stamp != role.ConcurrencyStamp)
+            return AccessErrors.SaveConflict;
+
         // A role stronger than you cannot be edited by you.
         if (!AccessGuard.Holds(access, role.Permissions.Select(p => p.Permission)))
             return AccessErrors.Escalation;
@@ -234,6 +238,10 @@ internal sealed class AccessRoleService : IAccessRoleService
 
         if (role is null)
             return AccessErrors.NotFound("Role");
+
+        // Optimistic concurrency: refuse if the client's stamp doesn't match the current one.
+        if (request.ConcurrencyStamp is { } stamp && stamp != role.ConcurrencyStamp)
+            return AccessErrors.SaveConflict;
 
         var current = role.Permissions.Select(p => p.Permission).ToList();
 

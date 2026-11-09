@@ -11,10 +11,10 @@ internal sealed record AccessCall(AccessScope Scope, Guid UserId, EffectiveAcces
 internal sealed class AccessGuard
 {
     private readonly IAccessScopeContext _scopeContext;
-    private readonly ICurrentUser _actor;
+    private readonly IAccessCurrentUser _actor;
     private readonly IAccessService _access;
 
-    public AccessGuard(IAccessScopeContext scopeContext, ICurrentUser actor, IAccessService access)
+    public AccessGuard(IAccessScopeContext scopeContext, IAccessCurrentUser actor, IAccessService access)
     {
         _scopeContext = scopeContext;
         _actor = actor;

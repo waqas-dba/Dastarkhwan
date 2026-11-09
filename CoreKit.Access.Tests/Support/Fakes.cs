@@ -11,7 +11,7 @@ public sealed class FixedTimeProvider : TimeProvider
     public void Advance(TimeSpan by) => _now += by;
 }
 
-public sealed class FakeCurrentUser : ICurrentUser
+public sealed class FakeCurrentUser : IAccessCurrentUser
 {
     public Guid? UserId { get; set; }
 

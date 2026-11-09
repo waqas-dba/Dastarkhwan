@@ -63,57 +63,15 @@ public sealed class ClaimsCurrentUserTests
     }
 }
 
-public sealed class TenantDefaultPortsTests
+public sealed class DefaultPortsTests
 {
     [Fact]
-    public void ScopeContext_WithoutATenantModule_HasNoScope()
-        => Assert.Null(new TenantAccessScopeContext().Current);
+    public void ScopeContext_WithoutAScopeModule_HasNoScope()
+        => Assert.Null(new DefaultAccessScopeContext().Current);
 
     [Fact]
-    public void ScopeContext_WithoutAResolvedTenant_HasNoScope()
-        => Assert.Null(new TenantAccessScopeContext(new FakeCurrentTenant()).Current);
-
-    [Fact]
-    public void ScopeContext_IsTheCurrentTenant()
-    {
-        var id = Guid.NewGuid();
-
-        var scope = new TenantAccessScopeContext(new FakeCurrentTenant { Id = id }).Current;
-
-        Assert.Equal(AccessScope.ForTenant(id), scope);
-    }
-
-    [Fact]
-    public async Task Membership_WithoutATenantModule_NobodyBelongs()
-        => Assert.Null(await new TenantAccessMembership().FindAsync(AccessScope.ForTenant(Guid.NewGuid()), Guid.NewGuid()));
-
-    [Fact]
-    public async Task Membership_ReadsTenantMembership_IncludingTheOwnerFlag()
-    {
-        var tenantId = Guid.NewGuid();
-        var owner = Guid.NewGuid();
-        var staff = Guid.NewGuid();
-        var reader = new FakeTenantMembershipReader();
-        reader.Members[(tenantId, owner)] = true;
-        reader.Members[(tenantId, staff)] = false;
-        var membership = new TenantAccessMembership(reader);
-        var scope = AccessScope.ForTenant(tenantId);
-
-        Assert.Equal(new AccessMember(true), await membership.FindAsync(scope, owner));
-        Assert.Equal(new AccessMember(false), await membership.FindAsync(scope, staff));
-        Assert.Null(await membership.FindAsync(scope, Guid.NewGuid()));
-    }
-
-    [Fact]
-    public async Task Membership_IsOnlyForTenantScopes()
-    {
-        var id = Guid.NewGuid();
-        var user = Guid.NewGuid();
-        var reader = new FakeTenantMembershipReader();
-        reader.Members[(id, user)] = true;
-
-        Assert.Null(await new TenantAccessMembership(reader).FindAsync(new AccessScope("store", id), user));
-    }
+    public async Task Membership_WithoutAMembershipModule_NobodyBelongs()
+        => Assert.Null(await new DefaultAccessMembership().FindAsync(AccessScope.ForTenant(Guid.NewGuid()), Guid.NewGuid()));
 }
 
 public sealed class AccessPermissionCheckerTests : IDisposable
@@ -155,7 +113,7 @@ public sealed class RequireAccessAttributeTests : IDisposable
     {
         var services = new ServiceCollection()
             .AddSingleton<IAccessScopeContext>(_env.ScopeContext)
-            .AddSingleton<ICurrentUser>(_env.User)
+            .AddSingleton<IAccessCurrentUser>(_env.User)
             .AddSingleton<IAccessService>(_env.Access)
             .BuildServiceProvider();
 
@@ -261,7 +219,7 @@ public sealed class AccessDependencyInjectionTests
         Assert.NotNull(sp.GetRequiredService<IAccessAssignmentService>());
         Assert.NotNull(sp.GetRequiredService<IAccessAuditLog>());
         Assert.NotNull(sp.GetRequiredService<IAccessMaintenance>());
-        Assert.NotNull(sp.GetRequiredService<IPermissionChecker>());
+        Assert.NotNull(sp.GetRequiredService<CoreKit.Access.Abstractions.IPermissionChecker>());
 
         var catalog = provider.GetRequiredService<AccessCatalog>();
         Assert.True(catalog.Contains("sales.create"));
@@ -280,7 +238,7 @@ public sealed class AccessDependencyInjectionTests
         var access = scope.ServiceProvider.GetRequiredService<IAccessService>();
 
         ResultAssert.Fails(await access.GetMyAccessAsync(), AccessErrorKind.Validation, "access.scope_required");
-        Assert.False(await scope.ServiceProvider.GetRequiredService<IPermissionChecker>().HasPermissionAsync("sales.create"));
+        Assert.False(await scope.ServiceProvider.GetRequiredService<CoreKit.Access.Abstractions.IPermissionChecker>().HasPermissionAsync("sales.create"));
     }
 
     [Fact]
@@ -292,11 +250,14 @@ public sealed class AccessDependencyInjectionTests
         reader.Members[(tenantId, ownerId)] = true;
 
         using var connection = Open();
+        var membership = new FakeMembership();
+        membership.Set(AccessScope.ForTenant(tenantId), ownerId, isOwner: true);
+
         using var provider = Build(connection, before: services =>
         {
-            services.AddSingleton<ICurrentTenant>(new FakeCurrentTenant { Id = tenantId });
-            services.AddSingleton<ITenantMembershipReader>(reader);
-            services.AddSingleton<ICurrentUser>(new FakeCurrentUser { UserId = ownerId });
+            services.AddSingleton<IAccessCurrentUser>(new FakeCurrentUser { UserId = ownerId });
+            services.AddSingleton<IAccessScopeContext>(new FakeScopeContext { Current = AccessScope.ForTenant(tenantId) });
+            services.AddSingleton<IAccessMembership>(membership);
         });
 
         using var scope = provider.CreateScope();
@@ -311,20 +272,7 @@ public sealed class AccessDependencyInjectionTests
 
         Assert.Equal("Cashier", created.Name);
         Assert.Single(ResultAssert.Ok(await roles.ListAsync()));
-        Assert.True(await scope.ServiceProvider.GetRequiredService<IPermissionChecker>().HasPermissionAsync("anything.at.all"));
-    }
-
-    [Fact]
-    public void TheThreeTenantEventHandlersAreRegistered()
-    {
-        using var connection = Open();
-        using var provider = Build(connection);
-        using var scope = provider.CreateScope();
-        var sp = scope.ServiceProvider;
-
-        Assert.Single(sp.GetServices<IEventHandler<TenantCreated>>());
-        Assert.Single(sp.GetServices<IEventHandler<TenantMemberRemoved>>());
-        Assert.Single(sp.GetServices<IEventHandler<TenantDeleted>>());
+        Assert.True(await scope.ServiceProvider.GetRequiredService<CoreKit.Access.Abstractions.IPermissionChecker>().HasPermissionAsync("anything.at.all"));
     }
 
     [Fact]
@@ -332,10 +280,10 @@ public sealed class AccessDependencyInjectionTests
     {
         using var connection = Open();
         var mine = new FakeCurrentUser { UserId = Guid.NewGuid() };
-        using var provider = Build(connection, before: s => s.AddSingleton<ICurrentUser>(mine));
+        using var provider = Build(connection, before: s => s.AddSingleton<IAccessCurrentUser>(mine));
         using var scope = provider.CreateScope();
 
-        Assert.Same(mine, scope.ServiceProvider.GetRequiredService<ICurrentUser>());
+        Assert.Same(mine, scope.ServiceProvider.GetRequiredService<IAccessCurrentUser>());
     }
 
     [Theory]

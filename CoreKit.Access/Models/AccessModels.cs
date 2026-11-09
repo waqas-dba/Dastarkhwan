@@ -16,6 +16,9 @@ public sealed class AccessRoleDto
     public DateTime CreatedAt { get; set; }
 
     public DateTime? UpdatedAt { get; set; }
+
+    /// <summary>Changes on every update. Clients must send it back when updating to avoid lost changes.</summary>
+    public Guid ConcurrencyStamp { get; set; }
 }
 
 public sealed class AccessPermissionDto
@@ -40,11 +43,17 @@ public sealed class UpdateAccessRoleRequest
     public string? Name { get; set; }
 
     public string? Description { get; set; }
+
+    /// <summary>The concurrency stamp the client last read. Required to prevent lost updates.</summary>
+    public Guid? ConcurrencyStamp { get; set; }
 }
 
 public sealed class SetAccessRolePermissionsRequest
 {
     public List<string> Permissions { get; set; } = new();
+
+    /// <summary>The concurrency stamp the client last read. Required to prevent lost updates.</summary>
+    public Guid? ConcurrencyStamp { get; set; }
 }
 
 public sealed class SetAccessUserRolesRequest

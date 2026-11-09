@@ -1,6 +1,6 @@
 ﻿namespace CoreKit.Access.Services;
 
-/// <summary>Lets any module ask "may the signed-in user do this here?" through the shared kernel.</summary>
+/// <summary>Lets any module ask "may the signed-in user do this here?" through Access.</summary>
 internal sealed class AccessPermissionChecker : IPermissionChecker
 {
     private readonly IAccessService _access;

@@ -17,4 +17,3 @@ global using CoreKit.Access.Models;
 global using CoreKit.Access.Persistence;
 global using CoreKit.Access.Services;
 global using CoreKit.Access.Settings;
-global using CoreKit.SharedKernel;

@@ -11,10 +11,10 @@ internal sealed class AccessAuditRecorder : IAccessAuditRecorder
     private const int MaxDetailsLength = 2000;
 
     private readonly IAccessAuditRepository _audit;
-    private readonly ICurrentUser _actor;
+    private readonly IAccessCurrentUser _actor;
     private readonly TimeProvider _time;
 
-    public AccessAuditRecorder(IAccessAuditRepository audit, ICurrentUser actor, TimeProvider time)
+    public AccessAuditRecorder(IAccessAuditRepository audit, IAccessCurrentUser actor, TimeProvider time)
     {
         _audit = audit;
         _actor = actor;

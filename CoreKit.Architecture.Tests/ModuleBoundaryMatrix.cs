@@ -25,7 +25,7 @@ internal static class ModuleBoundaryMatrix
         {
             ["CoreKit.SharedKernel"] = Array.Empty<string>(),
             ["CoreKit.Identity"] = new[] { "CoreKit.SharedKernel" },
-            ["CoreKit.Access"] = new[] { "CoreKit.SharedKernel" },
+            ["CoreKit.Access"] = Array.Empty<string>(),
             ["CoreKit.Tenant"] = new[] { "CoreKit.SharedKernel", "CoreKit.Identity" },
         };
 
@@ -36,7 +36,7 @@ internal static class ModuleBoundaryMatrix
     public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> ProjectReferenceAllowlist =
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
         {
-            ["CoreKit.Access/CoreKit.Access.csproj"] = new[] { "CoreKit.SharedKernel/CoreKit.SharedKernel.csproj" },
+            ["CoreKit.Access/CoreKit.Access.csproj"] = Array.Empty<string>(),
             ["CoreKit.Identity/CoreKit.Identity.csproj"] = new[] { "CoreKit.SharedKernel/CoreKit.SharedKernel.csproj" },
             ["CoreKit.Tenant/CoreKit.Tenant.csproj"] = new[]
             {

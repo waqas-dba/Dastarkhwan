@@ -22,7 +22,7 @@ public sealed class RequireAccessAttribute : Attribute, IAsyncActionFilter
 
         if (services.GetRequiredService<IAccessScopeContext>().Current is null)
             error = AccessErrors.ScopeRequired;
-        else if (services.GetRequiredService<ICurrentUser>().UserId is null)
+        else if (services.GetRequiredService<IAccessCurrentUser>().UserId is null)
             error = AccessErrors.NotAuthenticated;
         else if (!await services.GetRequiredService<IAccessService>()
                      .HasPermissionAsync(_permission, context.HttpContext.RequestAborted))

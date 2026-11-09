@@ -1,14 +1,12 @@
-﻿using CoreKit.Access.Catalog;
-
-namespace CoreKit.Access.Extensions;
+﻿namespace CoreKit.Access.Extensions;
 
 public static class AccessServiceCollectionExtensions
 {
     public const string ConnectionStringName = "Access";
 
     /// <summary>
-    /// Registers Access: database, repositories, services, and defaults that read the current user, tenant and
-    /// tenant membership through the shared kernel. Without a Tenant module nobody belongs to a scope, so
+    /// Registers Access: database, repositories, services, and defaults that read the current user and
+    /// scope through Access's own abstractions. Without a scope module nobody belongs to a scope, so
     /// nothing is granted. Reads "ConnectionStrings:Access" and "Access".
     /// </summary>
     /// <param name="configureDatabase">
@@ -65,19 +63,19 @@ public static class AccessServiceCollectionExtensions
         services.AddScoped<IAccessMaintenance, AccessMaintenance>();
         services.AddScoped<IAccessAuditLog, AccessAuditLog>();
 
-        // What Access offers other modules, through the shared kernel.
+        // Access's own view of the current user: reads from the HttpContext claims (Identity issues "sub").
+        // Identity may register its own IAccessCurrentUser implementation that overrides this default.
+        services.TryAddScoped<IAccessCurrentUser, ClaimsCurrentUser>();
+
+        // Default scope context: no scope, so scoped calls are refused. A scope module (Tenant) may override.
+        services.TryAddScoped<IAccessScopeContext, DefaultAccessScopeContext>();
+
+        // Default membership: nobody is a member, so nobody is granted anything. A membership module
+        // (Tenant) may override.
+        services.TryAddScoped<IAccessMembership, DefaultAccessMembership>();
+
+        // What Access offers other modules, through Access's own abstractions.
         services.AddScoped<IPermissionChecker, AccessPermissionChecker>();
-
-        // What Access reads from other modules, through the shared kernel. Each default works with or
-        // without the Tenant and identity modules: a missing one simply means "no scope" or "nobody belongs".
-        services.TryAddScoped<ICurrentUser, ClaimsCurrentUser>();
-        services.TryAddScoped<IAccessScopeContext, TenantAccessScopeContext>();
-        services.TryAddScoped<IAccessMembership, TenantAccessMembership>();
-
-        // React to tenant facts: roles for a new tenant, cleanup when someone leaves or the tenant is deleted.
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IEventHandler<TenantCreated>, TenantCreatedHandler>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IEventHandler<TenantMemberRemoved>, TenantMemberRemovedHandler>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IEventHandler<TenantDeleted>, TenantDeletedHandler>());
 
         return services;
     }

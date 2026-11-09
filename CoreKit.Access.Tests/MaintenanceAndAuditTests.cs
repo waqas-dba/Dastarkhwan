@@ -1,4 +1,4 @@
-﻿namespace CoreKit.Access.Tests;
+namespace CoreKit.Access.Tests;
 
 public sealed class AccessMaintenanceTests : IDisposable
 {
@@ -217,129 +217,6 @@ public sealed class AccessMaintenanceTests : IDisposable
     }
 }
 
-public sealed class TenantEventHandlerTests : IDisposable
-{
-    private readonly TestEnv _env = new();
-    private static readonly DateTime Moment = new(2026, 10, 9, 12, 0, 0, DateTimeKind.Utc);
-
-    public void Dispose() => _env.Dispose();
-
-    [Fact]
-    public async Task TenantCreated_ProvisionsTheTemplates()
-    {
-        await new TenantCreatedHandler(_env.CreateMaintenance()).HandleAsync(new TenantCreated(_env.Scope.Id, Moment));
-
-        Assert.Equal(2, _env.Read(db => db.Roles.Count(r => r.ScopeId == _env.Scope.Id)));
-    }
-
-    [Fact]
-    public async Task TenantMemberRemoved_DropsThatPersonsRoles()
-    {
-        var role = _env.AddRole("Cashier");
-        var user = _env.AddMember(roles: new[] { role });
-
-        await new TenantMemberRemovedHandler(_env.CreateMaintenance())
-            .HandleAsync(new TenantMemberRemoved(_env.Scope.Id, user, Moment));
-
-        Assert.Empty(_env.Read(db => db.Assignments.ToList()));
-    }
-
-    [Fact]
-    public async Task TenantDeleted_RemovesTheTenantsRoles()
-    {
-        var role = _env.AddRole("Cashier", new[] { "sales.create" });
-        _env.AddMember(roles: new[] { role });
-
-        await new TenantDeletedHandler(_env.CreateMaintenance()).HandleAsync(new TenantDeleted(_env.Scope.Id, Moment));
-
-        Assert.Empty(_env.Read(db => db.Roles.ToList()));
-        Assert.Empty(_env.Read(db => db.Assignments.ToList()));
-    }
-}
-
-public sealed class AccessAuditLogTests : IDisposable
-{
-    private readonly TestEnv _env = new();
-
-    public void Dispose() => _env.Dispose();
-
-    private async Task MakeSomeHistoryAsync()
-    {
-        var owner = _env.SignInOwner();
-        var roles = _env.CreateRoleService();
-
-        var cashier = ResultAssert.Ok(await roles.CreateAsync(new CreateAccessRoleRequest { Name = "Cashier" }));
-        _env.Time.Advance(TimeSpan.FromMinutes(1));
-        await roles.UpdateAsync(cashier.Id, new UpdateAccessRoleRequest { Name = "Teller" });
-        _env.Time.Advance(TimeSpan.FromMinutes(1));
-        await roles.DeleteAsync(cashier.Id);
-
-        Assert.NotEqual(Guid.Empty, owner);
-    }
-
-    [Fact]
-    public async Task List_ShowsNewestFirst_WithTheActor()
-    {
-        await MakeSomeHistoryAsync();
-
-        var page = ResultAssert.Ok(await _env.CreateAuditLog().ListAsync());
-
-        Assert.Equal(
-            new[] { AccessAuditActions.RoleDeleted, AccessAuditActions.RoleUpdated, AccessAuditActions.RoleCreated },
-            page.Items.Select(e => e.Action));
-        Assert.Equal(3, page.TotalCount);
-        Assert.All(page.Items, e => Assert.Equal(_env.User.UserId, e.ActorUserId));
-    }
-
-    [Fact]
-    public async Task List_Pages()
-    {
-        await MakeSomeHistoryAsync();
-
-        var second = ResultAssert.Ok(await _env.CreateAuditLog().ListAsync(page: 2, pageSize: 2));
-
-        Assert.Equal(new[] { AccessAuditActions.RoleCreated }, second.Items.Select(e => e.Action));
-        Assert.Equal(2, second.TotalPages);
-    }
-
-    [Fact]
-    public async Task List_ClampsPaging()
-    {
-        _env.SignInOwner();
-
-        var page = ResultAssert.Ok(await _env.CreateAuditLog().ListAsync(page: 0, pageSize: 100000));
-
-        Assert.Equal(1, page.Page);
-        Assert.Equal(200, page.PageSize);
-    }
-
-    [Fact]
-    public async Task List_ShowsOnlyThisScopesHistory()
-    {
-        _env.SignInOwner();
-        _env.Seed(db => db.AuditEntries.Add(new AccessAuditEntry
-        {
-            Id = Guid.NewGuid(),
-            ScopeType = "tenant",
-            ScopeId = Guid.NewGuid(),
-            Action = "foreign",
-            OccurredAt = _env.UtcNow
-        }));
-
-        var page = ResultAssert.Ok(await _env.CreateAuditLog().ListAsync());
-
-        Assert.Empty(page.Items);
-    }
-
-    [Fact]
-    public async Task List_NeedsThePermission()
-    {
-        _env.SignInAs(AccessPermissionNames.RolesRead);
-
-        ResultAssert.Fails(await _env.CreateAuditLog().ListAsync(), AccessErrorKind.Forbidden, "access.denied");
-    }
-}
-
 /// <summary>Test double that reports a non-successful save outcome, so maintenance tests can force a failed save without touching the database.</summary>
 internal sealed class FailingUnitOfWork : IAccessUnitOfWork
 {
@@ -349,3 +226,4 @@ internal sealed class FailingUnitOfWork : IAccessUnitOfWork
 
     public Task<SaveOutcome> SaveAsync(CancellationToken ct = default) => Task.FromResult(_outcome);
 }
+

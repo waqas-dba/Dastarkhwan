@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using CoreKit.SharedKernel.Abstractions;
+using Microsoft.Extensions.Logging;
 
 namespace CoreKit.Identity.Seeding;
 

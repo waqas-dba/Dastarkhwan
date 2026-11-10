@@ -1,4 +1,5 @@
-﻿using CoreKit.Tenant.Abstractions;
+﻿using CoreKit.SharedKernel.Abstractions;
+using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Integration;
 
 namespace CoreKit.Tenant.Extensions;

@@ -1,4 +1,6 @@
-﻿namespace CoreKit.Identity.Seeding;
+﻿using CoreKit.SharedKernel.Abstractions;
+
+namespace CoreKit.Identity.Seeding;
 
 public static class SeedingExtensions
 {

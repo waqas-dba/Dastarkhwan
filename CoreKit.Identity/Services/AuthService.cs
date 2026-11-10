@@ -72,10 +72,18 @@ public sealed class AuthService : IAuthService
 
         // If the account is locked out, refuse login without revealing lockout status.
         var now = Now();
-        if (user.LockoutEnd is { } lockoutEnd && lockoutEnd > now)
+        if (user.LockoutEnd is { } lockoutEnd)
         {
-            _logger.LogInformation("Login blocked for user {UserId}: account locked until {LockoutEnd}.", user.Id, lockoutEnd);
-            return IdentityErrors.InvalidCredentials;
+            if (lockoutEnd > now)
+            {
+                _logger.LogInformation("Login blocked for user {UserId}: account locked until {LockoutEnd}.", user.Id, lockoutEnd);
+                return IdentityErrors.InvalidCredentials;
+            }
+
+            // The lockout window is over. The old failure count is spent, so this attempt starts
+            // with a fresh budget; otherwise one more mistake would immediately re-lock the account.
+            user.AccessFailedCount = 0;
+            user.LockoutEnd = null;
         }
 
         var check = _hasher.Verify(user.PasswordHash, password);

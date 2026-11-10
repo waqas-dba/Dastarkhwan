@@ -36,6 +36,15 @@ public interface IUserRepository
 
     Task SetPasswordHashAsync(Guid userId, string passwordHash, DateTime now, CancellationToken ct = default);
 
+    /// <summary>Atomically increments the failed-login counter. Returns the new value.</summary>
+    Task<int> IncrementAccessFailedCountAsync(Guid userId, CancellationToken ct = default);
+
+    /// <summary>Atomically sets the lockout end time.</summary>
+    Task SetLockoutEndAsync(Guid userId, DateTime? lockoutEnd, CancellationToken ct = default);
+
+    /// <summary>Atomically resets the failed-login counter and clears the lockout.</summary>
+    Task ResetAccessFailureAsync(Guid userId, CancellationToken ct = default);
+
     /// <summary>Makes the user's role links match exactly the given role ids.</summary>
     Task ReplaceRolesAsync(User user, IReadOnlyCollection<Guid> roleIds, CancellationToken ct = default);
 

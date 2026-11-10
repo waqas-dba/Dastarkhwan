@@ -537,4 +537,60 @@ public sealed class UserServiceTests : IDisposable
         Assert.Equal(1, failedUser.AccessFailedCount);
         Assert.Null(failedUser.LockoutEnd);
     }
+
+    [Fact]
+    public async Task Login_ConcurrentFailedAttempts_DoNotLoseIncrements()
+    {
+        var email = "staff@example.com";
+        var wrongPassword = "wrong-password";
+        var attemptCount = 10;
+
+        // Create independent AuthService instances, each with its own DbContext.
+        var services = Enumerable.Range(0, attemptCount)
+            .Select(_ => CreateAuthService())
+            .ToList();
+
+        // Launch concurrent failed logins.
+        var tasks = services.Select(s => s.LoginAsync(
+            new LoginRequest { Email = email, Password = wrongPassword },
+            CancellationToken.None)).ToList();
+
+        await Task.WhenAll(tasks);
+
+        // Every attempt must fail with invalid credentials.
+        foreach (var task in tasks)
+        {
+            var result = await task;
+            ResultAssert.Fails(result, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
+        }
+
+        // Read back from a fresh context: no increments may be lost.
+        using var db = _env.NewContext();
+        var userAfter = await db.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == IdentityNormalizer.NormalizeEmail(email));
+        Assert.NotNull(userAfter);
+        Assert.Equal(attemptCount, userAfter.AccessFailedCount);
+        Assert.True(userAfter.LockoutEnd.HasValue); // 10 >= 5, so locked
+    }
+
+    private IAuthService CreateAuthService()
+    {
+        var db = _env.NewContext();
+        var userRepository = new UserRepository(db);
+        var refreshTokenRepository = new RefreshTokenRepository(db);
+        var accessResolver = new AccessResolver(new PermissionRepository(db));
+        var currentUser = new FakeCurrentUserService();
+        var emailOptions = Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false });
+
+        return new AuthService(
+            userRepository,
+            refreshTokenRepository,
+            _env.Hasher,
+            new FakeTokenService(),
+            new FakeSessionIssuer(),
+            accessResolver,
+            currentUser,
+            emailOptions,
+            _env.Time,
+            NullLogger<AuthService>.Instance);
+    }
 }

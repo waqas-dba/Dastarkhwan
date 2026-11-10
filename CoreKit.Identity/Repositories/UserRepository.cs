@@ -100,6 +100,37 @@ public sealed class UserRepository : IUserRepository
                 .SetProperty(u => u.UpdatedAt, (DateTime?)now), ct);
     }
 
+    public async Task<int> IncrementAccessFailedCountAsync(Guid userId, CancellationToken ct = default)
+    {
+        await _db.Users
+            .Where(u => u.Id == userId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.AccessFailedCount, u.AccessFailedCount + 1), ct);
+
+        return await _db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => u.AccessFailedCount)
+            .FirstOrDefaultAsync(ct);
+    }
+
+    public async Task SetLockoutEndAsync(Guid userId, DateTime? lockoutEnd, CancellationToken ct = default)
+    {
+        await _db.Users
+            .Where(u => u.Id == userId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.LockoutEnd, lockoutEnd), ct);
+    }
+
+    public async Task ResetAccessFailureAsync(Guid userId, CancellationToken ct = default)
+    {
+        await _db.Users
+            .Where(u => u.Id == userId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.AccessFailedCount, 0)
+                .SetProperty(u => u.LockoutEnd, (DateTime?)null), ct);
+    }
+
     public async Task ReplaceRolesAsync(User user, IReadOnlyCollection<Guid> roleIds, CancellationToken ct = default)
     {
         foreach (var link in user.UserRoles.Where(ur => !roleIds.Contains(ur.RoleId)).ToList())

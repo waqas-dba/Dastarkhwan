@@ -80,32 +80,28 @@ public sealed class AuthService : IAuthService
                 return IdentityErrors.InvalidCredentials;
             }
 
-            // The lockout window is over. The old failure count is spent, so this attempt starts
-            // with a fresh budget; otherwise one more mistake would immediately re-lock the account.
-            user.AccessFailedCount = 0;
-            user.LockoutEnd = null;
+            // The lockout window is over. Reset the failure budget atomically.
+            await _userRepository.ResetAccessFailureAsync(user.Id, ct);
         }
 
         var check = _hasher.Verify(user.PasswordHash, password);
 
         if (check == PasswordCheckResult.Failed || !user.IsActive)
         {
-            // Increment failed attempt counter and lock out after 5 failures.
-            user.AccessFailedCount++;
-            if (user.AccessFailedCount >= 5)
-            {
-                user.LockoutEnd = now.AddMinutes(15);
-            }
-            await _userRepository.UpdateAsync(user, ct);
+            // Atomically increment the failed-attempt counter. No lost increments under concurrency.
+            var newCount = await _userRepository.IncrementAccessFailedCountAsync(user.Id, ct);
 
-            _logger.LogInformation("Login failed for user {UserId}. Failed attempts: {Count}.", user.Id, user.AccessFailedCount);
+            if (newCount >= 5)
+            {
+                await _userRepository.SetLockoutEndAsync(user.Id, now.AddMinutes(15), ct);
+            }
+
+            _logger.LogInformation("Login failed for user {UserId}. Failed attempts: {Count}.", user.Id, newCount);
             return IdentityErrors.InvalidCredentials;
         }
 
-        // Successful login: reset failed attempt counter and lockout.
-        user.AccessFailedCount = 0;
-        user.LockoutEnd = null;
-        await _userRepository.UpdateAsync(user, ct);
+        // Successful login: reset failed attempt counter and lockout atomically.
+        await _userRepository.ResetAccessFailureAsync(user.Id, ct);
 
         // Only reached with the right password, so this message cannot be used to discover accounts.
         if (_emailOptions.RequireConfirmedEmail && !user.EmailConfirmed)

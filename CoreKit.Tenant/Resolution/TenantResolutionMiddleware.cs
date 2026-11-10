@@ -1,4 +1,5 @@
 ﻿using System.Net;
+using System.Security.Claims;
 using System.Text.Json;
 
 namespace CoreKit.Tenant.Resolution;
@@ -7,12 +8,21 @@ namespace CoreKit.Tenant.Resolution;
 /// Finds the tenant of each request. If a tenant is identified it must exist and be Active, and every
 /// strategy that found one must agree. Requests that identify no tenant continue without one
 /// (use RequireTenant() on routes that need a tenant).
+///
+/// After resolving a tenant, the middleware also validates that the authenticated user is a current
+/// member of that tenant. Removed or never-members are refused even when they hold a valid JWT with
+/// a tenant claim.
 /// </summary>
 public sealed class TenantResolutionMiddleware
 {
     private readonly RequestDelegate _next;
+    private readonly ITenantMembershipReader _membershipReader;
 
-    public TenantResolutionMiddleware(RequestDelegate next) => _next = next;
+    public TenantResolutionMiddleware(RequestDelegate next, ITenantMembershipReader membershipReader)
+    {
+        _next = next;
+        _membershipReader = membershipReader;
+    }
 
     public async Task InvokeAsync(
         HttpContext context,
@@ -71,6 +81,23 @@ public sealed class TenantResolutionMiddleware
             return;
         }
 
+        // Validate current membership for authenticated users. A valid JWT with a tenant claim is
+        // not enough — the user must currently be a member of the resolved tenant. Removed members
+        // are refused even when their token has not expired.
+        if (context.User.Identity?.IsAuthenticated == true)
+        {
+            var userId = GetUserId(context.User);
+            if (userId is { } uid && userId != Guid.Empty)
+            {
+                var member = await _membershipReader.FindAsync(tenant.Id, uid, ct);
+                if (member is null)
+                {
+                    await WriteErrorAsync(context, TenantErrors.Forbidden("You are not a member of this tenant."));
+                    return;
+                }
+            }
+        }
+
         setter.Set(tenant.Id);
 
         await _next(context);
@@ -84,5 +111,13 @@ public sealed class TenantResolutionMiddleware
         await context.Response.WriteAsync(
             JsonSerializer.Serialize(new { code = error.Code, message = error.Message }),
             context.RequestAborted);
+    }
+
+    private static Guid? GetUserId(ClaimsPrincipal user)
+    {
+        var value = user.FindFirst("sub")?.Value
+            ?? user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        return Guid.TryParse(value, out var id) && id != Guid.Empty ? id : null;
     }
 }

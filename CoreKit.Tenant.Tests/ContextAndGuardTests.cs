@@ -224,4 +224,58 @@ public sealed class TenantAccessGuardTests
         Assert.True(_guard.IsTenantBound);
         Assert.Equal(id, _guard.CurrentTenantId);
     }
+
+    [Fact]
+    public void PlatformAdmin_WithTenantResolved_CanDoPlatformWork()
+    {
+        _actor.IsPlatformAdmin = true;
+        _current.Set(Guid.NewGuid());
+
+        Assert.Null(_guard.EnsurePlatformScope());
+    }
+
+    [Fact]
+    public void PlatformAdmin_WithSuspendedTenant_CanDoPlatformWork()
+    {
+        _actor.IsPlatformAdmin = true;
+        var tenantId = Guid.NewGuid();
+        _current.Set(tenantId);
+
+        Assert.Null(_guard.EnsurePlatformScope());
+    }
+
+    [Fact]
+    public void PlatformAdmin_WithTenantResolved_CanAccessOwnTenant()
+    {
+        _actor.IsPlatformAdmin = true;
+        var tenantId = Guid.NewGuid();
+        _current.Set(tenantId);
+
+        Assert.Null(_guard.EnsureCanAccess(tenantId));
+    }
+
+    [Fact]
+    public void PlatformAdmin_WithTenantResolved_CannotAccessOtherTenant()
+    {
+        _actor.IsPlatformAdmin = true;
+        var ownTenant = Guid.NewGuid();
+        var otherTenant = Guid.NewGuid();
+        _current.Set(ownTenant);
+
+        Assert.Equal(TenantErrors.CrossTenantAccess, _guard.EnsureCanAccess(otherTenant));
+    }
+
+    [Fact]
+    public void NonAdmin_WithoutTenant_CannotDoPlatformWork()
+    {
+        Assert.Equal(TenantErrors.PlatformOnly, _guard.EnsurePlatformScope());
+    }
+
+    [Fact]
+    public void PlatformAdmin_WithoutTenant_CanDoPlatformWork()
+    {
+        _actor.IsPlatformAdmin = true;
+
+        Assert.Null(_guard.EnsurePlatformScope());
+    }
 }

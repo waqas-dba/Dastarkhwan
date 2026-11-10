@@ -264,4 +264,117 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
         Assert.False(run.NextCalled);
         Assert.Contains("tenant.suspended", run.Body);
     }
+
+    [Fact]
+    public async Task ActiveMember_WithValidToken_CanAccessTenant()
+    {
+        var tenant = _env.AddTenant();
+        var user = _env.AddMember(tenant.Id);
+
+        var run = await RunAsync(Request(claim: tenant.Id));
+
+        Assert.True(run.NextCalled);
+        Assert.Equal(tenant.Id, _env.CurrentTenant.Id);
+    }
+
+    [Fact]
+    public async Task RemovedMember_WithValidToken_IsRejected()
+    {
+        var tenant = _env.AddTenant();
+        var user = Guid.NewGuid();
+
+        // Add then remove the member
+        _env.AddMember(tenant.Id, user);
+        _env.Seed(db => db.Members.Remove(
+            db.Members.FirstOrDefault(m => m.TenantId == tenant.Id && m.UserId == user)!));
+
+        var run = await RunAsync(Request(claim: tenant.Id));
+
+        Assert.False(run.NextCalled);
+        Assert.Equal(403, run.Context.Response.StatusCode);
+        Assert.Contains("You are not a member of this tenant", run.Body);
+        Assert.False(_env.CurrentTenant.IsResolved);
+    }
+
+    [Fact]
+    public async Task NonMember_WithValidToken_IsRejected()
+    {
+        var tenant = _env.AddTenant();
+        var user = Guid.NewGuid(); // Never added as a member
+
+        var run = await RunAsync(Request(claim: tenant.Id));
+
+        Assert.False(run.NextCalled);
+        Assert.Equal(403, run.Context.Response.StatusCode);
+        Assert.Contains("You are not a member of this tenant", run.Body);
+        Assert.False(_env.CurrentTenant.IsResolved);
+    }
+
+    [Fact]
+    public async Task MembershipLookupFailure_DeniesAccess()
+    {
+        var tenant = _env.AddTenant();
+        var user = Guid.NewGuid();
+
+        // Create a context with an authenticated user but no membership reader
+        // that would return null (simulating lookup failure)
+        var context = new DefaultHttpContext();
+        context.User = new ClaimsPrincipal(
+            new ClaimsIdentity(new[] { new Claim(TenantClaimTypes.TenantId, tenant.Id.ToString()) }, "test"));
+
+        var nextCalled = false;
+        var middleware = new TenantResolutionMiddleware(_ =>
+        {
+            nextCalled = true;
+            return Task.CompletedTask;
+        }, new NullMembershipReader());
+
+        var options = Options.Create(_env.Config);
+        var strategies = new ITenantResolutionStrategy[]
+        {
+            new ClaimTenantResolutionStrategy(options)
+        };
+
+        context.Response.Body = new MemoryStream();
+        await middleware.InvokeAsync(context, strategies, _env.InfoProvider, _env.CurrentTenant);
+
+        Assert.False(nextCalled);
+        Assert.Equal(403, context.Response.StatusCode);
+        context.Response.Body.Position = 0;
+        var body = await new StreamReader(context.Response.Body).ReadToEndAsync();
+        Assert.Contains("You are not a member of this tenant", body);
+        Assert.False(_env.CurrentTenant.IsResolved);
+    }
+}
+
+/// <summary>Returns null for every membership lookup, simulating a lookup failure.</summary>
+internal sealed class NullMembershipReader : ITenantMembershipReader
+{
+    public Task<TenantMember?> FindAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
+        => Task.FromResult<TenantMember?>(null);
+
+    public Task<TenantMember?> FindForUpdateAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
+        => Task.FromResult<TenantMember?>(null);
+
+    public Task<IReadOnlyList<TenantMember>> ListAsync(Guid tenantId, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<TenantMember>>(new List<TenantMember>());
+
+    public Task<IReadOnlyList<TenantMember>> ListForUserAsync(Guid userId, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<TenantMember>>(new List<TenantMember>());
+
+    public Task<IReadOnlyList<TenantMember>> ListForUserForUpdateAsync(Guid userId, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<TenantMember>>(new List<TenantMember>());
+
+    public Task<int> CountOwnersAsync(Guid tenantId, CancellationToken ct = default)
+        => Task.FromResult(0);
+
+    public Task<bool> HasDefaultAsync(Guid userId, CancellationToken ct = default)
+        => Task.FromResult(false);
+
+    public Task<Guid?> FindPreferredTenantIdAsync(Guid userId, CancellationToken ct = default)
+        => Task.FromResult<Guid?>(null);
+
+    public void Add(TenantMember member) => throw new NotSupportedException();
+
+    public void Remove(TenantMember member) => throw new NotSupportedException();
 }

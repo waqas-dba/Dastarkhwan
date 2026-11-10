@@ -24,7 +24,7 @@ public sealed class TenantAccessGuard
 
     /// <summary>For work that spans tenants: listing, creating, changing status, deleting.</summary>
     public TenantError? EnsurePlatformScope()
-        => _currentTenant.IsResolved || !_platform.IsGranted ? TenantErrors.PlatformOnly : null;
+        => !_platform.IsGranted ? TenantErrors.PlatformOnly : null;
 
     /// <summary>For work on one tenant.</summary>
     public TenantError? EnsureCanAccess(Guid tenantId)

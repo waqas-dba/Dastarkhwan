@@ -1,4 +1,6 @@
-﻿namespace CoreKit.Tenant.Services;
+﻿using CoreKit.Tenant.Abstractions;
+
+namespace CoreKit.Tenant.Services;
 
 public sealed class TenantMembershipService : ITenantMembershipService
 {
@@ -8,6 +10,8 @@ public sealed class TenantMembershipService : ITenantMembershipService
     private readonly ITenantUnitOfWork _unitOfWork;
     private readonly ITenantEventPublisher _events;
     private readonly TenantAccessGuard _guard;
+    private readonly ITenantPlatformAccess _platform;
+    private readonly ITenantActor _actor;
     private readonly TimeProvider _time;
 
     public TenantMembershipService(
@@ -17,6 +21,8 @@ public sealed class TenantMembershipService : ITenantMembershipService
         ITenantUnitOfWork unitOfWork,
         ITenantEventPublisher events,
         TenantAccessGuard guard,
+        ITenantPlatformAccess platform,
+        ITenantActor actor,
         TimeProvider time)
     {
         _tenants = tenants;
@@ -25,6 +31,8 @@ public sealed class TenantMembershipService : ITenantMembershipService
         _unitOfWork = unitOfWork;
         _events = events;
         _guard = guard;
+        _platform = platform;
+        _actor = actor;
         _time = time;
     }
 
@@ -46,6 +54,15 @@ public sealed class TenantMembershipService : ITenantMembershipService
     {
         if (_guard.EnsureCanAccess(tenantId) is { } denied)
             return denied;
+
+        if (request.IsOwner && !_platform.IsGranted)
+        {
+            if (_actor.UserId is null)
+                return TenantErrors.Forbidden("Only a tenant owner or platform administrator can assign ownership.");
+            var caller = await _members.FindAsync(tenantId, _actor.UserId.Value, ct);
+            if (caller is null || !caller.IsOwner)
+                return TenantErrors.Forbidden("Only a tenant owner or platform administrator can assign ownership.");
+        }
 
         if (request.UserId == Guid.Empty)
             return TenantErrors.Validation("A user id is required.");
@@ -125,6 +142,15 @@ public sealed class TenantMembershipService : ITenantMembershipService
         if (_guard.EnsureCanAccess(tenantId) is { } denied)
             return denied;
 
+        if (!_platform.IsGranted)
+        {
+            if (_actor.UserId is null)
+                return TenantErrors.Forbidden("Only a tenant owner or platform administrator can change ownership.");
+            var caller = await _members.FindAsync(tenantId, _actor.UserId.Value, ct);
+            if (caller is null || !caller.IsOwner)
+                return TenantErrors.Forbidden("Only a tenant owner or platform administrator can change ownership.");
+        }
+
         var tenant = await _tenants.FindByIdAsync(tenantId, ct);
 
         if (tenant is null)
@@ -140,6 +166,9 @@ public sealed class TenantMembershipService : ITenantMembershipService
 
         if (member.IsOwner == request.IsOwner)
             return TenantResult.Success(TenantMapper.ToDto(member));
+
+        if (request.IsOwner && _actor.UserId == userId)
+            return TenantErrors.Forbidden("You cannot promote yourself to owner.");
 
         if (!request.IsOwner && await _members.CountOwnersAsync(tenantId, ct) <= 1)
             return TenantErrors.Conflict("The last owner of a tenant cannot lose ownership.");

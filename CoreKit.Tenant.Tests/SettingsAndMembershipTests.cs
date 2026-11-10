@@ -455,4 +455,105 @@ public sealed class TenantMembershipServiceTests : IDisposable
         ResultAssert.Fails(await Svc.ListMembersAsync(other.Id), TenantErrorKind.Forbidden);
         ResultAssert.Fails(await Svc.RemoveMemberAsync(other.Id, Guid.NewGuid()), TenantErrorKind.Forbidden);
     }
+
+    [Fact]
+    public async Task Add_RejectsArbitraryOwnerAssignment()
+    {
+        var actorUser = Guid.NewGuid();
+        var targetUser = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = actorUser;
+        _env.AddMember(_tenant.Id, actorUser, isOwner: false);
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
+
+        ResultAssert.Fails(
+            await Svc.AddMemberAsync(_tenant.Id, new AddTenantMemberRequest { UserId = targetUser, IsOwner = true }),
+            TenantErrorKind.Forbidden);
+    }
+
+    [Fact]
+    public async Task Add_AllowsPlatformAdminToAddOwner()
+    {
+        var targetUser = Guid.NewGuid();
+
+        var dto = ResultAssert.Ok(await Svc.AddMemberAsync(_tenant.Id, new AddTenantMemberRequest { UserId = targetUser, IsOwner = true }));
+
+        Assert.True(dto.IsOwner);
+        Assert.True(_env.Read(db => db.Members.Single(m => m.UserId == targetUser).IsOwner));
+    }
+
+    [Fact]
+    public async Task Add_AllowsExistingOwnerToAddOwner()
+    {
+        var ownerUser = Guid.NewGuid();
+        var targetUser = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = ownerUser;
+        _env.AddMember(_tenant.Id, ownerUser, isOwner: true);
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
+
+        var dto = ResultAssert.Ok(await Svc.AddMemberAsync(_tenant.Id, new AddTenantMemberRequest { UserId = targetUser, IsOwner = true }));
+
+        Assert.True(dto.IsOwner);
+        Assert.True(_env.Read(db => db.Members.Single(m => m.UserId == targetUser).IsOwner));
+    }
+
+    [Fact]
+    public async Task SetOwner_RejectsPromotionByNonOwner()
+    {
+        var actorUser = Guid.NewGuid();
+        var targetUser = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = actorUser;
+        _env.AddMember(_tenant.Id, actorUser, isOwner: false);
+        _env.AddMember(_tenant.Id, targetUser);
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
+
+        ResultAssert.Fails(
+            await Svc.SetOwnerAsync(_tenant.Id, targetUser, new SetTenantOwnerRequest { IsOwner = true }),
+            TenantErrorKind.Forbidden);
+    }
+
+    [Fact]
+    public async Task SetOwner_AllowsPromotionByPlatformAdmin()
+    {
+        var targetUser = Guid.NewGuid();
+        _env.AddMember(_tenant.Id, targetUser);
+
+        var dto = ResultAssert.Ok(await Svc.SetOwnerAsync(_tenant.Id, targetUser, new SetTenantOwnerRequest { IsOwner = true }));
+
+        Assert.True(dto.IsOwner);
+        Assert.True(_env.Read(db => db.Members.Single(m => m.UserId == targetUser).IsOwner));
+    }
+
+    [Fact]
+    public async Task SetOwner_AllowsPromotionByExistingOwner()
+    {
+        var ownerUser = Guid.NewGuid();
+        var targetUser = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = ownerUser;
+        _env.AddMember(_tenant.Id, ownerUser, isOwner: true);
+        _env.AddMember(_tenant.Id, targetUser);
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
+
+        var dto = ResultAssert.Ok(await Svc.SetOwnerAsync(_tenant.Id, targetUser, new SetTenantOwnerRequest { IsOwner = true }));
+
+        Assert.True(dto.IsOwner);
+        Assert.True(_env.Read(db => db.Members.Single(m => m.UserId == targetUser).IsOwner));
+    }
+
+    [Fact]
+    public async Task SetOwner_RejectsSelfPromotion()
+    {
+        var user = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = true;
+        _env.Actor.UserId = user;
+        _env.AddMember(_tenant.Id, user, isOwner: false);
+
+        ResultAssert.Fails(
+            await Svc.SetOwnerAsync(_tenant.Id, user, new SetTenantOwnerRequest { IsOwner = true }),
+            TenantErrorKind.Forbidden);
+        Assert.False(_env.Read(db => db.Members.Single(m => m.UserId == user).IsOwner));
+    }
 }

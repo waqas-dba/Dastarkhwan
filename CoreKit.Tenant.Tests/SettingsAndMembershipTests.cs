@@ -691,34 +691,55 @@ public sealed class TenantMembershipServiceTests : IDisposable
     public async Task Remove_NonOwnerConcurrentPromotion_ReturnsConflict()
     {
         var actorUser = Guid.NewGuid();
+        var platformUser = Guid.NewGuid();
         var nonOwnerMember = Guid.NewGuid();
-        var otherOwner = Guid.NewGuid();
-        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.IsPlatformAdmin = true;
         _env.Actor.UserId = actorUser;
         _env.AddMember(_tenant.Id, actorUser, isOwner: true);
         _env.AddMember(_tenant.Id, nonOwnerMember, isOwner: false);
-        _env.AddMember(_tenant.Id, otherOwner, isOwner: true);
+        _env.AddMember(_tenant.Id, platformUser, isOwner: true);
         using var _ = _env.CurrentTenant.Change(_tenant.Id);
 
-        // Concurrent promotion of the non-owner changes the tenant stamp
-        _env.Seed(db =>
+        // Context B service graph: separate DbContext, performs the concurrent promotion
+        var dbB = _env.NewContext();
+        var svcB = CreateMembershipServiceWithContext(dbB);
+
+        // Context B's actor is platform admin
+        _env.Actor.UserId = platformUser;
+
+        // Callback: Context B promotes nonOwnerMember to owner before Context A saves
+        Func<CancellationToken, Task> promoteCallback = async ct =>
         {
-            var t = db.Tenants.Single(x => x.Id == _tenant.Id);
-            t.ConcurrencyStamp = Guid.NewGuid();
-        });
+            await svcB.SetOwnerAsync(_tenant.Id, nonOwnerMember, new SetTenantOwnerRequest { IsOwner = true }, ct);
+        };
 
-        // Stale removal (read as non-owner, then concurrent promotion changed stamp)
-        var result = await Svc.RemoveMemberAsync(_tenant.Id, nonOwnerMember);
+        // Context A service graph: decorated unit of work so Context B's promotion runs before Context A saves
+        var dbA = _env.NewContext();
+        var unitOfWorkA = new TenantUnitOfWork(dbA, NullLogger<TenantUnitOfWork>.Instance);
+        var decoratedUow = new PendingSaveUnitOfWorkDecorator(unitOfWorkA, promoteCallback);
+        var svcA = CreateMembershipServiceWithDecoratedUow(dbA, decoratedUow);
 
-        // Stale operation must return concurrency conflict
+        // Context A attempts to remove nonOwnerMember — stale because Context B promoted it first
+        var result = await svcA.RemoveMemberAsync(_tenant.Id, nonOwnerMember);
+
+        // Stale removal must return concurrency conflict
         ResultAssert.Fails(result, TenantErrorKind.Conflict);
 
-        // Concurrent committed ownership change remains intact — non-owner member still exists
-        Assert.True(_env.Read(db => db.Members.Single(m => m.UserId == nonOwnerMember && !m.IsOwner).IsOwner == false));
+        // Concurrent committed ownership change remains intact — nonOwnerMember is now an owner
+        Assert.True(_env.Read(db => db.Members.Single(m => m.UserId == nonOwnerMember).IsOwner));
 
-        // Tenant stamp reflects the concurrent change
+        // Context B's tenant stamp persisted
         var stampAfter = _env.Read(db => db.Tenants.Single(t => t.Id == _tenant.Id).ConcurrencyStamp);
         Assert.NotEqual(Guid.Empty, stampAfter);
+
+        // Context B's ownership audit entry persisted
+        Assert.True(_env.Read(db => db.AuditEntries.Any(a => a.Action == TenantAuditActions.OwnerChanged)));
+
+        // Context A's removal audit entry is absent
+        Assert.False(_env.Read(db => db.AuditEntries.Any(a => a.Action == TenantAuditActions.MemberRemoved)));
+
+        // No removal event published by Context A
+        Assert.DoesNotContain(_env.Published, e => e is TenantMemberRemovedEvent);
     }
 
     [Fact]
@@ -747,33 +768,90 @@ public sealed class TenantMembershipServiceTests : IDisposable
     public async Task Remove_NonOwnerConcurrentPromotion_DoesNotPersistChanges()
     {
         var actorUser = Guid.NewGuid();
+        var platformUser = Guid.NewGuid();
         var nonOwnerMember = Guid.NewGuid();
-        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.IsPlatformAdmin = true;
         _env.Actor.UserId = actorUser;
         _env.AddMember(_tenant.Id, actorUser, isOwner: true);
         _env.AddMember(_tenant.Id, nonOwnerMember, isOwner: false);
+        _env.AddMember(_tenant.Id, platformUser, isOwner: true);
         using var _ = _env.CurrentTenant.Change(_tenant.Id);
+
+        var dbB = _env.NewContext();
+        var svcB = CreateMembershipServiceWithContext(dbB);
+        _env.Actor.UserId = platformUser;
+
+        Func<CancellationToken, Task> promoteCallback = async ct =>
+        {
+            await svcB.SetOwnerAsync(_tenant.Id, nonOwnerMember, new SetTenantOwnerRequest { IsOwner = true }, ct);
+        };
+
+        var dbA = _env.NewContext();
+        var unitOfWorkA = new TenantUnitOfWork(dbA, NullLogger<TenantUnitOfWork>.Instance);
+        var decoratedUow = new PendingSaveUnitOfWorkDecorator(unitOfWorkA, promoteCallback);
+        var svcA = CreateMembershipServiceWithDecoratedUow(dbA, decoratedUow);
 
         var auditCountBefore = _env.Read(db => db.AuditEntries.Count());
 
-        // Concurrent promotion changes the stamp
-        _env.Seed(db =>
-        {
-            var t = db.Tenants.Single(x => x.Id == _tenant.Id);
-            t.ConcurrencyStamp = Guid.NewGuid();
-        });
-
         // Stale removal must fail
         ResultAssert.Fails(
-            await Svc.RemoveMemberAsync(_tenant.Id, nonOwnerMember),
+            await svcA.RemoveMemberAsync(_tenant.Id, nonOwnerMember),
             TenantErrorKind.Conflict);
 
-        // Membership unchanged — non-owner member still exists
+        // Membership unchanged — non-owner member still exists and is not an owner
         Assert.True(_env.Read(db => db.Members.Any(m => m.UserId == nonOwnerMember && !m.IsOwner)));
 
         // No audit entry for the stale removal
         var auditCountAfter = _env.Read(db => db.AuditEntries.Count());
         Assert.Equal(auditCountBefore, auditCountAfter);
+    }
+
+    private TenantMembershipService CreateMembershipServiceWithContext(TenantDbContext db)
+    {
+        var tenantRepo = new TenantRepository(db);
+        var memberRepo = new TenantMemberRepository(db);
+        var auditRepo = new TenantAuditRepository(db);
+        var auditRecorder = new TenantAuditRecorder(auditRepo, _env.Actor, _env.Time);
+        var unitOfWork = new TenantUnitOfWork(db, NullLogger<TenantUnitOfWork>.Instance);
+        var handlerServices = new ServiceCollection().BuildServiceProvider();
+        var publisher = new TenantEventPublisher(handlerServices, NullLogger<TenantEventPublisher>.Instance);
+
+        return new TenantMembershipService(
+            tenantRepo, memberRepo, auditRecorder, unitOfWork, publisher,
+            _env.Guard, _env.PlatformAccess, _env.Actor, _env.Time);
+    }
+
+    private TenantMembershipService CreateMembershipServiceWithDecoratedUow(TenantDbContext db, ITenantUnitOfWork decoratedUow)
+    {
+        var tenantRepo = new TenantRepository(db);
+        var memberRepo = new TenantMemberRepository(db);
+        var auditRepo = new TenantAuditRepository(db);
+        var auditRecorder = new TenantAuditRecorder(auditRepo, _env.Actor, _env.Time);
+        var handlerServices = new ServiceCollection().BuildServiceProvider();
+        var publisher = new TenantEventPublisher(handlerServices, NullLogger<TenantEventPublisher>.Instance);
+
+        return new TenantMembershipService(
+            tenantRepo, memberRepo, auditRecorder, decoratedUow, publisher,
+            _env.Guard, _env.PlatformAccess, _env.Actor, _env.Time);
+    }
+
+    private sealed class PendingSaveUnitOfWorkDecorator : ITenantUnitOfWork
+    {
+        private readonly ITenantUnitOfWork _inner;
+        private readonly Func<CancellationToken, Task>? _beforeSave;
+
+        public PendingSaveUnitOfWorkDecorator(ITenantUnitOfWork inner, Func<CancellationToken, Task>? beforeSave = null)
+        {
+            _inner = inner;
+            _beforeSave = beforeSave;
+        }
+
+        public async Task<SaveOutcome> SaveAsync(CancellationToken ct = default)
+        {
+            if (_beforeSave is not null)
+                await _beforeSave(ct);
+            return await _inner.SaveAsync(ct);
+        }
     }
 
     [Fact]

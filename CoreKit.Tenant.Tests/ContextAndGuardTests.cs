@@ -171,12 +171,12 @@ public sealed class TenantAccessGuardTests
     }
 
     [Fact]
-    public void Bound_IsNeverPlatformScope_EvenForAdmins()
+    public void PlatformAdmin_BoundToTenant_CanStillDoPlatformWork()
     {
         _actor.IsPlatformAdmin = true;
         _current.Set(Guid.NewGuid());
 
-        Assert.Equal(TenantErrors.PlatformOnly, _guard.EnsurePlatformScope());
+        Assert.Null(_guard.EnsurePlatformScope());
         Assert.Equal(TenantErrors.CrossTenantAccess, _guard.EnsureCanAccess(Guid.NewGuid()));
     }
 

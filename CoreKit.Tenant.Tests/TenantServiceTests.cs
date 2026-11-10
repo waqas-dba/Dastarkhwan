@@ -150,12 +150,12 @@ public sealed class TenantServiceCreateTests : IDisposable
             TenantErrorKind.Validation);
 
     [Fact]
-    public async Task Create_IsPlatformOnly_ForTenantBoundCallers()
+    public async Task Create_WorksWithTenantBound_WhenPlatformAccessGranted()
     {
         using var _ = _env.CurrentTenant.Change(Guid.NewGuid());
 
-        ResultAssert.Fails(
-            await Svc.CreateAsync(new CreateTenantRequest { Name = "Acme" }), TenantErrorKind.Forbidden, "tenant.platform_only");
+        var dto = ResultAssert.Ok(await Svc.CreateAsync(new CreateTenantRequest { Name = "Acme" }));
+        Assert.Equal("Acme", dto.Name);
     }
 
     [Fact]
@@ -471,9 +471,8 @@ public sealed class TenantServiceStatusTests : IDisposable
         _env.Actor.IsPlatformAdmin = true;
         using var _ = _env.CurrentTenant.Change(tenant.Id);
 
-        ResultAssert.Fails(
-            await Svc.SuspendAsync(tenant.Id, new ChangeTenantStatusRequest()), TenantErrorKind.Forbidden);
-        Assert.Equal(TenantStatus.Active, _env.Read(db => db.Tenants.Single(t => t.Id == tenant.Id)).Status);
+        ResultAssert.Ok(await Svc.SuspendAsync(tenant.Id, new ChangeTenantStatusRequest()));
+        Assert.Equal(TenantStatus.Suspended, _env.Read(db => db.Tenants.Single(t => t.Id == tenant.Id)).Status);
     }
 
     [Fact]
@@ -532,13 +531,13 @@ public sealed class TenantServiceStatusTests : IDisposable
         => ResultAssert.Fails(await Svc.DeleteAsync(Guid.NewGuid()), TenantErrorKind.NotFound);
 
     [Fact]
-    public async Task Delete_IsPlatformOnly()
+    public async Task Delete_WorksWithTenantBound_WhenPlatformAccessGranted()
     {
         var tenant = _env.AddTenant(status: TenantStatus.Archived);
         using var _ = _env.CurrentTenant.Change(tenant.Id);
 
-        ResultAssert.Fails(await Svc.DeleteAsync(tenant.Id), TenantErrorKind.Forbidden);
-        Assert.Single(_env.Read(db => db.Tenants.ToList()));
+        ResultAssert.Ok(await Svc.DeleteAsync(tenant.Id));
+        Assert.Empty(_env.Read(db => db.Tenants.ToList()));
     }
 
     [Fact]
@@ -663,10 +662,10 @@ public sealed class TenantServiceReadTests : IDisposable
     }
 
     [Fact]
-    public async Task List_IsPlatformOnly()
+    public async Task List_WorksWithTenantBound_WhenPlatformAccessGranted()
     {
         using var _ = _env.CurrentTenant.Change(Guid.NewGuid());
 
-        ResultAssert.Fails(await Svc.ListAsync(new TenantListQuery()), TenantErrorKind.Forbidden);
+        ResultAssert.Ok(await Svc.ListAsync(new TenantListQuery()));
     }
 }

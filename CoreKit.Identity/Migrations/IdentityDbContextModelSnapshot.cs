@@ -99,8 +99,14 @@ namespace CoreKit.Identity.Migrations
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("FamilyId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("RevokedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RevokedReason")
+                        .HasColumnType("text");
 
                     b.Property<string>("TokenHash")
                         .IsRequired()
@@ -207,6 +213,9 @@ namespace CoreKit.Identity.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<int>("SecurityVersion")
+                        .HasColumnType("integer");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");

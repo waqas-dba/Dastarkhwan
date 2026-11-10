@@ -98,13 +98,19 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
 
     public void Dispose() => _env.Dispose();
 
-    private static DefaultHttpContext Request(Guid? claim = null, string? header = null)
+    private static DefaultHttpContext Request(Guid? claim = null, string? header = null, Guid? userId = null)
     {
         var context = new DefaultHttpContext();
+        var claims = new List<Claim>();
 
         if (claim is { } id)
-            context.User = new ClaimsPrincipal(
-                new ClaimsIdentity(new[] { new Claim(TenantClaimTypes.TenantId, id.ToString()) }, "test"));
+            claims.Add(new Claim(TenantClaimTypes.TenantId, id.ToString()));
+
+        if (userId is { } uid)
+            claims.Add(new Claim("sub", uid.ToString()));
+
+        if (claims.Count > 0)
+            context.User = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
 
         if (header is not null)
             context.Request.Headers["X-Tenant-Id"] = header;
@@ -115,11 +121,13 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
     private async Task<(DefaultHttpContext Context, bool NextCalled, string Body)> RunAsync(DefaultHttpContext context)
     {
         var nextCalled = false;
-        var middleware = new TenantResolutionMiddleware(_ =>
-        {
-            nextCalled = true;
-            return Task.CompletedTask;
-        });
+        var middleware = new TenantResolutionMiddleware(
+            _ =>
+            {
+                nextCalled = true;
+                return Task.CompletedTask;
+            },
+            new TenantMembershipReader(_env.Members));
 
         var options = Options.Create(_env.Config);
         var strategies = new ITenantResolutionStrategy[]
@@ -180,7 +188,9 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
         using var other = new TestEnv();
         other.Config.Resolution.TrustHeader = true;
         var bySlugTenant = other.AddTenant("Shop", "shop");
-        var middleware = new TenantResolutionMiddleware(_ => Task.CompletedTask);
+        var middleware = new TenantResolutionMiddleware(
+            _ => Task.CompletedTask,
+            new TenantMembershipReader(other.Members));
         var options = Options.Create(other.Config);
 
         await middleware.InvokeAsync(
@@ -269,7 +279,8 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
     public async Task ActiveMember_WithValidToken_CanAccessTenant()
     {
         var tenant = _env.AddTenant();
-        var user = _env.AddMember(tenant.Id);
+        var user = Guid.NewGuid();
+        _env.AddMember(tenant.Id, user);
 
         var run = await RunAsync(Request(claim: tenant.Id));
 
@@ -288,7 +299,7 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
         _env.Seed(db => db.Members.Remove(
             db.Members.FirstOrDefault(m => m.TenantId == tenant.Id && m.UserId == user)!));
 
-        var run = await RunAsync(Request(claim: tenant.Id));
+        var run = await RunAsync(Request(claim: tenant.Id, userId: user));
 
         Assert.False(run.NextCalled);
         Assert.Equal(403, run.Context.Response.StatusCode);
@@ -302,7 +313,7 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
         var tenant = _env.AddTenant();
         var user = Guid.NewGuid(); // Never added as a member
 
-        var run = await RunAsync(Request(claim: tenant.Id));
+        var run = await RunAsync(Request(claim: tenant.Id, userId: user));
 
         Assert.False(run.NextCalled);
         Assert.Equal(403, run.Context.Response.StatusCode);
@@ -320,7 +331,11 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
         // that would return null (simulating lookup failure)
         var context = new DefaultHttpContext();
         context.User = new ClaimsPrincipal(
-            new ClaimsIdentity(new[] { new Claim(TenantClaimTypes.TenantId, tenant.Id.ToString()) }, "test"));
+            new ClaimsIdentity(new[]
+            {
+                new Claim(TenantClaimTypes.TenantId, tenant.Id.ToString()),
+                new Claim("sub", user.ToString())
+            }, "test"));
 
         var nextCalled = false;
         var middleware = new TenantResolutionMiddleware(_ =>
@@ -350,8 +365,8 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
 /// <summary>Returns null for every membership lookup, simulating a lookup failure.</summary>
 internal sealed class NullMembershipReader : ITenantMembershipReader
 {
-    public Task<TenantMember?> FindAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
-        => Task.FromResult<TenantMember?>(null);
+    public Task<TenantMemberInfo?> FindAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
+        => Task.FromResult<TenantMemberInfo?>(null);
 
     public Task<TenantMember?> FindForUpdateAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
         => Task.FromResult<TenantMember?>(null);

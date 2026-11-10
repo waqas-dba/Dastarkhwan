@@ -1,4 +1,6 @@
-﻿namespace CoreKit.Tenant.Tests;
+﻿using Microsoft.Extensions.DependencyInjection;
+
+namespace CoreKit.Tenant.Tests;
 
 public sealed class TenantSettingsServiceTests : IDisposable
 {

@@ -13,5 +13,5 @@ public interface ICurrentUserService : ICurrentUser
 
     IReadOnlyCollection<string> Roles { get; }
 
-    IReadOnlyCollection<string> Permissions { get; }
+    new IReadOnlyCollection<string> Permissions { get; }
 }

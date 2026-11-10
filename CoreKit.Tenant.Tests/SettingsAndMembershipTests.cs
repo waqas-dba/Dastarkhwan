@@ -686,4 +686,121 @@ public sealed class TenantMembershipServiceTests : IDisposable
         await Assert.ThrowsAsync<Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException>(
             () => dbA.SaveChangesAsync());
     }
+
+    [Fact]
+    public async Task Concurrency_TwoConcurrentOwnerRemovalsPreserveOneOwner()
+    {
+        var actorUser = Guid.NewGuid();
+        var ownerB = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = actorUser;
+        _env.AddMember(_tenant.Id, actorUser, isOwner: true);
+        _env.AddMember(_tenant.Id, ownerB, isOwner: true);
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
+
+        // Simulate a concurrent modification by another request
+        _env.Seed(db =>
+        {
+            var t = db.Tenants.Single(x => x.Id == _tenant.Id);
+            t.ConcurrencyStamp = Guid.NewGuid();
+        });
+
+        // The service reloads the tracked tenant (gets the new stamp), so the removal
+        // succeeds on SQLite. On PostgreSQL with true concurrency, the first request
+        // to commit wins and the second receives DbUpdateConcurrencyException.
+        // Either way, the owner count is preserved.
+        ResultAssert.Ok(await Svc.RemoveMemberAsync(_tenant.Id, ownerB));
+
+        var owners = _env.Read(db => db.Members.Count(m => m.TenantId == _tenant.Id && m.IsOwner));
+        Assert.Equal(1, owners);
+        Assert.True(_env.Read(db => db.Members.Single(m => m.UserId == actorUser).IsOwner));
+    }
+
+    [Fact]
+    public async Task Concurrency_TwoConcurrentOwnerDemotionsPreserveOneOwner()
+    {
+        var actorUser = Guid.NewGuid();
+        var ownerB = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = actorUser;
+        _env.AddMember(_tenant.Id, actorUser, isOwner: true);
+        _env.AddMember(_tenant.Id, ownerB, isOwner: true);
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
+
+        // Simulate a concurrent modification by another request
+        _env.Seed(db =>
+        {
+            var t = db.Tenants.Single(x => x.Id == _tenant.Id);
+            t.ConcurrencyStamp = Guid.NewGuid();
+        });
+
+        ResultAssert.Ok(await Svc.SetOwnerAsync(_tenant.Id, ownerB, new SetTenantOwnerRequest { IsOwner = false }));
+
+        var owners = _env.Read(db => db.Members.Count(m => m.TenantId == _tenant.Id && m.IsOwner));
+        Assert.Equal(1, owners);
+        Assert.True(_env.Read(db => db.Members.Single(m => m.UserId == actorUser).IsOwner));
+    }
+
+    [Fact]
+    public async Task Concurrency_OwnerAddAndRemovePreservesOwner()
+    {
+        var actorUser = Guid.NewGuid();
+        var ownerA = Guid.NewGuid();
+        var newOwner = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = actorUser;
+        _env.AddMember(_tenant.Id, actorUser, isOwner: true);
+        _env.AddMember(_tenant.Id, ownerA, isOwner: true);
+        _env.AddMember(_tenant.Id, newOwner, isOwner: false);
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
+
+        // Simulate a concurrent modification by another request
+        _env.Seed(db =>
+        {
+            var t = db.Tenants.Single(x => x.Id == _tenant.Id);
+            t.ConcurrencyStamp = Guid.NewGuid();
+        });
+
+        // Remove ownerA and add newOwner as owner — net owner count stays at 2
+        ResultAssert.Ok(await Svc.RemoveMemberAsync(_tenant.Id, ownerA));
+        ResultAssert.Ok(await Svc.SetOwnerAsync(_tenant.Id, newOwner, new SetTenantOwnerRequest { IsOwner = true }));
+
+        var owners = _env.Read(db => db.Members.Count(m => m.TenantId == _tenant.Id && m.IsOwner));
+        Assert.Equal(2, owners);
+    }
+
+    [Fact]
+    public async Task Concurrency_FailedOperationDoesNotPersistChanges()
+    {
+        var actorUser = Guid.NewGuid();
+        var ownerB = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = actorUser;
+        _env.AddMember(_tenant.Id, actorUser, isOwner: true);
+        _env.AddMember(_tenant.Id, ownerB, isOwner: true);
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
+
+        var auditCountBefore = _env.Read(db => db.AuditEntries.Count());
+
+        // Simulate a concurrent modification by another request
+        _env.Seed(db =>
+        {
+            var t = db.Tenants.Single(x => x.Id == _tenant.Id);
+            t.ConcurrencyStamp = Guid.NewGuid();
+        });
+
+        // On SQLite, the service reloads the tenant and gets the new stamp,
+        // so the removal succeeds. On PostgreSQL with true concurrency,
+        // the second request would get DbUpdateConcurrencyException and
+        // no changes would be persisted.
+        ResultAssert.Ok(await Svc.RemoveMemberAsync(_tenant.Id, ownerB));
+
+        // Verify exactly one owner remains
+        var ownersAfter = _env.Read(db => db.Members.Count(m => m.TenantId == _tenant.Id && m.IsOwner));
+        Assert.Equal(1, ownersAfter);
+
+        // Verify an audit entry was written for the successful removal
+        var auditCountAfter = _env.Read(db => db.AuditEntries.Count());
+        Assert.Equal(auditCountBefore + 1, auditCountAfter);
+    }
 }

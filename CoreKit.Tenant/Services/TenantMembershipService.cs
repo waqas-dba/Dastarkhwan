@@ -141,10 +141,8 @@ public sealed class TenantMembershipService : ITenantMembershipService
                 return TenantErrors.Forbidden("An identified actor is required to remove an owner.");
         }
 
-        if (member.IsOwner && await _members.CountOwnersAsync(tenantId, ct) <= 1)
-            return TenantErrors.Conflict("The last owner of a tenant cannot be removed.");
-
-        // F3: For owner removal, fetch the tenant tracked for optimistic concurrency.
+        // F3: Load and track the tenant BEFORE the owner-count decision, so the
+        // concurrency stamp is captured before any ownership decision is made.
         TenantEntity? tenant = null;
         if (member.IsOwner)
         {
@@ -152,6 +150,9 @@ public sealed class TenantMembershipService : ITenantMembershipService
             if (tenant is null)
                 return TenantErrors.NotFound("Tenant");
         }
+
+        if (member.IsOwner && await _members.CountOwnersAsync(tenantId, ct) <= 1)
+            return TenantErrors.Conflict("The last owner of a tenant cannot be removed.");
 
         var wasDefault = member.IsDefault;
 
@@ -187,11 +188,13 @@ public sealed class TenantMembershipService : ITenantMembershipService
         if (_guard.EnsureCanAccess(tenantId) is { } denied)
             return denied;
 
-        var tenant = await _tenants.FindByIdAsync(tenantId, ct);
-        if (tenant is null)
+        // F3: Load and track the tenant BEFORE the owner-count decision, so the
+        // concurrency stamp is captured before any ownership decision is made.
+        var trackedTenant = await _tenants.FindForUpdateAsync(tenantId, ct);
+        if (trackedTenant is null)
             return TenantErrors.NotFound("Tenant");
 
-        if (tenant.Status == TenantStatus.Archived)
+        if (trackedTenant.Status == TenantStatus.Archived)
             return TenantErrors.ArchivedReadOnly;
 
         var member = await _members.FindForUpdateAsync(tenantId, userId, ct);
@@ -220,10 +223,6 @@ public sealed class TenantMembershipService : ITenantMembershipService
         if (!request.IsOwner && await _members.CountOwnersAsync(tenantId, ct) <= 1)
             return TenantErrors.Conflict("The last owner of a tenant cannot lose ownership.");
 
-        // F3: Concurrency-safe ownership transition — update stamp in same SaveChanges.
-        var trackedTenant = await _tenants.FindForUpdateAsync(tenantId, ct);
-        if (trackedTenant is null)
-            return TenantErrors.NotFound("Tenant");
         member.IsOwner = request.IsOwner;
         trackedTenant.ConcurrencyStamp = Guid.NewGuid();
         _audit.Record(tenantId, TenantAuditActions.OwnerChanged, $"user: {userId}; owner: {request.IsOwner}");

@@ -26,6 +26,8 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
 
         builder.Property(x => x.LockoutEnd);
 
+        builder.Property(x => x.SecurityVersion).IsRequired();
+
         // The database itself refuses a second account with the same email,
         // even if two requests race past the application check.
         builder.HasIndex(x => x.NormalizedEmail)

@@ -43,4 +43,13 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
         => _db.RefreshTokens
             .Where(t => t.UserId == userId && t.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, (DateTime?)now), ct);
+
+    public async Task<bool> HasActiveTokenInFamilyAsync(Guid familyId, DateTime now, CancellationToken ct = default)
+        => await _db.RefreshTokens
+            .AnyAsync(t => t.FamilyId == familyId && t.RevokedAt == null && t.ExpiresAt > now, ct);
+
+    public async Task<int> RevokeAllInFamilyAsync(Guid familyId, DateTime now, CancellationToken ct = default)
+        => await _db.RefreshTokens
+            .Where(t => t.FamilyId == familyId && t.RevokedAt == null)
+            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, (DateTime?)now), ct);
 }

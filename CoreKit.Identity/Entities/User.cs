@@ -31,6 +31,10 @@ public sealed class User
     /// <summary>Lockout end time. When set and in the future, login is refused.</summary>
     public DateTime? LockoutEnd { get; set; }
 
+    /// <summary>Security version. Increments on password change, email verification revocation, account deactivation.
+    /// Every authenticated request validates this against the JWT claim. Mismatch = revoked.</summary>
+    public int SecurityVersion { get; set; }
+
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
 
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();

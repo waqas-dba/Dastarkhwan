@@ -18,6 +18,10 @@ public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<Refresh
 
         builder.Property(x => x.TokenHash).IsRequired().HasMaxLength(128);
 
+        builder.Property(x => x.FamilyId).IsRequired();
+
+        builder.Property(x => x.RevokedReason);
+
         builder.HasOne(x => x.User)
             .WithMany(x => x.RefreshTokens)
             .HasForeignKey(x => x.UserId)

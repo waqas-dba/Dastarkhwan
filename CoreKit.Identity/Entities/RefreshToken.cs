@@ -19,6 +19,14 @@ public sealed class RefreshToken
 
     public DateTime CreatedAt { get; set; }
 
+    /// <summary>Family identifier. All tokens in a rotation chain share the same family ID.
+    /// Rotating a token revokes the old one (RevokedAt set) and creates a new one with the same FamilyId.
+    /// Reuse of a revoked token from a family revokes the entire family.</summary>
+    public Guid FamilyId { get; set; }
+
+    /// <summary>Reason for revocation. Null while the token is active.</summary>
+    public string? RevokedReason { get; set; }
+
     public User User { get; set; } = null!;
 
     /// <summary>True while the token has neither been revoked nor expired.</summary>

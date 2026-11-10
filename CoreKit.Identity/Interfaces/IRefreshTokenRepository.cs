@@ -19,4 +19,10 @@ public interface IRefreshTokenRepository
 
     /// <summary>Ends every session of a user in one statement.</summary>
     Task<int> RevokeAllForUserAsync(Guid userId, DateTime now, CancellationToken ct = default);
+
+    /// <summary>Returns true if any token in the family is unrevoked and not expired.</summary>
+    Task<bool> HasActiveTokenInFamilyAsync(Guid familyId, DateTime now, CancellationToken ct = default);
+
+    /// <summary>Revokes every unrevoked token in the family.</summary>
+    Task<int> RevokeAllInFamilyAsync(Guid familyId, DateTime now, CancellationToken ct = default);
 }

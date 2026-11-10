@@ -26,7 +26,7 @@ internal static class ModuleBoundaryMatrix
             ["CoreKit.SharedKernel"] = Array.Empty<string>(),
             ["CoreKit.Identity"] = new[] { "CoreKit.SharedKernel" },
             ["CoreKit.Access"] = Array.Empty<string>(),
-            ["CoreKit.Tenant"] = new[] { "CoreKit.SharedKernel", "CoreKit.Identity" },
+            ["CoreKit.Tenant"] = new[] { "CoreKit.SharedKernel" },
         };
 
     /// <summary>
@@ -40,7 +40,6 @@ internal static class ModuleBoundaryMatrix
             ["CoreKit.Identity/CoreKit.Identity.csproj"] = new[] { "CoreKit.SharedKernel/CoreKit.SharedKernel.csproj" },
             ["CoreKit.Tenant/CoreKit.Tenant.csproj"] = new[]
             {
-                "CoreKit.Identity/CoreKit.Identity.csproj",
                 "CoreKit.SharedKernel/CoreKit.SharedKernel.csproj",
             },
             ["CoreKit.SharedKernel/CoreKit.SharedKernel.csproj"] = Array.Empty<string>(),
@@ -79,36 +78,4 @@ internal static class ModuleBoundaryMatrix
     public static readonly IReadOnlyList<string> TestProjects =
         SolutionInventory.ExpectedTestAssemblyNames.Values.ToList();
 
-    /// <summary>
-    /// D-015 temporary exception: Tenant -> Identity is the only documented temporary
-    /// production-module exception. It must be removed during S4.3 (Tenant decoupling).
-    /// This sentinel test confirms the exception remains until S4.3 is implemented.
-    /// Do not implement S4.3 here.
-    /// </summary>
-    public const string D015_TenantIdentity_TemporaryException =
-        "Tenant -> Identity direct dependency is temporary under D-015; remove during S4.3";
-
-    /// <summary>
-    /// Asserts that the D-015 Tenant -> Identity exception is still present in both
-    /// allowlists. This is a sentinel: if S4.3 removes the exception, this test will
-    /// fail and the matrix should be updated to remove Tenant -> Identity.
-    /// </summary>
-    public static void AssertD015TenantIdentityExceptionPresent()
-    {
-        // Compiled-assembly allowlist: Tenant references Identity
-        var tenantAllowed = CompiledAssemblyAllowlist["CoreKit.Tenant"];
-        if (!tenantAllowed.Contains("CoreKit.Identity"))
-            throw new InvalidOperationException(
-                "D-015 sentinel failed: CoreKit.Tenant no longer references CoreKit.Identity " +
-                "in CompiledAssemblyAllowlist. If S4.3 has been implemented, remove this sentinel. " +
-                "Otherwise, restore the exception.");
-
-        // Project-reference allowlist: Tenant.csproj references Identity.csproj
-        var tenantProjectAllowed = ProjectReferenceAllowlist["CoreKit.Tenant/CoreKit.Tenant.csproj"];
-        if (!tenantProjectAllowed.Contains("CoreKit.Identity/CoreKit.Identity.csproj"))
-            throw new InvalidOperationException(
-                "D-015 sentinel failed: CoreKit.Tenant.csproj no longer references " +
-                "CoreKit.Identity.csproj in ProjectReferenceAllowlist. If S4.3 has been " +
-                "implemented, remove this sentinel. Otherwise, restore the exception.");
-    }
 }

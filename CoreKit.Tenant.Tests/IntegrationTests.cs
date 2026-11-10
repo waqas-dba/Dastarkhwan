@@ -1,5 +1,4 @@
-﻿using CoreKit.Identity.Entities;
-using CoreKit.Tenant.Extensions;
+﻿using CoreKit.Tenant.Extensions;
 using CoreKit.Tenant.Integration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +13,10 @@ public sealed class TenantClaimsContributorTests : IDisposable
 
     private async Task<string?> ClaimFor(Guid userId)
     {
-        var claims = await new TenantClaimsContributor(_env.Members).GetClaimsAsync(new User { Id = userId });
+        var claims = await new TenantClaimsContributor(_env.Members).GetClaimsAsync(
+            userId,
+            Array.Empty<string>(),
+            Array.Empty<string>());
 
         return claims.SingleOrDefault(c => c.Type == TenantClaimTypes.TenantId)?.Value;
     }
@@ -100,23 +102,23 @@ public sealed class TenantClaimsContributorTests : IDisposable
     }
 }
 
-public sealed class IdentityTenantActorTests
+public sealed class TenantActorTests
 {
     [Fact]
-    public void WithoutIdentity_ThereIsNoUserAndNoPlatformAccess()
+    public void WithoutACurrentUser_ThereIsNoUserAndNoPlatformAccess()
     {
-        var actor = new IdentityTenantActor();
+        var actor = new TenantActor();
 
         Assert.Null(actor.UserId);
         Assert.False(actor.IsPlatformAdmin);
     }
 
     [Fact]
-    public void TakesTheUserFromIdentity()
+    public void TakesTheUserFromTheSharedKernel()
     {
         var id = Guid.NewGuid();
 
-        Assert.Equal(id, new IdentityTenantActor(new FakeCurrentUserService { UserId = id }).UserId);
+        Assert.Equal(id, new TenantActor(new FakeCurrentUserService { UserId = id }).UserId);
     }
 
     [Fact]
@@ -128,8 +130,8 @@ public sealed class IdentityTenantActorTests
             Permissions = new[] { TenantPermissionNames.Update, TenantPermissionNames.Read }
         };
 
-        Assert.True(new IdentityTenantActor(withPermission).IsPlatformAdmin);
-        Assert.False(new IdentityTenantActor(withOthers).IsPlatformAdmin);
+        Assert.True(new TenantActor(withPermission).IsPlatformAdmin);
+        Assert.False(new TenantActor(withOthers).IsPlatformAdmin);
     }
 }
 

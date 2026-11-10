@@ -410,14 +410,6 @@ public sealed class ProjectReferenceBoundaryTests
             $"{string.Join(Environment.NewLine, violations)}");
     }
 
-    [Fact]
-    public void D015_tenant_identity_exception_remains_until_S4_3()
-    {
-        // Sentinel: the D-015 Tenant -> Identity exception must remain in both allowlists.
-        // If S4.3 (Tenant decoupling) has been implemented, remove this exception and this test.
-        ModuleBoundaryMatrix.AssertD015TenantIdentityExceptionPresent();
-    }
-
     // ------------------------------------------------------------------
     // MemberData sources
     // ------------------------------------------------------------------

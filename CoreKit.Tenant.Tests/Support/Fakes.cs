@@ -1,6 +1,4 @@
-﻿using CoreKit.Identity.Services;
-
-namespace CoreKit.Tenant.Tests.Support;
+﻿namespace CoreKit.Tenant.Tests.Support;
 
 public sealed class FixedTimeProvider : TimeProvider
 {
@@ -20,14 +18,10 @@ public sealed class FakeTenantActor : ITenantActor
     public bool IsPlatformAdmin { get; set; }
 }
 
-/// <summary>Stands in for Identity's current user. If your ICurrentUserService has other members, add them here.</summary>
-public sealed class FakeCurrentUserService : ICurrentUserService
+/// <summary>Stands in for the host-provided current user from the shared kernel.</summary>
+public sealed class FakeCurrentUserService : ICurrentUser
 {
     public Guid? UserId { get; set; }
-
-    public string? Email { get; set; }
-
-    public IReadOnlyCollection<string> Roles { get; set; } = Array.Empty<string>();
 
     public IReadOnlyCollection<string> Permissions { get; set; } = Array.Empty<string>();
 

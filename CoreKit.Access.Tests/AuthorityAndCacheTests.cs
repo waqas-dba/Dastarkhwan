@@ -446,6 +446,9 @@ public sealed class AccessCacheConcurrencyTests
         // No exceptions from concurrent access.
         Assert.Empty(exceptions);
 
+        // Generation metadata stays bounded even while many invalidations race.
+        Assert.True(cache.GenerationEntryCount <= 50);
+
         // Cache still works after stress.
         var token = cache.Begin(scope, users[0]);
         cache.Set(scope, users[0], Access("final"), token);
@@ -454,7 +457,38 @@ public sealed class AccessCacheConcurrencyTests
     }
 
     [Fact]
-    public async Task ConcurrentSetWithOldToken_RejectedAfterInvalidation()
+    public async Task ReaderThatStartedBeforeInvalidation_CannotPublishItsResult()
+    {
+        var cache = Cache();
+        var user = Guid.NewGuid();
+        var readerHasToken = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var invalidationCompleted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // The reader takes its generation token, then waits until the invalidation has completed.
+        var token = cache.Begin(Scope, user);
+        var reader = Task.Run(async () =>
+        {
+            readerHasToken.SetResult();
+            await invalidationCompleted.Task;
+            cache.Set(Scope, user, Access("stale"), token);
+        });
+
+        await readerHasToken.Task;
+        cache.InvalidateScope(Scope);
+        invalidationCompleted.SetResult();
+        await reader;
+
+        // A lookup that starts now belongs to the new generation, so it cannot see the stale result.
+        Assert.False(cache.TryGet(Scope, user, out _));
+
+        var freshToken = cache.Begin(Scope, user);
+        cache.Set(Scope, user, Access("fresh"), freshToken);
+        Assert.True(cache.TryGet(Scope, user, out var fresh));
+        Assert.True(fresh.Has("fresh"));
+    }
+
+    [Fact]
+    public void ConcurrentSetWithOldToken_RejectedAfterInvalidation()
     {
         var cache = Cache();
         var user = Guid.NewGuid();
@@ -480,7 +514,7 @@ public sealed class AccessCacheConcurrencyTests
     }
 
     [Fact]
-    public async Task ConcurrentSetWithOldToken_StoredBeforeInvalidation_Succeeds()
+    public void ConcurrentSetWithOldToken_StoredBeforeInvalidation_Succeeds()
     {
         var cache = Cache();
         var user = Guid.NewGuid();

@@ -55,25 +55,44 @@ public sealed class TenantMembershipService : ITenantMembershipService
         if (_guard.EnsureCanAccess(tenantId) is { } denied)
             return denied;
 
-        if (request.IsOwner && !_platform.IsGranted)
+        // F1: Require an identified actor for ownership assignment.
+        // F2: Prevent self-promotion to owner.
+        if (request.IsOwner)
         {
-            if (_actor.UserId is null)
-                return TenantErrors.Forbidden("Only a tenant owner or platform administrator can assign ownership.");
-            var caller = await _members.FindAsync(tenantId, _actor.UserId.Value, ct);
-            if (caller is null || !caller.IsOwner)
-                return TenantErrors.Forbidden("Only a tenant owner or platform administrator can assign ownership.");
+            if (_actor.UserId is null || _actor.UserId == Guid.Empty)
+                return TenantErrors.Forbidden("An identified actor is required to assign ownership.");
+            if (_actor.UserId == request.UserId)
+                return TenantErrors.Forbidden("You cannot promote yourself to owner.");
+            if (!_platform.IsGranted)
+            {
+                var caller = await _members.FindAsync(tenantId, _actor.UserId.Value, ct);
+                if (caller is null || !caller.IsOwner)
+                    return TenantErrors.Forbidden("Only a tenant owner or platform administrator can assign ownership.");
+            }
         }
 
         if (request.UserId == Guid.Empty)
             return TenantErrors.Validation("A user id is required.");
 
-        var tenant = await _tenants.FindByIdAsync(tenantId, ct);
-
-        if (tenant is null)
+        // F3: For ownership changes, fetch the tenant tracked for optimistic concurrency.
+        TenantEntity? tenant = null;
+        if (request.IsOwner)
+        {
+            tenant = await _tenants.FindForUpdateAsync(tenantId, ct);
+            if (tenant is null)
+                return TenantErrors.NotFound("Tenant");
+            if (tenant.Status == TenantStatus.Archived)
+                return TenantErrors.ArchivedReadOnly;
+        }
+        else if (await _tenants.FindByIdAsync(tenantId, ct) is { } existingTenant)
+        {
+            if (existingTenant.Status == TenantStatus.Archived)
+                return TenantErrors.ArchivedReadOnly;
+        }
+        else
+        {
             return TenantErrors.NotFound("Tenant");
-
-        if (tenant.Status == TenantStatus.Archived)
-            return TenantErrors.ArchivedReadOnly;
+        }
 
         if (await _members.FindAsync(tenantId, request.UserId, ct) is not null)
             return TenantErrors.Conflict("The user is already a member of this tenant.");
@@ -91,6 +110,11 @@ public sealed class TenantMembershipService : ITenantMembershipService
 
         _members.Add(member);
         _audit.Record(tenantId, TenantAuditActions.MemberAdded, request.IsOwner ? $"user: {request.UserId}; owner" : $"user: {request.UserId}");
+
+        if (request.IsOwner)
+        {
+            tenant!.ConcurrencyStamp = Guid.NewGuid();
+        }
 
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
             return saveError;
@@ -110,8 +134,24 @@ public sealed class TenantMembershipService : ITenantMembershipService
         if (member is null)
             return TenantErrors.NotFound("Member");
 
+        // F1: Require an identified actor for owner removal.
+        if (member.IsOwner)
+        {
+            if (_actor.UserId is null || _actor.UserId == Guid.Empty)
+                return TenantErrors.Forbidden("An identified actor is required to remove an owner.");
+        }
+
         if (member.IsOwner && await _members.CountOwnersAsync(tenantId, ct) <= 1)
             return TenantErrors.Conflict("The last owner of a tenant cannot be removed.");
+
+        // F3: For owner removal, fetch the tenant tracked for optimistic concurrency.
+        TenantEntity? tenant = null;
+        if (member.IsOwner)
+        {
+            tenant = await _tenants.FindForUpdateAsync(tenantId, ct);
+            if (tenant is null)
+                return TenantErrors.NotFound("Tenant");
+        }
 
         var wasDefault = member.IsDefault;
 
@@ -128,6 +168,11 @@ public sealed class TenantMembershipService : ITenantMembershipService
 
         _audit.Record(tenantId, TenantAuditActions.MemberRemoved, $"user: {userId}");
 
+        if (member.IsOwner)
+        {
+            tenant!.ConcurrencyStamp = Guid.NewGuid();
+        }
+
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
             return saveError;
 
@@ -142,17 +187,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
         if (_guard.EnsureCanAccess(tenantId) is { } denied)
             return denied;
 
-        if (!_platform.IsGranted)
-        {
-            if (_actor.UserId is null)
-                return TenantErrors.Forbidden("Only a tenant owner or platform administrator can change ownership.");
-            var caller = await _members.FindAsync(tenantId, _actor.UserId.Value, ct);
-            if (caller is null || !caller.IsOwner)
-                return TenantErrors.Forbidden("Only a tenant owner or platform administrator can change ownership.");
-        }
-
         var tenant = await _tenants.FindByIdAsync(tenantId, ct);
-
         if (tenant is null)
             return TenantErrors.NotFound("Tenant");
 
@@ -160,20 +195,37 @@ public sealed class TenantMembershipService : ITenantMembershipService
             return TenantErrors.ArchivedReadOnly;
 
         var member = await _members.FindForUpdateAsync(tenantId, userId, ct);
-
         if (member is null)
             return TenantErrors.NotFound("Member");
 
         if (member.IsOwner == request.IsOwner)
             return TenantResult.Success(TenantMapper.ToDto(member));
 
+        // F1: Require an identified actor for all ownership changes, even for platform admins.
+        if (_actor.UserId is null || _actor.UserId == Guid.Empty)
+            return TenantErrors.Forbidden("An identified actor is required to change ownership.");
+
+        // F2: Prevent self-promotion to owner.
         if (request.IsOwner && _actor.UserId == userId)
             return TenantErrors.Forbidden("You cannot promote yourself to owner.");
+
+        // F1: Only tenant owners or platform administrators can change ownership.
+        if (!_platform.IsGranted)
+        {
+            var caller = await _members.FindAsync(tenantId, _actor.UserId.Value, ct);
+            if (caller is null || !caller.IsOwner)
+                return TenantErrors.Forbidden("Only a tenant owner or platform administrator can change ownership.");
+        }
 
         if (!request.IsOwner && await _members.CountOwnersAsync(tenantId, ct) <= 1)
             return TenantErrors.Conflict("The last owner of a tenant cannot lose ownership.");
 
+        // F3: Concurrency-safe ownership transition — update stamp in same SaveChanges.
+        var trackedTenant = await _tenants.FindForUpdateAsync(tenantId, ct);
+        if (trackedTenant is null)
+            return TenantErrors.NotFound("Tenant");
         member.IsOwner = request.IsOwner;
+        trackedTenant.ConcurrencyStamp = Guid.NewGuid();
         _audit.Record(tenantId, TenantAuditActions.OwnerChanged, $"user: {userId}; owner: {request.IsOwner}");
 
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)

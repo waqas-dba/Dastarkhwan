@@ -312,7 +312,10 @@ public sealed class TenantMembershipServiceTests : IDisposable
     {
         var a = Guid.NewGuid();
         var b = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = a;
         _env.AddMember(_tenant.Id, a, isOwner: true);
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
 
         ResultAssert.Fails(await Svc.RemoveMemberAsync(_tenant.Id, a), TenantErrorKind.Conflict);
 
@@ -346,8 +349,11 @@ public sealed class TenantMembershipServiceTests : IDisposable
     {
         var a = Guid.NewGuid();
         var b = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = a;
         _env.AddMember(_tenant.Id, a, isOwner: true);
         _env.AddMember(_tenant.Id, b);
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
 
         Assert.True(ResultAssert.Ok(await Svc.SetOwnerAsync(_tenant.Id, b, new SetTenantOwnerRequest { IsOwner = true })).IsOwner);
         Assert.False(ResultAssert.Ok(await Svc.SetOwnerAsync(_tenant.Id, a, new SetTenantOwnerRequest { IsOwner = false })).IsOwner);
@@ -357,7 +363,10 @@ public sealed class TenantMembershipServiceTests : IDisposable
     public async Task SetOwner_RefusesToDemoteTheLastOwner()
     {
         var a = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = a;
         _env.AddMember(_tenant.Id, a, isOwner: true);
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
 
         ResultAssert.Fails(
             await Svc.SetOwnerAsync(_tenant.Id, a, new SetTenantOwnerRequest { IsOwner = false }), TenantErrorKind.Conflict);
@@ -474,7 +483,10 @@ public sealed class TenantMembershipServiceTests : IDisposable
     [Fact]
     public async Task Add_AllowsPlatformAdminToAddOwner()
     {
+        var platformUser = Guid.NewGuid();
         var targetUser = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = true;
+        _env.Actor.UserId = platformUser;
 
         var dto = ResultAssert.Ok(await Svc.AddMemberAsync(_tenant.Id, new AddTenantMemberRequest { UserId = targetUser, IsOwner = true }));
 
@@ -517,7 +529,10 @@ public sealed class TenantMembershipServiceTests : IDisposable
     [Fact]
     public async Task SetOwner_AllowsPromotionByPlatformAdmin()
     {
+        var platformUser = Guid.NewGuid();
         var targetUser = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = true;
+        _env.Actor.UserId = platformUser;
         _env.AddMember(_tenant.Id, targetUser);
 
         var dto = ResultAssert.Ok(await Svc.SetOwnerAsync(_tenant.Id, targetUser, new SetTenantOwnerRequest { IsOwner = true }));
@@ -555,5 +570,120 @@ public sealed class TenantMembershipServiceTests : IDisposable
             await Svc.SetOwnerAsync(_tenant.Id, user, new SetTenantOwnerRequest { IsOwner = true }),
             TenantErrorKind.Forbidden);
         Assert.False(_env.Read(db => db.Members.Single(m => m.UserId == user).IsOwner));
+    }
+
+    [Fact]
+    public async Task Add_RejectsPlatformAdminWithNullActorAsOwner()
+    {
+        _env.Actor.IsPlatformAdmin = true;
+        _env.Actor.UserId = null;
+
+        ResultAssert.Fails(
+            await Svc.AddMemberAsync(_tenant.Id, new AddTenantMemberRequest { UserId = Guid.NewGuid(), IsOwner = true }),
+            TenantErrorKind.Forbidden);
+    }
+
+    [Fact]
+    public async Task SetOwner_RejectsPlatformAdminWithNullActor()
+    {
+        _env.Actor.IsPlatformAdmin = true;
+        _env.Actor.UserId = null;
+        var targetUser = Guid.NewGuid();
+        _env.AddMember(_tenant.Id, targetUser);
+
+        ResultAssert.Fails(
+            await Svc.SetOwnerAsync(_tenant.Id, targetUser, new SetTenantOwnerRequest { IsOwner = true }),
+            TenantErrorKind.Forbidden);
+    }
+
+    [Fact]
+    public async Task Add_RejectsGuidEmptyActorAsOwner()
+    {
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = Guid.Empty;
+
+        ResultAssert.Fails(
+            await Svc.AddMemberAsync(_tenant.Id, new AddTenantMemberRequest { UserId = Guid.NewGuid(), IsOwner = true }),
+            TenantErrorKind.Forbidden);
+    }
+
+    [Fact]
+    public async Task Add_RejectsSelfAdditionAsOwner()
+    {
+        var actorUser = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = actorUser;
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
+
+        ResultAssert.Fails(
+            await Svc.AddMemberAsync(_tenant.Id, new AddTenantMemberRequest { UserId = actorUser, IsOwner = true }),
+            TenantErrorKind.Forbidden);
+    }
+
+    [Fact]
+    public async Task ConcurrencyStampUpdatedOnOwnerRemoval()
+    {
+        var ownerA = Guid.NewGuid();
+        var ownerB = Guid.NewGuid();
+        _env.AddMember(_tenant.Id, ownerA, isOwner: true);
+        _env.AddMember(_tenant.Id, ownerB, isOwner: true);
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
+
+        var stampBefore = _env.Read(db => db.Tenants.Single(t => t.Id == _tenant.Id).ConcurrencyStamp);
+
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = ownerA;
+
+        await Svc.RemoveMemberAsync(_tenant.Id, ownerB);
+
+        var stampAfter = _env.Read(db => db.Tenants.Single(t => t.Id == _tenant.Id).ConcurrencyStamp);
+        Assert.NotEqual(stampBefore, stampAfter);
+    }
+
+    [Fact]
+    public async Task ConcurrencyStampUpdatedOnOwnerPromotion()
+    {
+        var actorUser = Guid.NewGuid();
+        var ownerA = Guid.NewGuid();
+        var memberB = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = actorUser;
+        _env.AddMember(_tenant.Id, actorUser, isOwner: true);
+        _env.AddMember(_tenant.Id, ownerA, isOwner: true);
+        _env.AddMember(_tenant.Id, memberB);
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
+
+        var stampBefore = _env.Read(db => db.Tenants.Single(t => t.Id == _tenant.Id).ConcurrencyStamp);
+
+        await Svc.SetOwnerAsync(_tenant.Id, memberB, new SetTenantOwnerRequest { IsOwner = true });
+
+        var stampAfter = _env.Read(db => db.Tenants.Single(t => t.Id == _tenant.Id).ConcurrencyStamp);
+        Assert.NotEqual(stampBefore, stampAfter);
+    }
+
+    [Fact]
+    public async Task DbUpdateConcurrencyExceptionOnStaleStamp()
+    {
+        var ownerA = Guid.NewGuid();
+        var ownerB = Guid.NewGuid();
+        _env.AddMember(_tenant.Id, ownerA, isOwner: true);
+        _env.AddMember(_tenant.Id, ownerB, isOwner: true);
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
+
+        // Load tenant via context A (tracked)
+        var dbA = _env.NewContext();
+        var tenantA = await dbA.Tenants.SingleAsync(t => t.Id == _tenant.Id);
+        var originalStamp = tenantA.ConcurrencyStamp;
+
+        // Change stamp via context B (simulates concurrent modification)
+        var dbB = _env.NewContext();
+        var tenantB = await dbB.Tenants.SingleAsync(t => t.Id == _tenant.Id);
+        tenantB.ConcurrencyStamp = Guid.NewGuid();
+        await dbB.SaveChangesAsync();
+
+        // Modify tenant via context A and try to save — should fail with concurrency exception
+        tenantA.ConcurrencyStamp = Guid.NewGuid();
+        await Assert.ThrowsAsync<Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException>(
+            () => dbA.SaveChangesAsync());
     }
 }

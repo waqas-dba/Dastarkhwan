@@ -102,10 +102,10 @@ public sealed class UserRepository : IUserRepository
 
     public async Task<int> IncrementAccessFailedCountAsync(Guid userId, CancellationToken ct = default)
     {
-        await _db.Users
-            .Where(u => u.Id == userId)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(u => u.AccessFailedCount, u.AccessFailedCount + 1), ct);
+        // Database-side atomic increment: no lost increments under concurrent load.
+        await _db.Database.ExecuteSqlRawAsync(
+            "UPDATE \"Identity_Users\" SET \"AccessFailedCount\" = \"AccessFailedCount\" + 1 WHERE \"Id\" = {0}",
+            userId, ct);
 
         return await _db.Users
             .AsNoTracking()

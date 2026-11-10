@@ -1,3 +1,5 @@
+using CoreKit.Identity.Repositories;
+
 namespace CoreKit.Identity.Tests;
 
 /// <summary>

@@ -688,6 +688,95 @@ public sealed class TenantMembershipServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Remove_NonOwnerConcurrentPromotion_ReturnsConflict()
+    {
+        var actorUser = Guid.NewGuid();
+        var nonOwnerMember = Guid.NewGuid();
+        var otherOwner = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = actorUser;
+        _env.AddMember(_tenant.Id, actorUser, isOwner: true);
+        _env.AddMember(_tenant.Id, nonOwnerMember, isOwner: false);
+        _env.AddMember(_tenant.Id, otherOwner, isOwner: true);
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
+
+        // Concurrent promotion of the non-owner changes the tenant stamp
+        _env.Seed(db =>
+        {
+            var t = db.Tenants.Single(x => x.Id == _tenant.Id);
+            t.ConcurrencyStamp = Guid.NewGuid();
+        });
+
+        // Stale removal (read as non-owner, then concurrent promotion changed stamp)
+        var result = await Svc.RemoveMemberAsync(_tenant.Id, nonOwnerMember);
+
+        // Stale operation must return concurrency conflict
+        ResultAssert.Fails(result, TenantErrorKind.Conflict);
+
+        // Concurrent committed ownership change remains intact — non-owner member still exists
+        Assert.True(_env.Read(db => db.Members.Single(m => m.UserId == nonOwnerMember && !m.IsOwner).IsOwner == false));
+
+        // Tenant stamp reflects the concurrent change
+        var stampAfter = _env.Read(db => db.Tenants.Single(t => t.Id == _tenant.Id).ConcurrencyStamp);
+        Assert.NotEqual(Guid.Empty, stampAfter);
+    }
+
+    [Fact]
+    public async Task Remove_NonOwnerUpdatesTenantStamp()
+    {
+        var actorUser = Guid.NewGuid();
+        var nonOwnerMember = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = actorUser;
+        _env.AddMember(_tenant.Id, actorUser, isOwner: true);
+        _env.AddMember(_tenant.Id, nonOwnerMember, isOwner: false);
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
+
+        var stampBefore = _env.Read(db => db.Tenants.Single(t => t.Id == _tenant.Id).ConcurrencyStamp);
+
+        ResultAssert.Ok(await Svc.RemoveMemberAsync(_tenant.Id, nonOwnerMember));
+
+        var stampAfter = _env.Read(db => db.Tenants.Single(t => t.Id == _tenant.Id).ConcurrencyStamp);
+        Assert.NotEqual(stampBefore, stampAfter);
+
+        // Member is actually removed
+        Assert.False(_env.Read(db => db.Members.Any(m => m.UserId == nonOwnerMember)));
+    }
+
+    [Fact]
+    public async Task Remove_NonOwnerConcurrentPromotion_DoesNotPersistChanges()
+    {
+        var actorUser = Guid.NewGuid();
+        var nonOwnerMember = Guid.NewGuid();
+        _env.Actor.IsPlatformAdmin = false;
+        _env.Actor.UserId = actorUser;
+        _env.AddMember(_tenant.Id, actorUser, isOwner: true);
+        _env.AddMember(_tenant.Id, nonOwnerMember, isOwner: false);
+        using var _ = _env.CurrentTenant.Change(_tenant.Id);
+
+        var auditCountBefore = _env.Read(db => db.AuditEntries.Count());
+
+        // Concurrent promotion changes the stamp
+        _env.Seed(db =>
+        {
+            var t = db.Tenants.Single(x => x.Id == _tenant.Id);
+            t.ConcurrencyStamp = Guid.NewGuid();
+        });
+
+        // Stale removal must fail
+        ResultAssert.Fails(
+            await Svc.RemoveMemberAsync(_tenant.Id, nonOwnerMember),
+            TenantErrorKind.Conflict);
+
+        // Membership unchanged — non-owner member still exists
+        Assert.True(_env.Read(db => db.Members.Any(m => m.UserId == nonOwnerMember && !m.IsOwner)));
+
+        // No audit entry for the stale removal
+        var auditCountAfter = _env.Read(db => db.AuditEntries.Count());
+        Assert.Equal(auditCountBefore, auditCountAfter);
+    }
+
+    [Fact]
     public async Task Concurrency_TwoConcurrentOwnerRemovalsPreserveOneOwner()
     {
         var actorUser = Guid.NewGuid();

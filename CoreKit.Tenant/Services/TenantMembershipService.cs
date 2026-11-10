@@ -129,6 +129,15 @@ public sealed class TenantMembershipService : ITenantMembershipService
         if (_guard.EnsureCanAccess(tenantId) is { } denied)
             return denied;
 
+        // F3: Load and track the tenant BEFORE reading the membership state, so the
+        // concurrency stamp is captured before any ownership decision is made.
+        var trackedTenant = await _tenants.FindForUpdateAsync(tenantId, ct);
+        if (trackedTenant is null)
+            return TenantErrors.NotFound("Tenant");
+
+        if (trackedTenant.Status == TenantStatus.Archived)
+            return TenantErrors.ArchivedReadOnly;
+
         var member = await _members.FindForUpdateAsync(tenantId, userId, ct);
 
         if (member is null)
@@ -139,16 +148,6 @@ public sealed class TenantMembershipService : ITenantMembershipService
         {
             if (_actor.UserId is null || _actor.UserId == Guid.Empty)
                 return TenantErrors.Forbidden("An identified actor is required to remove an owner.");
-        }
-
-        // F3: Load and track the tenant BEFORE the owner-count decision, so the
-        // concurrency stamp is captured before any ownership decision is made.
-        TenantEntity? tenant = null;
-        if (member.IsOwner)
-        {
-            tenant = await _tenants.FindForUpdateAsync(tenantId, ct);
-            if (tenant is null)
-                return TenantErrors.NotFound("Tenant");
         }
 
         if (member.IsOwner && await _members.CountOwnersAsync(tenantId, ct) <= 1)
@@ -169,10 +168,9 @@ public sealed class TenantMembershipService : ITenantMembershipService
 
         _audit.Record(tenantId, TenantAuditActions.MemberRemoved, $"user: {userId}");
 
-        if (member.IsOwner)
-        {
-            tenant!.ConcurrencyStamp = Guid.NewGuid();
-        }
+        // F3: Update the concurrency stamp for every successful membership removal,
+        // including removal of a member initially read as a non-owner.
+        trackedTenant.ConcurrencyStamp = Guid.NewGuid();
 
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
             return saveError;

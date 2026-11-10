@@ -24,7 +24,7 @@ public sealed class RoleService : IRoleService
     public async Task<IdentityResult<IReadOnlyList<RoleDto>>> ListAsync(CancellationToken ct = default)
     {
         if (!_currentUser.Permissions.Contains(IdentityPermissionNames.RolesRead))
-            return IdentityErrors.Forbidden("You cannot view roles.");
+            return IdentityErrors.AccessDenied("You cannot view roles.");
 
         return Common.IdentityResult.Success(await _roleRepository.ListAsync(ct));
     }
@@ -32,8 +32,18 @@ public sealed class RoleService : IRoleService
     public async Task<IdentityResult<RoleDto>> GetAsync(Guid id, CancellationToken ct = default)
     {
         if (!_currentUser.Permissions.Contains(IdentityPermissionNames.RolesRead))
-            return IdentityErrors.Forbidden("You cannot view roles.");
+            return IdentityErrors.AccessDenied("You cannot view roles.");
 
+        return await LoadDtoAsync(id, ct);
+    }
+
+    /// <summary>
+    /// Builds the response after a successful write without asking for the read permission again.
+    /// A caller allowed to create or update a role must not be told the write failed just because
+    /// they cannot list roles.
+    /// </summary>
+    private async Task<IdentityResult<RoleDto>> LoadDtoAsync(Guid id, CancellationToken ct)
+    {
         var role = await _roleRepository.GetDetailsAsync(id, ct);
 
         return role is null ? IdentityErrors.NotFound("Role") : Common.IdentityResult.Success(role);
@@ -42,7 +52,7 @@ public sealed class RoleService : IRoleService
     public async Task<IdentityResult<RoleDto>> CreateAsync(CreateRoleRequest request, CancellationToken ct = default)
     {
         if (!_currentUser.Permissions.Contains(IdentityPermissionNames.RolesCreate))
-            return IdentityErrors.Forbidden("You cannot create roles.");
+            return IdentityErrors.AccessDenied("You cannot create roles.");
 
         var nameError = RoleInputValidator.ValidateName(request.Name, out var name);
 
@@ -79,13 +89,13 @@ public sealed class RoleService : IRoleService
         if (!await _roleRepository.CreateAsync(role, ct))
             return IdentityErrors.Conflict("A role with this name already exists.");
 
-        return await GetAsync(role.Id, ct);
+        return await LoadDtoAsync(role.Id, ct);
     }
 
     public async Task<IdentityResult<RoleDto>> UpdateAsync(Guid id, UpdateRoleRequest request, CancellationToken ct = default)
     {
         if (!_currentUser.Permissions.Contains(IdentityPermissionNames.RolesUpdate))
-            return IdentityErrors.Forbidden("You cannot update roles.");
+            return IdentityErrors.AccessDenied("You cannot update roles.");
 
         var role = await _roleRepository.FindByIdAsync(id, ct);
 
@@ -131,13 +141,13 @@ public sealed class RoleService : IRoleService
         if (!await _roleRepository.UpdateAsync(role, ct))
             return IdentityErrors.Conflict("A role with this name already exists.");
 
-        return await GetAsync(id, ct);
+        return await LoadDtoAsync(id, ct);
     }
 
     public async Task<Common.IdentityResult> DeleteAsync(Guid id, CancellationToken ct = default)
     {
         if (!_currentUser.Permissions.Contains(IdentityPermissionNames.RolesDelete))
-            return IdentityErrors.Forbidden("You cannot delete roles.");
+            return IdentityErrors.AccessDenied("You cannot delete roles.");
 
         var role = await _roleRepository.FindByIdAsync(id, ct);
 
@@ -161,7 +171,7 @@ public sealed class RoleService : IRoleService
         Guid id, SetRolePermissionsRequest request, CancellationToken ct = default)
     {
         if (!_currentUser.Permissions.Contains(IdentityPermissionNames.RolesUpdate))
-            return IdentityErrors.Forbidden("You cannot update role permissions.");
+            return IdentityErrors.AccessDenied("You cannot update role permissions.");
 
         var role = await _roleRepository.FindByIdWithPermissionsAsync(id, ct);
 
@@ -178,6 +188,6 @@ public sealed class RoleService : IRoleService
 
         await _roleRepository.ReplacePermissionsAsync(role, wanted, ct);
 
-        return await GetAsync(id, ct);
+        return await LoadDtoAsync(id, ct);
     }
 }

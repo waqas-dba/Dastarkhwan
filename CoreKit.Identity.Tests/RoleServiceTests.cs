@@ -10,7 +10,16 @@ namespace CoreKit.Identity.Tests;
 /// </summary>
 public sealed class RoleServiceTests : IDisposable
 {
-    private readonly TestEnv _env = new();
+    private readonly TestEnv _env;
+
+    public RoleServiceTests()
+    {
+        _env = new TestEnv();
+
+        // Role service methods now check the signed-in actor's permissions, so start as the
+        // seeded administrator; individual authorization tests switch to a limited actor.
+        _env.SignInOwner();
+    }
 
     public void Dispose() => _env.Dispose();
 
@@ -187,6 +196,32 @@ public sealed class RoleServiceTests : IDisposable
 
         ResultAssert.Fails(await _env.RoleService.GetAsync(_env.AdministratorRoleId),
             IdentityErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task ListRoles_WithoutRolesReadPermission_Fails()
+    {
+        _env.SignInStaff();
+
+        ResultAssert.Fails(await _env.RoleService.ListAsync(),
+            IdentityErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task CreateRole_WithOnlyCreatePermission_Succeeds()
+    {
+        // Creating a role must not require roles.read; the caller still needs the new role back.
+        _env.SignInWith(_env.StaffUserId, new List<string> { IdentityRoleNames.Staff },
+            IdentityPermissionNames.RolesCreate);
+
+        var dto = ResultAssert.Ok(await _env.RoleService.CreateAsync(new CreateRoleRequest
+        {
+            Name = "CreateOnlyRole",
+            PermissionIds = new List<Guid> { _env.UserPermissionId }
+        }));
+
+        Assert.Equal("CreateOnlyRole", dto.Name);
+        Assert.Contains(IdentityPermissionNames.UsersRead, dto.Permissions);
     }
 
     [Fact]

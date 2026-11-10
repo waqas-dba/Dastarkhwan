@@ -42,6 +42,9 @@ public sealed class UserService : IUserService
 
     public async Task<IdentityResult<PagedResult<UserDto>>> ListAsync(UserListQuery query, CancellationToken ct = default)
     {
+        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.UsersRead))
+            return IdentityErrors.AccessDenied("You cannot view users.");
+
         var page = Math.Max(query.Page, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
 
@@ -59,8 +62,18 @@ public sealed class UserService : IUserService
     public async Task<IdentityResult<UserDto>> GetAsync(Guid id, CancellationToken ct = default)
     {
         if (!_currentUser.Permissions.Contains(IdentityPermissionNames.UsersRead))
-            return IdentityErrors.Forbidden("You cannot view users.");
+            return IdentityErrors.AccessDenied("You cannot view users.");
 
+        return await LoadDtoAsync(id, ct);
+    }
+
+    /// <summary>
+    /// Builds the response after a successful write without asking for the read permission again.
+    /// A caller allowed to create or update a user must not be told the write failed just because
+    /// they cannot list users.
+    /// </summary>
+    private async Task<IdentityResult<UserDto>> LoadDtoAsync(Guid id, CancellationToken ct)
+    {
         var user = await _userRepository.FindByIdWithRolesAsync(id, ct);
 
         if (user is null)
@@ -74,7 +87,7 @@ public sealed class UserService : IUserService
     public async Task<IdentityResult<UserDto>> CreateAsync(CreateUserRequest request, CancellationToken ct = default)
     {
         if (!_currentUser.Permissions.Contains(IdentityPermissionNames.UsersCreate))
-            return IdentityErrors.Forbidden("You cannot create users.");
+            return IdentityErrors.AccessDenied("You cannot create users.");
 
         var email = request.Email?.Trim() ?? string.Empty;
 
@@ -100,7 +113,7 @@ public sealed class UserService : IUserService
         // Only an administrator can grant the Administrator role
         var wantsAdministrator = roles.Any(r => AdministratorRole.Is(r));
         if (wantsAdministrator && !_currentUser.Roles.Contains(IdentityRoleNames.Administrator))
-            return IdentityErrors.Forbidden("You cannot grant administrator privileges.");
+            return IdentityErrors.AccessDenied("You cannot grant administrator privileges.");
 
         var normalizedEmail = IdentityNormalizer.NormalizeEmail(email);
 
@@ -125,13 +138,13 @@ public sealed class UserService : IUserService
         if (!await _userRepository.CreateAsync(user, ct))
             return IdentityErrors.Conflict("A user with this email already exists.");
 
-        return await GetAsync(user.Id, ct);
+        return await LoadDtoAsync(user.Id, ct);
     }
 
     public async Task<IdentityResult<UserDto>> UpdateAsync(Guid id, UpdateUserRequest request, CancellationToken ct = default)
     {
         if (!_currentUser.Permissions.Contains(IdentityPermissionNames.UsersUpdate))
-            return IdentityErrors.Forbidden("You cannot update users.");
+            return IdentityErrors.AccessDenied("You cannot update users.");
 
         var user = await _userRepository.FindForUpdateAsync(id, ct);
 
@@ -144,7 +157,7 @@ public sealed class UserService : IUserService
         {
             var isTargetAdmin = user.UserRoles.Any(ur => AdministratorRole.Is(ur.Role));
             if (isTargetAdmin && !_currentUser.Roles.Contains(IdentityRoleNames.Administrator))
-                return IdentityErrors.Forbidden("You cannot change another administrator's credentials.");
+                return IdentityErrors.AccessDenied("You cannot change another administrator's credentials.");
         }
 
         var now = Now();
@@ -216,13 +229,13 @@ public sealed class UserService : IUserService
         if (endSessions)
             await _refreshTokenRepository.RevokeAllForUserAsync(id, now, ct);
 
-        return await GetAsync(id, ct);
+        return await LoadDtoAsync(id, ct);
     }
 
     public async Task<Common.IdentityResult> DeleteAsync(Guid id, CancellationToken ct = default)
     {
         if (!_currentUser.Permissions.Contains(IdentityPermissionNames.UsersDelete))
-            return IdentityErrors.Forbidden("You cannot delete users.");
+            return IdentityErrors.AccessDenied("You cannot delete users.");
 
         if (_currentUser.UserId == id)
             return IdentityErrors.Forbidden("You cannot delete your own account.");
@@ -243,7 +256,7 @@ public sealed class UserService : IUserService
     public async Task<IdentityResult<UserDto>> SetRolesAsync(Guid id, SetUserRolesRequest request, CancellationToken ct = default)
     {
         if (!_currentUser.Permissions.Contains(IdentityPermissionNames.UsersUpdate))
-            return IdentityErrors.Forbidden("You cannot update user roles.");
+            return IdentityErrors.AccessDenied("You cannot update user roles.");
 
         var user = await _userRepository.FindForUpdateAsync(id, ct);
 
@@ -259,7 +272,7 @@ public sealed class UserService : IUserService
         // Only an administrator can grant the Administrator role
         var wantsAdministrator = roles.Any(r => AdministratorRole.Is(r));
         if (wantsAdministrator && !_currentUser.Roles.Contains(IdentityRoleNames.Administrator))
-            return IdentityErrors.Forbidden("You cannot grant administrator privileges.");
+            return IdentityErrors.AccessDenied("You cannot grant administrator privileges.");
 
         var losesAdministrator =
             user.UserRoles.Any(ur => AdministratorRole.Is(ur.Role)) &&
@@ -272,7 +285,7 @@ public sealed class UserService : IUserService
 
         await _userRepository.ReplaceRolesAsync(user, wanted, ct);
 
-        return await GetAsync(id, ct);
+        return await LoadDtoAsync(id, ct);
     }
 
     private DateTime Now() => _time.GetUtcNow().UtcDateTime;

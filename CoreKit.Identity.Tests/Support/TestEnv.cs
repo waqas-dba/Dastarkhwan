@@ -167,6 +167,7 @@ internal sealed class TestEnv : IDisposable
             AccessResolver, AdministratorGuard, Hasher, CurrentUser, Time);
 
         RoleService = new RoleService(RoleRepository, PermissionRepository, CurrentUser);
+        PermissionService = new PermissionService(PermissionRepository, CurrentUser);
 
         var emailOptions = Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false });
         AuthService = new AuthService(
@@ -199,6 +200,8 @@ internal sealed class TestEnv : IDisposable
     public IUserService UserService { get; }
 
     public IRoleService RoleService { get; }
+
+    public IPermissionService PermissionService { get; }
 
     public IAuthService AuthService { get; }
 
@@ -236,6 +239,18 @@ internal sealed class TestEnv : IDisposable
         CurrentUser.Email = "staff@example.com";
         CurrentUser.Roles = new List<string> { IdentityRoleNames.Staff };
         CurrentUser.Permissions = new List<string> { IdentityPermissionNames.UsersRead };
+    }
+
+    /// <summary>
+    /// Signs in a seeded user with an exact permission set. Tests use this when the point is a
+    /// caller who holds one permission (for example create) but not a neighbouring one (read).
+    /// </summary>
+    public void SignInWith(Guid userId, IReadOnlyCollection<string> roles, params string[] permissions)
+    {
+        CurrentUser.UserId = userId;
+        CurrentUser.Email = null;
+        CurrentUser.Roles = roles;
+        CurrentUser.Permissions = permissions;
     }
 
     public void SignOut()

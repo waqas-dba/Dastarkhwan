@@ -25,6 +25,14 @@ public static class IdentityErrors
     public static IdentityError Conflict(string message)
         => new(IdentityErrorKind.Conflict, "conflict", message);
 
+    /// <summary>
+    /// The caller is signed in but lacks the permission the operation requires. Kept separate from
+    /// <see cref="Forbidden"/> so clients can tell "you may not do this at all" from "this specific
+    /// change is not allowed" (for example editing the protected Administrator role).
+    /// </summary>
+    public static IdentityError AccessDenied(string message)
+        => new(IdentityErrorKind.Forbidden, "access.denied", message);
+
     public static IdentityError Forbidden(string message)
         => new(IdentityErrorKind.Forbidden, "forbidden", message);
 }

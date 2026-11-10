@@ -199,9 +199,11 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task UpdateUser_DeactivateLastActiveAdministrator_Fails()
     {
-        // The owner is the only active administrator. Sign in as staff (not the target),
-        // so the self-modification check is skipped and the administrator guard runs.
-        _env.SignInStaff();
+        // The owner is the only active administrator. Sign in as someone else who is allowed to
+        // update users, so the permission check and self-modification check are passed and the
+        // administrator guard is what refuses the change.
+        _env.SignInWith(_env.StaffUserId, new List<string> { IdentityRoleNames.Staff },
+            IdentityPermissionNames.UsersUpdate);
 
         ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.OwnerUserId, new UpdateUserRequest
         {
@@ -221,9 +223,10 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task UpdateUser_DeleteLastActiveAdministrator_Fails()
     {
-        // Sign in as staff (not the target), so the self-modification check is skipped
-        // and the administrator guard runs.
-        _env.SignInStaff();
+        // Sign in as someone else who may delete users, so the permission check and
+        // self-modification check are passed and the administrator guard is what refuses the delete.
+        _env.SignInWith(_env.StaffUserId, new List<string> { IdentityRoleNames.Staff },
+            IdentityPermissionNames.UsersDelete);
 
         ResultAssert.Fails(await _env.UserService.DeleteAsync(_env.OwnerUserId),
             IdentityErrorKind.Conflict, "conflict");
@@ -249,8 +252,10 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task SetRoles_RemoveLastActiveAdministratorRole_Fails()
     {
-        // Owner is the only active administrator. Staff tries to remove Administrator from owner.
-        _env.SignInStaff();
+        // Owner is the only active administrator. Another user who may edit roles tries to remove
+        // Administrator from owner, so the administrator guard is what refuses the change.
+        _env.SignInWith(_env.StaffUserId, new List<string> { IdentityRoleNames.Staff },
+            IdentityPermissionNames.UsersUpdate);
 
         ResultAssert.Fails(await _env.UserService.SetRolesAsync(_env.OwnerUserId, new SetUserRolesRequest
         {
@@ -286,10 +291,42 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task GetUser_WithoutUsersReadPermission_Fails()
     {
-        _env.SignInStaff();
+        // Staff normally holds users.read, so sign this actor in with no permissions at all.
+        _env.SignInWith(_env.StaffUserId, new List<string> { IdentityRoleNames.Staff });
 
         ResultAssert.Fails(await _env.UserService.GetAsync(_env.StaffUserId),
             IdentityErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task ListUsers_WithoutUsersReadPermission_Fails()
+    {
+        // Listing must be guarded at the service, not only at the endpoint, so a caller that
+        // reaches the service another way still cannot enumerate users.
+        _env.SignInWith(_env.StaffUserId, new List<string> { IdentityRoleNames.Staff });
+
+        ResultAssert.Fails(await _env.UserService.ListAsync(new UserListQuery()),
+            IdentityErrorKind.Forbidden, "access.denied");
+    }
+
+    [Fact]
+    public async Task CreateUser_WithOnlyCreatePermission_Succeeds()
+    {
+        // A write must not depend on a read permission: the caller may create users without
+        // being allowed to browse them, and still needs the created record back.
+        _env.SignInWith(_env.StaffUserId, new List<string> { IdentityRoleNames.Staff },
+            IdentityPermissionNames.UsersCreate);
+
+        var dto = ResultAssert.Ok(await _env.UserService.CreateAsync(new CreateUserRequest
+        {
+            Email = "createonly@example.com",
+            Password = "CreateOnlyPass123!",
+            DisplayName = "Create Only",
+            RoleIds = new List<Guid> { _env.StaffRoleId }
+        }));
+
+        Assert.Equal("createonly@example.com", dto.Email);
+        Assert.Contains(IdentityRoleNames.Staff, dto.Roles);
     }
 
     [Fact]
@@ -443,6 +480,44 @@ public sealed class UserServiceTests : IDisposable
         Assert.NotNull(unlockedUser);
         Assert.Equal(0, unlockedUser.AccessFailedCount);
         Assert.Null(unlockedUser.LockoutEnd);
+    }
+
+    [Fact]
+    public async Task Login_FailedAttemptAfterLockoutExpires_StartsFreshCount()
+    {
+        var user = _env.StaffUserId;
+
+        // Lock the account.
+        for (int i = 0; i < 5; i++)
+        {
+            await _env.AuthService.LoginAsync(new LoginRequest
+            {
+                Email = "staff@example.com",
+                Password = "wrong-password"
+            }, CancellationToken.None);
+        }
+
+        _env.Time.Advance(TimeSpan.FromMinutes(16));
+
+        // The first mistake after expiry must not immediately re-lock the account.
+        ResultAssert.Fails(await _env.AuthService.LoginAsync(new LoginRequest
+        {
+            Email = "staff@example.com",
+            Password = "wrong-password"
+        }, CancellationToken.None), IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
+
+        using var db = _env.NewContext();
+        var userAfterFailure = await db.Users.FirstOrDefaultAsync(u => u.Id == user);
+        Assert.NotNull(userAfterFailure);
+        Assert.Equal(1, userAfterFailure.AccessFailedCount);
+        Assert.Null(userAfterFailure.LockoutEnd);
+
+        // A correct password still works right after that single failure.
+        ResultAssert.Ok(await _env.AuthService.LoginAsync(new LoginRequest
+        {
+            Email = "staff@example.com",
+            Password = "StaffPass123!"
+        }, CancellationToken.None));
     }
 
     [Fact]

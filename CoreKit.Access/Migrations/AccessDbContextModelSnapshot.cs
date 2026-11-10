@@ -127,8 +127,6 @@ namespace CoreKit.Access.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("Id", "ScopeType", "ScopeId");
-
                     b.HasIndex("ScopeType", "ScopeId", "NormalizedName")
                         .IsUnique()
                         .HasDatabaseName("UX_ACCESS_Roles_Scope_Name");

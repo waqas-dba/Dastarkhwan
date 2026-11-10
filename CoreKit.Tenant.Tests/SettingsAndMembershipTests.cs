@@ -791,8 +791,6 @@ public sealed class TenantMembershipServiceTests : IDisposable
         var decoratedUow = new PendingSaveUnitOfWorkDecorator(unitOfWorkA, promoteCallback);
         var svcA = CreateMembershipServiceWithDecoratedUow(dbA, decoratedUow);
 
-        var auditCountBefore = _env.Read(db => db.AuditEntries.Count());
-
         // Stale removal must fail
         ResultAssert.Fails(
             await svcA.RemoveMemberAsync(_tenant.Id, nonOwnerMember),

@@ -798,12 +798,14 @@ public sealed class TenantMembershipServiceTests : IDisposable
             await svcA.RemoveMemberAsync(_tenant.Id, nonOwnerMember),
             TenantErrorKind.Conflict);
 
-        // Membership unchanged — non-owner member still exists and is not an owner
-        Assert.True(_env.Read(db => db.Members.Any(m => m.UserId == nonOwnerMember && !m.IsOwner)));
+        // Concurrent committed ownership change remains intact — nonOwnerMember is now an owner
+        Assert.True(_env.Read(db => db.Members.Single(m => m.UserId == nonOwnerMember).IsOwner));
 
-        // No audit entry for the stale removal
-        var auditCountAfter = _env.Read(db => db.AuditEntries.Count());
-        Assert.Equal(auditCountBefore, auditCountAfter);
+        // Context B's ownership audit entry persisted
+        Assert.True(_env.Read(db => db.AuditEntries.Any(a => a.Action == TenantAuditActions.OwnerChanged)));
+
+        // Context A's removal audit entry is absent
+        Assert.False(_env.Read(db => db.AuditEntries.Any(a => a.Action == TenantAuditActions.MemberRemoved)));
     }
 
     private TenantMembershipService CreateMembershipServiceWithContext(TenantDbContext db)

@@ -1,4 +1,5 @@
-﻿using CoreKit.SharedKernel.Abstractions;
+﻿using CoreKit.Access.Abstractions;
+using CoreKit.SharedKernel.Abstractions;
 using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Integration;
 
@@ -85,6 +86,12 @@ public static class TenantServiceCollectionExtensions
 
         // Tenant adds its tenant claim to every access token Identity issues.
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IAccessTokenClaimsContributor, TenantClaimsContributor>());
+
+        // Expose Tenant's scope and membership to Access through public contracts.
+        // Registered with AddScoped (not TryAddScoped) so Access's TryAddScoped defaults
+        // in AddAccess do not override these when the host calls AddTenant before AddAccess.
+        services.AddScoped<IAccessScopeContext, TenantAccessScopeContext>();
+        services.AddScoped<IAccessMembership, TenantAccessMembership>();
 
         return services;
     }

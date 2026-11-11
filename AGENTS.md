@@ -48,14 +48,13 @@ Never overwrite or discard existing work.
 ## 4. Non-negotiable rules
 
 - One implementation owner per task.
-- OpenCode is the default primary implementation owner.
-- OpenCode prepares plans and handovers; it implements only explicitly approved isolated, low-risk tasks.
+- OpenCode is the default primary implementation agent. OpenCode prepares technical plans and handovers and implements only explicitly approved tasks within the assigned scope.
 - ChatGPT Account 2 reviews independently and remains read-only.
 - ChatGPT Account 1 coordinates and recommends acceptance; it does not modify repository files.
 - Only one AI agent may modify a shared working tree at a time.
 - The user controls all Git write operations.
-- Never stage, commit, push, pull, switch branches, merge, rebase, reset, cherry-pick, clean, amend, or rewrite history.
-- Never run tests, builds, or migrations without explicit authorization for that specific action.
+- Git inspection commands are permitted without approval. Git operations that change repository state require explicit Project Owner approval before execution.
+- Never run tests, builds, or migrations without explicit authorization for that specific action. Relevant builds and automated tests may be run after implementation when explicitly included in an approved implementation task; documentation-only tasks do not run builds or tests unless specifically requested.
 - Creating migration files requires explicit approval.
 - Never expand task scope or modify unapproved files.
 - Never claim unobserved results.

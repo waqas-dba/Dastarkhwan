@@ -12,9 +12,9 @@ Build a secure, reusable modular SaaS platform for food-item delivery and parcel
 - Current agreed workflow: OpenCode prepares plans and technical handovers; OpenCode implements approved slices; ChatGPT Account 2 independently reviews read-only; ChatGPT Account 1 coordinates and recommends acceptance; the user approves, verifies manually and controls all Git operations.
 - Only one agent modifies the shared working tree at a time. Every participating agent verifies and reports its own baseline SHA.
 - `CLAUDE.md`, `ai-tasks.md` and `AGENTS.md` state the current agent allocation and the mandatory task briefing standard (`ai-tasks.md` §13). Verify them before relying on role assignments.
-- AI may add or update tests but must not run tests or builds without explicit permission. The user normally performs verification manually.
+- **Implementation tasks:** relevant builds and automated tests may be run after implementation when explicitly included in the approved task. The agent must report exact commands, results, failures and skipped tests. Broader or expensive test suites require justification and approval where appropriate. Do not fix unrelated failures without approval. **Documentation-only tasks:** no builds or tests unless specifically requested.
 - AI does not execute migrations or modify databases without explicit permission. Creating migration files also requires approval for that specific slice.
-- AI never performs Git write operations. The user alone stages, commits, pushes, merges and controls repository history.
+- **Git:** inspection commands are permitted without approval. Git operations that change repository state require explicit Project Owner approval before execution. AI never performs Git write operations without such approval. The user alone stages, commits, pushes, merges and controls repository history.
 - Update documentation only when facts, decisions or status change. Do not duplicate material across files.
 
 ## M0 — Repository baseline
@@ -39,7 +39,7 @@ Slices are prepared by OpenCode, implemented by OpenCode, independently reviewed
 
 | Slice | Task | Status | Boundary / completion evidence |
 |---|---|---|---|
-| S1 | Documentation only: synchronize `current-state.md` and `roadmap.md` with accepted decisions, current evidence and current agent allocation | In progress | Documentation changes applied and committed at `ee554189`. Independent review identified two corrections; focused correction and re-review are pending. Project Owner acceptance remains pending. |
+| S1 | Documentation only: synchronize `current-state.md` and `roadmap.md` with accepted decisions, current evidence and current agent allocation | Under review | Documentation changes applied and committed at `45a5789`. Initial review identified documentation corrections; correction task `DK-TENANT-ACCESS-DOCS-FIX1` addresses them. Independent review and Project Owner acceptance remain pending. |
 | S2.1 | Create a dedicated `CoreKit.Access.Tests` project | Under review | `CoreKit.Access.Tests` exists with its Access-focused suites (created in `470d42c`). Independent review and user-run tests pending. File presence alone is not completion. |
 | S2.2 | Update architecture-test coverage and references for intended modules | In progress | Boundary rules cover SharedKernel, Identity, Access and Tenant, with a documented temporary exception. Boundary enforcement now evaluates actual MSBuild project references (imports included), validates solution inventory/classification and the IVT policy. Tests have not been run as part of this documentation task. |
 | S3 | Review the Access migration | Under review | Access migration files are committed under `CoreKit.Access/Migrations/` at `43c2179`. Review schema, constraints, relationships and compatibility. Database application requires separate explicit authorization. |
@@ -86,7 +86,7 @@ Access implementation exists. Migration artifacts are committed at `43c2179` and
 
 Tenant represents the SaaS account boundary; Store represents a merchant business. They are separate concepts.
 
-Tenant still directly references Identity through `CoreKit.Tenant.csproj`; remove this dependency using approved contracts. Define Store separately and its relationship to Tenant; do not put Store behavior inside Tenant.
+No direct Tenant-to-Identity project reference was found at the inspected source baseline (`5dfa796c`); D-015's direct-dependency requirement is met at project-reference level. Remaining Identity semantic coupling persists in `TenantActor` through `ICurrentUser.Permissions` and must be classified before removal. Tenant-to-Access authorization integration remains Pending under D-016. Existing Identity RBAC ownership and transition require separate review. Define Store separately and its relationship to Tenant; do not put Store behavior inside Tenant.
 
 **Done when:** Tenant is reusable and decoupled, Store ownership/lifecycle is explicit, tenant/store resolution fails closed, and tenant-owned access is enforced and tested.
 

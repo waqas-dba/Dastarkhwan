@@ -41,8 +41,8 @@ Use this log for decisions affecting product behavior, security, data, compatibi
 
 ## D-008 — Git remains user-controlled
 **Status:** Accepted  
-**Decision:** AI does not stage, commit, push, pull, checkout/switch branches, merge, rebase, reset, cherry-pick, create branches, or rewrite history.  
-**Consequences:** AI may recommend a manual checkpoint and prepare a descriptive commit subject/body. The user performs all Git write operations. See `ai-tasks.md`.
+**Decision:** Git inspection commands (`git status`, `git log`, `git diff`, branch listing) are permitted without approval. Git operations that change repository state require explicit Project Owner approval before execution.  
+**Consequences:** Before requesting approval, the agent must explain: purpose, exact command, benefits, risks and consequences, and whether branches, commits or remote repositories will be affected. Asking for approval does not authorize execution; the agent must wait for explicit approval. This applies to staging, committing, pushing, pulling, switching/creating branches, merging, rebasing, cherry-picking, resetting, cleaning, reverting and history rewriting. AI may recommend a manual checkpoint and prepare a descriptive commit subject/body. The user performs all Git write operations. See `ai-tasks.md` §15.2.
 
 ## D-009 — Checkout grouping
 **Status:** Proposed  

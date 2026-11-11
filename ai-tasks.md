@@ -79,7 +79,7 @@ Git inspection must remain read-only.
    - Follow the approved task.
    - Modify only approved files.
    - Provide exact diffs and a concise completion report.
-   - Do not run tests, builds, or migrations without specific user authorization.
+   - Relevant builds and automated tests may be run after implementation when explicitly included in the approved task; report exact commands, results, failures and skipped tests. Documentation-only tasks do not run builds or tests unless specifically requested.
 
 4. **ChatGPT Account 2 — Review**
    - Independently inspect the actual implementation and focused diff.
@@ -134,19 +134,20 @@ Split tasks that touch multiple module boundaries, persistence models, or unrela
 
 ## 7. Permission boundaries
 
-AI agents may inspect Git read-only.
+AI agents may inspect Git read-only (`git status`, `git log`, `git diff`, branch listing). Git operations that change repository state require explicit Project Owner approval before execution; before requesting approval the agent must explain purpose, exact command, benefits, risks and consequences, and whether branches, commits or remote repositories will be affected. Asking for approval does not authorize execution.
 
 AI agents must not:
 
-- Stage, commit, or push.
-- Pull or change branches.
-- Merge, rebase, reset, cherry-pick, clean, amend, or rewrite history.
-- Change Git configuration or hooks.
-- Run tests or builds without explicit authorization for that specific run.
+- Stage, commit, or push without explicit Project Owner approval.
+- Pull or change branches without explicit Project Owner approval.
+- Merge, rebase, reset, cherry-pick, clean, amend, or rewrite history without explicit Project Owner approval.
+- Change Git configuration or hooks without explicit Project Owner approval.
 - Apply migrations or modify databases without explicit authorization.
 - Create migration files without explicit approval for that task.
 - Discard or overwrite existing uncommitted work.
 - Expose passwords, tokens, API keys, connection strings, or other secrets.
+
+Relevant builds and automated tests may be run after implementation when explicitly included in the approved task; the agent must report exact commands, results, failures and skipped tests. Broader test suites require justification and approval where appropriate. Documentation-only tasks do not run builds or tests unless specifically requested. Do not fix unrelated failures without approval.
 
 AI may add or update test files, but must report them as not run unless the user explicitly authorized and the result was observed.
 

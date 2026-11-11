@@ -32,13 +32,17 @@ A status must describe the evidence available, not the intended architecture or 
 
 | Field | Value |
 |---|---|
-| Snapshot HEAD | `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9` |
-| Parent commit | `43c21792ff3f7e6ed8bdce15b1246e9c0b060a9c` |
+| Snapshot HEAD | `45a578958e555b9cb3fc77a5ae602f796fd270b1` |
+| Parent commit | `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9` |
 | Branch | `master` |
-| Latest commit message | `test(access): enable FK enforcement in scope consistency test` |
-| Evidence basis | Committed-file inspection at the snapshot HEAD. The remote was not queried; no claims are made about remote state. |
+| Latest commit message | `docs: synchronize architecture, decisions, agent instructions with Option B` |
+| Evidence basis | GitHub committed-file inspection at the snapshot HEAD. The remote was not queried; no claims are made about remote state. |
 | Local working-tree status | Clean at inspection time (`git status --short` returned empty). Not verified remotely. |
 | Scope | Point-in-time record of committed repository evidence |
+
+The latest repository snapshot is `45a5789`, a documentation-only commit. It changed project documents but did not change application source code.
+
+The source-inspection baseline for the Tenant/Identity and Tenant/Access findings remains `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9`. That earlier baseline was used to inspect source code and classify Tenant's Identity dependency status. The documentation-only commit at `45a5789` did not re-inspect source code; no claim is made that source behavior changed between the two baselines.
 
 The historical M0 baseline `9555b8c` remains unchanged.
 
@@ -157,13 +161,13 @@ Only one agent may modify the shared working tree at a time. All participating a
 
 ### Instruction-file synchronization
 
-`CLAUDE.md`, `ai-tasks.md`, `AGENTS.md`, `roadmap.md` and `current-state.md` now state the current agent allocation (ChatGPT Account 1, OpenCode, ChatGPT Account 2, Kimi, DeepSeek Web, OpenHands, Claude, Kilo unavailable, DeepSeek Harness unavailable, User) and the mandatory task briefing standard (`ai-tasks.md` §13). Verified at HEAD `5dfa796c` (2026-11-11).
+`CLAUDE.md`, `ai-tasks.md`, `AGENTS.md`, `roadmap.md` and `current-state.md` now state the current agent allocation (ChatGPT Account 1, OpenCode, ChatGPT Account 2, Kimi, DeepSeek Web, OpenHands, Claude, Kilo unavailable, DeepSeek Harness unavailable, User) and the mandatory task briefing standard (`ai-tasks.md` §13). Verified at HEAD `45a5789` (2026-11-11).
 
 ## Next proposed work
 
 Follow the ordered micro-slices in `roadmap.md`.
 
-S1 documentation synchronization changes have been applied at HEAD `5dfa796c` (2026-11-11). Independent review and Project Owner acceptance remain pending.
+S1 documentation synchronization changes were committed at `45a5789` (2026-11-11). Correction task `DK-TENANT-ACCESS-DOCS-FIX1` addresses review findings. S1 remains Under review until independent review and Project Owner acceptance are complete.
 
 After S1, follow the approved roadmap queue. Migration artifacts committed at `43c2179` require review; their presence does not authorize database application.
 
@@ -177,6 +181,7 @@ After S1, follow the approved roadmap queue. Migration artifacts committed at `4
 | 2026-11-08 | Current snapshot updated for `43c2179`; committed Access, Identity and Tenant migration artifacts recorded; evidence labels and agent-allocation discrepancy clarified | GitHub committed-file inspection at `43c2179`; local working-tree and database state not verified |
 | 2026-11-08 | Snapshot refreshed to `576c84d`; S2.1 recorded Under review; architecture-test evidence updated; obsolete instruction-file discrepancy removed; mandatory task briefing recorded in `ai-tasks.md` §13 | Committed-file inspection at `576c84d`; local tree clean at inspection; no tests or builds run |
 | 2026-11-11 | Snapshot refreshed to `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9`; D-016 (Tenant requires Access for authorization) recorded; D-015 direct-dependency marked completed at source level; Tenant–Access integration, platform authorization and per-operation enforcement recorded as Pending; agent allocation synchronized to current team | Committed-file inspection at `5dfa796c`; local tree clean at inspection; no tests or builds run |
+| 2026-11-11 | Documentation synchronization committed at `45a578958e555b9cb3fc77a5ae602f796fd270b1`; correction task `DK-TENANT-ACCESS-DOCS-FIX1` addresses review findings; S1 remains Under review; source-inspection baseline preserved at `5dfa796c` | Committed-file inspection at `45a5789`; local tree clean at inspection; no tests or builds run |
 
 ## Update rules
 

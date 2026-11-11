@@ -34,7 +34,7 @@ Never discard, overwrite, or silently absorb existing changes.
 
 The M0 report references `9555b8c` dated 2026-10-23. This is a historical baseline, not necessarily the current HEAD. Always inspect the actual repository before work.
 
-Read-only Git inspection is allowed. Git write operations are prohibited; see Section 10.
+Read-only Git inspection is allowed. Git operations that change repository state require explicit Project Owner approval before execution; see Section 10.
 
 ## 4. Token and context efficiency
 
@@ -136,8 +136,7 @@ Do not start frontend/UI work or later business workflows until their roadmap de
 - Enforce scope in application services and authorization, and test cross-tenant denial.
 - Keep secrets out of source control and logs.
 - Use parameterized data access, validation, safe errors, appropriate constraints, short transactions, and idempotency where required.
-- Add focused positive and negative tests for relevant changes, especially authorization and cross-tenant access.
-- AI may create or update tests but must not run tests or builds unless the user explicitly authorizes that specific action.
+- Add focused positive and negative tests for relevant changes, especially authorization and cross-tenant access. Relevant builds and automated tests may be run after implementation when explicitly included in an approved implementation task; the agent must report exact commands, results, failures and skipped tests. Broader test suites require justification and approval. Documentation-only tasks do not run builds or tests unless specifically requested. Do not fix unrelated failures without approval.
 - Do not execute database migrations or modify a database unless explicitly authorized.
 - Creating migration files also requires explicit approval for that task.
 - Never claim a test, build, migration, or deployment succeeded unless its result was actually observed and authorized.
@@ -146,13 +145,17 @@ Do not start frontend/UI work or later business workflows until their roadmap de
 
 The user alone controls Git write operations.
 
-AI agents must never:
+Git inspection commands (`git status`, `git log`, `git diff`, branch listing) are permitted without approval.
+
+AI agents must not perform Git operations that change repository state without explicit Project Owner approval:
 
 - Stage or commit.
 - Push or pull.
 - Create or switch branches.
 - Merge, rebase, reset, cherry-pick, clean, amend, or rewrite history.
 - Change Git configuration or hooks.
+
+Before requesting approval, the agent must explain the purpose, exact command, benefits, risks and consequences, and whether branches, commits or remote repositories will be affected. Asking for approval is not authorization; the agent must wait for explicit approval.
 
 Read-only inspection is permitted.
 

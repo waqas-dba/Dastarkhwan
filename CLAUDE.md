@@ -70,16 +70,21 @@ The approved team consists of four AI participants and the user.
 | Participant | Responsibility |
 |---|---|
 | ChatGPT Account 1 | Project Manager and Architecture Coordinator. Defines tasks, coordinates agents, maintains roadmap and milestones, evaluates reports, and recommends acceptance. |
-| DeepSeek Harness | Preparation Engineer. Researches the repository, investigates issues, prepares technical plans and handovers, and performs only explicitly approved isolated, low-risk implementation tasks. |
-| OpenCode + Nemotron | Primary Developer. Implements approved development tasks, supplies exact diffs, and provides completion reports. |
+| OpenCode | Primary implementation agent. Implements approved development tasks, supplies exact diffs, and provides completion reports. |
 | ChatGPT Account 2 | Independent Reviewer. Reviews actual code, architecture, security, and the focused diff. Read-only. |
+| Kimi | Architecture discussion, research and critique. |
+| DeepSeek Web | Research and technical preparation. |
+| OpenHands | Repository exploration and planning; isolated implementation only when explicitly assigned and not concurrently editing with OpenCode. |
+| Claude | Limited reserve for difficult implementation or security/architecture review. |
+| Kilo | Unavailable until the Project Owner says otherwise. |
+| DeepSeek Harness | Unavailable until the Project Owner says otherwise. |
 | User | Project Owner. Approves scope and architecture, controls Git operations, performs manual testing, and makes final acceptance decisions. |
 
 Coordination rules:
 
 - ChatGPT Account 1 coordinates but does not modify repository files or perform Git writes.
-- DeepSeek normally prepares implementation plans and handovers for OpenCode + Nemotron.
-- OpenCode + Nemotron is the default implementation owner.
+- OpenCode normally prepares implementation plans and handovers.
+- OpenCode is the default implementation owner.
 - DeepSeek may implement only when the user explicitly assigns it a separate, isolated, low-risk implementation task. That task must have one clearly named owner.
 - ChatGPT Account 2 performs independent read-only review and does not implement fixes.
 - One implementation owner per task.

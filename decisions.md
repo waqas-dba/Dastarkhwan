@@ -42,7 +42,7 @@ Use this log for decisions affecting product behavior, security, data, compatibi
 ## D-008 — Git remains user-controlled
 **Status:** Accepted  
 **Decision:** AI does not stage, commit, push, pull, checkout/switch branches, merge, rebase, reset, cherry-pick, create branches, or rewrite history.  
-**Consequences:** AI may recommend a manual checkpoint and prepare a descriptive commit subject/body. The user performs all Git write operations. See `docs/ai-tasks.md`.
+**Consequences:** AI may recommend a manual checkpoint and prepare a descriptive commit subject/body. The user performs all Git write operations. See `ai-tasks.md`.
 
 ## D-009 — Checkout grouping
 **Status:** Proposed  
@@ -76,6 +76,22 @@ Use this log for decisions affecting product behavior, security, data, compatibi
 **Status:** Accepted  
 **Decision:** Remove the direct `CoreKit.Tenant` dependency on `CoreKit.Identity` through stable SharedKernel contracts/abstractions.  
 **Consequences:** Inspect the existing six reported code-file references at the current baseline; classify each use before changing it. Choose contract ownership and dependency direction before implementation. Do not create duplicate user/account models or introduce circular references. Tenant must remain reusable by other SaaS applications.
+
+## D-016 — Tenant requires Access for authorization
+**Status:** Accepted  
+**Date:** 2026-11-11  
+**Decision:** Tenant requires Access for authorization of protected Tenant operations.  
+**Context:** Option B (Tenant requires Access for authorization) was approved over the previous Option A direction. Tenant owns tenant lifecycle, membership, tenant context and tenant-specific business rules. Access owns roles, permissions, assignments and authorization decisions. Tenant integrates through Access public contracts and must not access Access private persistence or internals.  
+**Consequences:**
+- Tenant integrates through Access public contracts (`IAccessScopeContext`, `IAccessMembership`, `IAccessService`, `IPermissionChecker`).
+- Access must not depend on Tenant or Identity private internals.
+- SharedKernel provides neutral cross-module contracts where genuinely needed (e.g. `ITenantMembershipReader` as a candidate bridge for Access to query Tenant membership).
+- Platform-wide/cross-tenant administration is explicitly modelled separately from tenant-scoped authorization.
+- Identity permission claims must not be treated as the authoritative source of Tenant authorization.
+- Protected operations must fail closed if Access authorization is unavailable or cannot establish a valid decision.
+- Existing Identity RBAC data and services must not be deleted until a separately reviewed ownership-transfer and compatibility plan is approved.
+- The dependency-registration mechanism is an implementation-design item to resolve; it is not invented here.
+**Review trigger:** Evidence that Tenant–Access authorization integration cannot be established through Access public contracts alone, or that platform authorization semantics conflict with tenant-scoped authorization.
 
 ## Decision template
 ### D-XXX — Title

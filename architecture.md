@@ -3,7 +3,7 @@
 ## 1. Direction
 Use a modular monolith initially. Split deployment only when measured performance, reliability, team ownership, or deployment needs justify it. Initial product scope is food-item delivery and parcel pickup/delivery in Pakistan. Backend development is the first priority; frontend work follows stable backend contracts.
 
-This file describes the **target architecture**. `docs/current-state.md` records what exists in code. Do not report a target rule as implemented unless verified in source and tests.
+This file describes the **target architecture**. `current-state.md` records what exists in code. Do not report a target rule as implemented unless verified in source and tests.
 
 ## 2. Logical modules and ownership
 These are responsibilities, not a requirement to create every project immediately. Inspect existing code before adding projects or abstractions.
@@ -56,13 +56,28 @@ A capability may remain inside a well-defined module until splitting provides re
 - Scope reads, writes, exports, reports, background jobs, webhooks, and platform/admin actions according to an explicit authorization policy.
 - Add tenant-safe unique constraints and indexes where required by the actual data model. Avoid assuming every table is tenant-owned.
 
-## 6. SaaS and standalone composition
+## 6. Tenant–Access integration (Option B)
+- Tenant requires Access for authorization of protected Tenant operations.
+- Tenant owns tenant lifecycle, membership, tenant context and tenant-specific business rules.
+- Access owns effective permissions and authorization decisions.
+- Tenant may implement adapters for Access public abstractions (`IAccessScopeContext`, `IAccessMembership`, `IAccessService`, `IPermissionChecker`).
+- `ITenantMembershipReader` (SharedKernel) is a candidate neutral bridge for Access to query Tenant membership.
+- Access must not reference Tenant's private services, repositories, `DbContext` or tables.
+- Tenant must not reference Identity private internals.
+- Missing or invalid tenant scope, membership or authorization must fail closed.
+- Tenant owner-to-Access owner mapping must be explicitly validated because Access owner semantics may grant broad permissions.
+- Platform scope is distinct from tenant scope and needs an explicit authorization design.
+- Tenant permission enforcement across individual operations remains implementation work, not an already completed capability.
+
+Preserve the modular monolith architecture and existing approved module ownership boundaries.
+
+## 7. SaaS and standalone composition
 - **SaaS:** compose Tenant, Identity, and Access, plus the application modules required by the product. All applicable operations enforce tenant/store scope.
 - **Standalone:** Tenant infrastructure is not required. Identity/Access may be optional only when a secure alternative is explicitly configured for protected operations.
 - Keep host-specific composition at clear boundaries; do not scatter SaaS/standalone conditionals throughout unrelated modules.
 - Create a separate `StandaloneStore` only if lifecycle/business rules materially differ. If only configuration differs, reuse Store with explicit host configuration.
 
-## 7. Tenant, store, market, and currency
+## 8. Tenant, store, market, and currency
 These are distinct concepts:
 - Tenant: SaaS account boundary.
 - Store: merchant business.
@@ -72,15 +87,15 @@ These are distinct concepts:
 
 Pakistan is the initial market. Future UK support should use market settings/adapters for address/postcode, payments, tax/invoicing, and locale. Verify current legal requirements before implementation. Persist explicit currency codes and appropriate decimal money values. Snapshot item prices, discounts, taxes, fees, and currency on orders; historical totals must not change when catalog settings change.
 
-## 8. Authentication and session security
-- Use short-lived JWT access tokens and rotating refresh tokens as accepted in `docs/decisions.md`.
+## 9. Authentication and session security
+- Use short-lived JWT access tokens and rotating refresh tokens as accepted in `decisions.md`.
 - Detect refresh-token reuse and revoke the affected token family/session according to the approved implementation design.
 - Do not store plaintext refresh tokens; protect stored token material and revoke sessions securely.
 - Lock an account for 15 minutes after 5 failed login attempts. Account lockout is not a replacement for IP/request rate limiting.
 - Avoid leaking whether a particular account exists through login and recovery responses.
 - Keep token contents minimal and avoid placing secrets or sensitive personal data in JWT claims.
 
-## 9. Data and workflows
+## 10. Data and workflows
 - Each module owns its schema and persistence mapping.
 - Use database constraints and short transactions for important invariants.
 - Do not hold a transaction open during slow external network calls.
@@ -89,12 +104,12 @@ Pakistan is the initial market. Future UK support should use market settings/ada
 - Plan migrations and backward compatibility before destructive schema changes. Review migration contents before applying them.
 - Do not execute or apply migrations without explicit user authorization.
 
-## 10. API and application design
+## 11. API and application design
 Conceptual request path: `HTTP endpoint → authentication → authorization/context resolution → application use case → owning module/persistence → response`.
 
 Use validation at boundaries, clear error contracts, bounded pagination, projections, async I/O, safe logging, and parameterized queries. Add layers only where they serve a real responsibility. Validate client-controlled prices, discounts, IDs, ownership, and state transitions on the server.
 
-## 11. Security and operational controls
+## 12. Security and operational controls
 - Authorize every protected server operation and verify resource ownership.
 - Enforce scope in list/detail/create/update/delete/export/report/job/webhook/admin paths.
 - Validate webhook signatures and make handlers safe to retry.
@@ -103,8 +118,8 @@ Use validation at boundaries, clear error contracts, bounded pagination, project
 - Use safe errors; do not leak stack traces or internal details to clients.
 - Use rate limits for abuse-prone endpoints and understand cache invalidation/scope.
 
-## 12. Performance
+## 13. Performance
 Use async I/O, projections, bounded pagination, indexes based on real query patterns, and avoid N+1 queries/unbounded loads. Measure before caching or architectural changes. Cache keys/results must be user-, tenant-, and store-safe with clear invalidation. Use background processing for suitable long tasks, with retries and idempotency.
 
-## 13. Decisions and evidence
-Accepted decisions and open questions are in `docs/decisions.md`. Current implementation status is in `docs/current-state.md`. Roadmap milestones are not evidence of implementation. Verify the latest repository commit before each task and update architecture only when a decision or verified structure changes.
+## 14. Decisions and evidence
+Accepted decisions and open questions are in `decisions.md`. Current implementation status is in `current-state.md`. Roadmap milestones are not evidence of implementation. Verify the latest repository commit before each task and update architecture only when a decision or verified structure changes.

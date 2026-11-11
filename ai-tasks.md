@@ -5,8 +5,7 @@
 | Participant | Responsibility | Must avoid |
 |---|---|---|
 | ChatGPT Account 1 — Project Manager | Coordinates the project, defines tasks and acceptance criteria, maintains roadmap priorities, oversees architecture, evaluates reports, and recommends acceptance. | Editing repository files, Git writes, or independently approving architecture changes. |
-| DeepSeek Harness — Preparation Engineer | Researches the repository, investigates issues, prepares technical plans, implementation instructions, and handovers. May implement only explicitly approved isolated, low-risk tasks. | Taking over the primary implementation or independent review role. |
-| OpenCode + Nemotron — Primary Developer | Owns primary implementation for approved tasks, makes the scoped changes, and supplies exact diffs and completion reports. | Scope expansion, unrelated refactoring, unauthorized commands, or Git writes. |
+| OpenCode — Primary implementation agent | Owns primary implementation for approved tasks, makes the scoped changes, and supplies exact diffs and completion reports. | Scope expansion, unrelated refactoring, unauthorized commands, or Git writes. |
 | ChatGPT Account 2 — Independent Reviewer | Independently reviews actual implementation, architecture, security, compatibility, and acceptance criteria. Read-only. | Editing implementation files, implementing fixes, or relying only on the developer's report. |
 | User — Project Owner | Approves scope and architecture, controls Git operations, performs manual testing, and makes final acceptance decisions. | Treating an unverified report as proof of completion. |
 
@@ -69,15 +68,15 @@ Git inspection must remain read-only.
    - Specify baseline, scope, approved files, exclusions, and acceptance criteria.
    - Prepare the task prompt.
 
-2. **DeepSeek Harness — Prepare**
+2. **OpenCode — Prepare**
    - Inspect the relevant repository areas.
    - Investigate dependencies, existing patterns, and risks.
    - Prepare a concise technical plan and handover for the implementation owner.
    - Do not implement the same task unless explicitly assigned a separate implementation slice.
 
-3. **OpenCode + Nemotron — Implement**
+3. **OpenCode — Implement**
    - Verify the same baseline and local working-tree state.
-   - Follow the approved task and DeepSeek handover.
+   - Follow the approved task.
    - Modify only approved files.
    - Provide exact diffs and a concise completion report.
    - Do not run tests, builds, or migrations without specific user authorization.
@@ -89,7 +88,7 @@ Git inspection must remain read-only.
    - Remain read-only.
    - Report actionable findings with severity and file/line references.
 
-5. **OpenCode + Nemotron — Correct**
+5. **OpenCode — Correct**
    - Address only approved review findings in a separate micro-task.
    - Provide a new diff and report.
    - Do not expand the original scope.
@@ -107,8 +106,7 @@ Git inspection must remain read-only.
 ### Coordination rules
 
 - One implementation owner per task.
-- OpenCode + Nemotron is the default primary implementation owner.
-- DeepSeek may implement only an explicitly approved, isolated, low-risk task with its own named owner.
+- OpenCode is the default primary implementation owner.
 - ChatGPT Account 2 is always read-only.
 - ChatGPT Account 1 coordinates and recommends; it does not modify the repository.
 - Only one AI agent may modify a shared working tree at a time.
@@ -164,8 +162,8 @@ Before using this template, complete the mandatory briefing standard in §13, in
 - Working tree: [clean / relevant local changes]
 
 ## Owner
-- Implementation owner: [OpenCode + Nemotron / DeepSeek Harness]
-- Preparation: [DeepSeek Harness, if applicable]
+- Implementation owner: [OpenCode]
+- Preparation: [OpenCode, if applicable]
 - Reviewer: ChatGPT Account 2
 - Coordinator: ChatGPT Account 1
 
@@ -286,8 +284,7 @@ Do not recommend a commit while critical review findings remain or verification 
 ## 12. Final authority
 
 ChatGPT Account 1 coordinates and recommends.
-DeepSeek Harness prepares and investigates.
-OpenCode + Nemotron implements approved tasks.
+OpenCode prepares and implements approved tasks.
 ChatGPT Account 2 independently reviews.
 The user owns scope, architecture approval, Git operations, manual testing, and final acceptance.
 
@@ -339,8 +336,8 @@ Every brief must end with these four items, written concretely:
 ## 5. Expected result
 ## 6. Files and scope
 ## 7. Responsible agents
-- Preparation: DeepSeek Harness
-- Implementation: OpenCode + Nemotron
+- Preparation: [OpenCode or designated preparer]
+- Implementation: [OpenCode]
 - Independent review: ChatGPT Account 2 (read-only)
 - Coordination: ChatGPT Account 1
 - Final authority: User
@@ -409,3 +406,233 @@ A task is incomplete if required documentation is missing or materially misleadi
 ### 14.8 Scope of application
 
 This standard governs: task briefs, handovers and reviews; module overview documents; endpoint and API documentation; configuration documentation; and code comments. It does not require retrofitting every existing document at once; a documentation audit can be a separately approved task.
+
+## 15. Guided Development, Learning and Approval Policy
+
+These six sections are mandatory project-wide rules for all participating development agents.
+
+### 15.1 Development and Testing
+
+- The implementation agent may inspect the repository and approved files.
+- It may run relevant builds and automated tests after implementation when these are included in an approved implementation task.
+- It must report exact commands, results, failures and skipped tests.
+- Broader test suites may be run when justified.
+- Do not fix unrelated failures without approval.
+- Documentation-only tasks must not run builds or tests unless specifically requested.
+
+### 15.2 Git Operations — Explicit Approval Required
+
+Before performing any Git operation that changes repository state, the agent must:
+
+1. Explain the purpose.
+2. Show the exact command.
+3. Explain benefits, risks and consequences.
+4. Explain whether it affects branches, commits or remote repositories.
+5. Obtain explicit Project Owner approval.
+
+This applies to:
+
+- Staging.
+- Committing.
+- Pushing.
+- Branch creation or switching.
+- Merging.
+- Rebasing.
+- Cherry-picking.
+- Resetting.
+- Cleaning.
+- Reverting.
+- History rewriting.
+
+Read-only inspection commands such as `git status`, `git log`, `git diff` and branch listing are permitted.
+
+Asking for approval is not authorization. Wait for explicit approval before executing the operation.
+
+### 15.3 Database and Destructive Operations
+
+Before migrations, database updates, schema changes, data deletion or destructive operations:
+
+- Explain the purpose.
+- Identify expected changes.
+- Identify affected databases, tables and records.
+- Explain backup and rollback arrangements.
+- Present practical alternatives with advantages and disadvantages.
+- Recommend the safest approach.
+- Wait for explicit Project Owner approval.
+
+Never assume approval from an earlier discussion or another approved task.
+
+### 15.4 Guided Learning and Decision Support
+
+The implementation agent must help the Project Owner understand technical work.
+
+For every important decision or approval request, explain:
+
+1. What decision is required.
+2. The technical background in plain language.
+3. Why the decision is necessary.
+4. Practical options.
+5. Advantages and disadvantages of each option.
+6. Security, architecture, performance, maintenance and future impacts where relevant.
+7. The recommended option and justification.
+8. The exact approval or decision requested.
+
+Avoid unexplained jargon. Use practical Dastarkhwan examples.
+
+Do not merely ask the Project Owner to approve a technical change without explaining what it means and why it matters.
+
+### 15.5 Approval Boundaries
+
+- Never assume approval from silence.
+- Never assume approval from a previous decision unless it explicitly covers the current action.
+- Do not implement unapproved architectural changes.
+- Do not expand task scope without approval.
+- Stop and ask when unexpected risks, dependencies or baseline mismatches arise.
+- Architecture approval does not automatically authorize implementation, database operations or Git operations.
+- The Project Owner retains final authority.
+
+### 15.6 Completion and Learning Report
+
+At task completion, report:
+
+- What changed and why.
+- Files modified.
+- Builds and tests executed with actual results.
+- Important technical concepts learned.
+- Decisions made and approvals received.
+- Remaining risks and outstanding work.
+- Suggested next step.
+
+Do not claim tests passed unless they were actually executed and their results are available.
+
+## 16. Teaching, Knowledge Transfer and Code Commenting Standards
+
+These are permanent project-wide standards for implementation, review and documentation tasks.
+
+### 16.1 Teach the Project Owner Throughout Development
+
+Act as both a developer and a technical instructor.
+
+Do not simply make changes and provide a completion report.
+
+Whenever an important or unfamiliar concept is introduced, explain:
+
+1. **What it is:** Explain in simple language.
+2. **How it works:** Describe its operation in Dastarkhwan.
+3. **Why it is needed:** Explain the problem it solves.
+4. **Where it is used:** Identify the relevant module, class, interface, method or file.
+5. **Alternatives:** Explain practical alternatives where they exist.
+6. **Trade-offs:** Explain advantages, disadvantages, risks and maintenance implications.
+7. **Recommendation:** Explain why the selected approach is appropriate.
+
+Use practical Dastarkhwan examples.
+
+Teach progressively without overwhelming the Project Owner. Focus on concepts relevant to the current task instead of unrelated tutorials.
+
+### 16.2 Explain Meaningful Code Changes
+
+For every meaningful implementation change, explain:
+
+- What the previous code did.
+- What the new code does.
+- Why the change was necessary.
+- How relevant classes, interfaces and methods interact.
+- How the change affects other modules.
+- Security, performance, scalability and maintenance implications.
+
+Where useful, provide a small before-and-after example or explain the execution flow step by step.
+
+### 16.3 Code Comments and XML Documentation
+
+Add useful code comments where they improve understanding and long-term maintainability.
+
+Comments should explain:
+
+- Why a non-obvious implementation or design choice exists.
+- Important business rules and architectural boundaries.
+- Security-sensitive behaviour and fail-closed decisions.
+- Non-obvious validation, error handling and edge cases.
+- Important dependencies and lifecycle assumptions.
+- Integration requirements.
+- Workarounds and why they are necessary.
+
+Use appropriate XML documentation for important public C# interfaces, classes and methods when their purpose, behaviour or usage is not self-evident.
+
+For complex methods, explain important steps and reasoning rather than documenting every line.
+
+**Commenting rules:**
+
+- Prefer clear, self-explanatory names and simple code.
+- Do not add comments that merely repeat the code.
+- Do not add excessive comments to every line.
+- Keep comments accurate when implementation changes.
+- Remove or update misleading and obsolete comments.
+- Do not use comments as a substitute for good architecture or documentation.
+- Explain important security assumptions explicitly.
+- Never expose secrets, credentials, tokens or sensitive configuration in comments.
+
+### 16.4 Learning-Oriented Completion Report
+
+In addition to the normal completion report, include:
+
+1. **What I learned:** Important technical concepts introduced or clarified.
+2. **How the implementation works:** A simple explanation of the execution flow.
+3. **Code walkthrough:** Important changed files, classes, interfaces and methods.
+4. **Comments and documentation:** Where comments or XML documentation were added or updated, and why.
+5. **Future considerations:** Concepts the Project Owner should understand before extending the implementation.
+
+### 16.5 Permanent Application
+
+Apply these standards to future Dastarkhwan implementation, review and documentation tasks.
+
+The goal is not merely to produce working software. The goal is to help the Project Owner progressively understand the system, its architecture, security and codebase so they can confidently maintain it and make informed decisions.
+
+## 17. Execution Instructions
+
+Follow this sequence:
+
+**Step 1 — Baseline verification**
+
+Verify local repository path, branch, HEAD and working-tree status. Stop on any unexpected discrepancy.
+
+**Step 2 — Documentation inspection**
+
+Read the actual instruction and architecture documents. Identify outdated statements, contradictions and missing requirements.
+
+**Step 3 — Change plan**
+
+Prepare a concise file-by-file change plan. Explain any ambiguity before proceeding.
+
+**Step 4 — Documentation implementation**
+
+Update only the authorized existing files. Keep changes focused and preserve unrelated content.
+
+**Step 5 — Self-review**
+
+Check all acceptance criteria, architecture consistency, task statuses, file references and agent instructions.
+
+**Step 6 — Completion report**
+
+Provide:
+
+- Baseline branch, SHA and date.
+- Working-tree status.
+- Exact files modified.
+- Summary of each document change.
+- Important architecture and governance updates.
+- Confirmation of excluded operations not performed.
+- Remaining risks or unresolved questions.
+- Learning and knowledge-transfer summary.
+- Suggested next step.
+
+Provide exact diffs or a sufficiently detailed file-by-file change summary so the Project Owner and reviewers can inspect the work.
+
+**Step 7 — Stop for review**
+
+Stop after providing the completion report.
+
+Do not begin another task.
+
+Wait for ChatGPT Account 1 review, independent ChatGPT Account 2 review and the Project Owner's manual acceptance.
+
+Do not start `DK-TENANT-ACCESS-FOUNDATION-01` automatically.

@@ -9,9 +9,14 @@ Read the relevant instructions before acting. Do not assume another agent has al
 | Participant | Role |
 |---|---|
 | ChatGPT Account 1 | Project Manager and Architecture Coordinator |
-| DeepSeek Harness | Preparation Engineer |
-| OpenCode + Nemotron | Primary Developer |
+| OpenCode | Primary implementation agent |
 | ChatGPT Account 2 | Independent Reviewer — read-only |
+| Kimi | Architecture discussion, research and critique |
+| DeepSeek Web | Research and technical preparation |
+| OpenHands | Repository exploration and planning; isolated implementation only when explicitly assigned and not concurrently editing with OpenCode |
+| Claude | Limited reserve for difficult implementation or security/architecture review |
+| Kilo | Unavailable until the Project Owner says otherwise |
+| DeepSeek Harness | Unavailable until the Project Owner says otherwise |
 | User | Project Owner and final decision-maker |
 
 Full responsibilities and coordination rules are defined in `ai-tasks.md`.
@@ -43,8 +48,8 @@ Never overwrite or discard existing work.
 ## 4. Non-negotiable rules
 
 - One implementation owner per task.
-- OpenCode + Nemotron is the default primary implementation owner.
-- DeepSeek Harness prepares plans and handovers; it implements only explicitly approved isolated, low-risk tasks.
+- OpenCode is the default primary implementation owner.
+- OpenCode prepares plans and handovers; it implements only explicitly approved isolated, low-risk tasks.
 - ChatGPT Account 2 reviews independently and remains read-only.
 - ChatGPT Account 1 coordinates and recommends acceptance; it does not modify repository files.
 - Only one AI agent may modify a shared working tree at a time.
@@ -75,16 +80,9 @@ Consult `architecture.md` and `decisions.md` before proposing boundary changes.
 
 ## 6. DeepSeek Harness
 
-Default responsibilities:
+Unavailable until the Project Owner says otherwise.
 
-- Read-only repository investigation.
-- Dependency and error analysis.
-- Technical planning and implementation handovers.
-- Preparing focused task prompts and evidence.
-
-Implementation is permitted only when the user explicitly approves a separate, isolated, low-risk task and names DeepSeek as its owner.
-
-## 7. OpenCode + Nemotron
+## 7. OpenCode
 
 Primary implementation responsibilities:
 

@@ -32,10 +32,10 @@ A status must describe the evidence available, not the intended architecture or 
 
 | Field | Value |
 |---|---|
-| Snapshot HEAD | `576c84d2ca0fb59b30266440e90d96faa04f264f` |
+| Snapshot HEAD | `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9` |
 | Parent commit | `43c21792ff3f7e6ed8bdce15b1246e9c0b060a9c` |
 | Branch | `master` |
-| Latest commit message | `test(architecture): normalize test-project paths symmetrically` |
+| Latest commit message | `test(access): enable FK enforcement in scope consistency test` |
 | Evidence basis | Committed-file inspection at the snapshot HEAD. The remote was not queried; no claims are made about remote state. |
 | Local working-tree status | Clean at inspection time (`git status --short` returned empty). Not verified remotely. |
 | Scope | Point-in-time record of committed repository evidence |
@@ -82,7 +82,10 @@ The following source findings were inspected at `daa7326` and remain applicable 
 | Identity | In progress | Identity implementation exists. The available evidence does not establish completion of the accepted Identity responsibilities or account lockout. |
 | Identity migrations | Under review | Identity migration artifacts are committed under `CoreKit.Identity/Migrations/`. Schema correctness, compatibility and database application are not verified. |
 | Identity role and permission ownership | Under review | The accepted target assigns roles and permissions to Access. The implementation ownership transfer must be verified against current Identity and Access entities, services, persistence and consumers before claiming completion. |
-| Tenant | In progress | `CoreKit.Tenant/CoreKit.Tenant.csproj` still directly references `CoreKit.Identity`; Tenant → Identity decoupling remains incomplete. |
+| Tenant | In progress | `CoreKit.Tenant/CoreKit.Tenant.csproj` references `CoreKit.SharedKernel`; no direct `CoreKit.Identity` project reference found at source level (D-015 direct-dependency requirement completed at project-reference level). Remaining Identity-related semantic coupling persists in `TenantActor` (`ICurrentUser.Permissions`) and must be classified before removal. Tenant–Access authorization integration is not yet implemented or verified. |
+| Tenant–Access authorization | Pending | Tenant–Access authorization integration through Access public contracts is not yet implemented or verified. No Tenant adapter for Access public abstractions exists in the inspected source. |
+| Platform authorization | Pending | Platform-wide/cross-tenant authorization is not yet implemented. No Access-owned platform authorization design has been established. |
+| Per-operation permission enforcement | Pending | Tenant permission enforcement across individual protected operations is not yet implemented. Named Access permissions are not enforced across Tenant operations. |
 | Tenant isolation | In progress | `CoreKit.Tenant/Isolation/TenantAwareDbContext.cs` contains tenant query-filter logic. `CoreKit.Tenant.Tests/IsolationTests.cs` contains isolation test coverage. These files alone do not prove complete enforcement across all application operations. |
 | Tenant migrations | Under review | Tenant migration artifacts have changed and are committed at `43c2179`. Compatibility and database application are not verified. |
 | Store and later product modules | Pending | No implementation completion is established for Store, Catalog, Cart, Orders, Payments, Fulfillment, Website or Marketplace. |
@@ -98,7 +101,7 @@ The following source findings were inspected at `daa7326` and remain applicable 
 | M2 — Module foundation | In progress | Boundary tests cover SharedKernel, Identity, Access and Tenant, with Tenant → Identity as an explicit temporary exception under D-015. Access suites now live in `CoreKit.Access.Tests` (S2.1 under review); boundary enforcement uses evaluated project references (S2.2 in progress). |
 | M3 — Identity | In progress | Identity exists; completion of lockout and the role/permission ownership transfer is not established. |
 | M4 — Access | In progress | Access services, endpoints and tests exist. Migration artifacts are committed and require review. Role ownership transfer and manual verification remain open. |
-| M5 — Tenant and Store | In progress | Tenant still references Identity directly. Store implementation is pending. |
+| M5 — Tenant and Store | In progress | Tenant has no direct `CoreKit.Identity` project reference at HEAD `5dfa796c` (D-015 direct-dependency completed at source level). Remaining Identity semantic coupling in `TenantActor` and Tenant–Access authorization integration (D-016) are outstanding. Store implementation is pending. |
 | M6 — SaaS Subscription (`CoreKit.Subscription`) | Pending | No implementation completion established. |
 | M7–M14 | Pending | Product implementation and acceptance have not been established. |
 
@@ -111,7 +114,8 @@ Decision statements are recorded in `decisions.md`, which remains the single sou
 | D-002 — Identity and Access ownership | Under review | The target assigns authentication and identity lifecycle to Identity, and roles, permissions, assignments and authorization to Access. Verify current entities, services, persistence and consumers before claiming the ownership transfer is complete. S6.1/S6.2 remain open. |
 | D-011 — Tenant data isolation | In progress | `CoreKit.Tenant/Isolation/TenantAwareDbContext.cs` contains tenant query-filter logic. `CoreKit.Tenant.Tests/IsolationTests.cs` includes tenant-isolation test coverage. Complete enforcement across application services, authorization, background jobs and other access paths is not established by these references alone. |
 | D-012 — Authentication and session approach | Under review | The accepted policy is recorded in `decisions.md`. The available evidence does not establish completion of refresh-token rotation, reuse detection, revocation and account lockout together. Verify the relevant Identity implementation before updating this status. |
-| D-015 — Tenant–Identity dependency | In progress | `CoreKit.Tenant/CoreKit.Tenant.csproj` still directly references `CoreKit.Identity`. Tenant decoupling is not complete. |
+| D-015 — Tenant–Identity dependency | Completed at source level (direct dependency) | No direct `CoreKit.Identity` project reference in `CoreKit.Tenant/CoreKit.Tenant.csproj` at HEAD `5dfa796c`; D-015's direct-dependency requirement is met at project-reference level. Remaining Identity-related semantic coupling in `TenantActor` (`ICurrentUser.Permissions`) is classified as outstanding and must be resolved separately. |
+| D-016 — Tenant requires Access for authorization | Pending | Decision accepted (2026-11-11). Tenant–Access authorization integration is not yet implemented or verified. No Tenant adapter for Access public abstractions exists in the inspected source. Platform authorization and per-operation permission enforcement remain outstanding. |
 
 ## Deferred decisions
 
@@ -138,23 +142,28 @@ Do not resolve these prematurely. Decide only when the dependent milestone needs
 
 The current agreed operating allocation is:
 
-- **DeepSeek Harness — Preparation Engineer:** repository investigation, research, planning and technical handovers.
-- **OpenCode + Nemotron — Implementation:** implement only explicitly approved micro-slices.
-- **ChatGPT Account 2 — Independent Reviewer:** read-only review of implementation, architecture and security.
-- **ChatGPT Account 1 — Project Manager:** coordination, architecture oversight, task definition and acceptance recommendation.
-- **User — Project Owner:** final authority, scope and architecture approval, manual testing, Git operations and acceptance.
+- **ChatGPT Account 1 — Project Manager and Architecture Coordinator:** defines tasks, coordinates agents, maintains roadmap and milestones, evaluates reports, recommends acceptance. Does not modify repository files or perform Git writes.
+- **OpenCode — Primary implementation agent:** implements approved development tasks, supplies exact diffs, provides completion reports.
+- **ChatGPT Account 2 — Independent read-only reviewer:** inspects actual implementation, architecture, security, and focused diff. Read-only.
+- **Kimi — Architecture discussion, research and critique.**
+- **DeepSeek Web — Research and technical preparation.**
+- **OpenHands — Repository exploration and planning; isolated implementation only when explicitly assigned and not concurrently editing with OpenCode.**
+- **Claude — Limited reserve for difficult implementation or security/architecture review.**
+- **Kilo — Unavailable until the Project Owner says otherwise.**
+- **DeepSeek Harness — Unavailable until the Project Owner says otherwise.**
+- **User — Project Owner:** final authority, manual testing and all Git write operations.
 
 Only one agent may modify the shared working tree at a time. All participating agents must verify and report the same baseline SHA.
 
-### Instruction-file discrepancy
+### Instruction-file synchronization
 
-`CLAUDE.md`, `ai-tasks.md` and `AGENTS.md` now state the current allocation (ChatGPT Account 1, DeepSeek Harness, OpenCode + Nemotron, ChatGPT Account 2, User) and the mandatory task briefing standard (`ai-tasks.md` §13). Instruction-file verification performed at `ee554189`; the historical snapshot HEAD remains `576c84d`.
+`CLAUDE.md`, `ai-tasks.md`, `AGENTS.md`, `roadmap.md` and `current-state.md` now state the current agent allocation (ChatGPT Account 1, OpenCode, ChatGPT Account 2, Kimi, DeepSeek Web, OpenHands, Claude, Kilo unavailable, DeepSeek Harness unavailable, User) and the mandatory task briefing standard (`ai-tasks.md` §13). Verified at HEAD `5dfa796c` (2026-11-11).
 
 ## Next proposed work
 
 Follow the ordered micro-slices in `roadmap.md`.
 
-S1 remains in progress until the corrected `current-state.md` and `roadmap.md` are manually applied, independently reviewed and accepted by the user.
+S1 documentation synchronization changes have been applied at HEAD `5dfa796c` (2026-11-11). Independent review and Project Owner acceptance remain pending.
 
 After S1, follow the approved roadmap queue. Migration artifacts committed at `43c2179` require review; their presence does not authorize database application.
 
@@ -167,6 +176,7 @@ After S1, follow the approved roadmap queue. Migration artifacts committed at `4
 | 2026-11-08 | Snapshot refreshed at `daa7326`; historical M0 baseline preserved; current snapshot recorded separately; accepted decisions separated from implementation | Committed-file inspection at `daa7326`; local working-tree details were separately reported and not remotely verified |
 | 2026-11-08 | Current snapshot updated for `43c2179`; committed Access, Identity and Tenant migration artifacts recorded; evidence labels and agent-allocation discrepancy clarified | GitHub committed-file inspection at `43c2179`; local working-tree and database state not verified |
 | 2026-11-08 | Snapshot refreshed to `576c84d`; S2.1 recorded Under review; architecture-test evidence updated; obsolete instruction-file discrepancy removed; mandatory task briefing recorded in `ai-tasks.md` §13 | Committed-file inspection at `576c84d`; local tree clean at inspection; no tests or builds run |
+| 2026-11-11 | Snapshot refreshed to `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9`; D-016 (Tenant requires Access for authorization) recorded; D-015 direct-dependency marked completed at source level; Tenant–Access integration, platform authorization and per-operation enforcement recorded as Pending; agent allocation synchronized to current team | Committed-file inspection at `5dfa796c`; local tree clean at inspection; no tests or builds run |
 
 ## Update rules
 

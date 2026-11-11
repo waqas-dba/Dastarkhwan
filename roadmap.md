@@ -9,7 +9,7 @@ Build a secure, reusable modular SaaS platform for food-item delivery and parcel
 - Verify the actual latest commit and local working-tree status before each task. `9555b8c` is the historical M0 baseline, not the current HEAD.
 - Inspect only relevant files. Do not assume a feature is missing without checking current code.
 - Break work into small, independently reviewable micro-slices; one approved slice per request.
-- Current agreed workflow: DeepSeek Harness prepares plans and technical handovers; OpenCode + Nemotron implement approved slices; ChatGPT Account 2 independently reviews read-only; ChatGPT Account 1 coordinates and recommends acceptance; the user approves, verifies manually and controls all Git operations.
+- Current agreed workflow: OpenCode prepares plans and technical handovers; OpenCode implements approved slices; ChatGPT Account 2 independently reviews read-only; ChatGPT Account 1 coordinates and recommends acceptance; the user approves, verifies manually and controls all Git operations.
 - Only one agent modifies the shared working tree at a time. Every participating agent verifies and reports its own baseline SHA.
 - `CLAUDE.md`, `ai-tasks.md` and `AGENTS.md` state the current agent allocation and the mandatory task briefing standard (`ai-tasks.md` §13). Verify them before relying on role assignments.
 - AI may add or update tests but must not run tests or builds without explicit permission. The user normally performs verification manually.
@@ -35,7 +35,7 @@ Decision statements live in `decisions.md` and are not repeated here. Deferred d
 
 ## Near-term execution queue (one micro-slice per request)
 
-Slices are prepared by DeepSeek Harness, implemented by OpenCode + Nemotron, independently reviewed by ChatGPT Account 2, coordinated by ChatGPT Account 1, and approved by the user. Verify the actual repository and local working tree before each slice. Obtain explicit user approval before implementation or any state-changing command.
+Slices are prepared by OpenCode, implemented by OpenCode, independently reviewed by ChatGPT Account 2, coordinated by ChatGPT Account 1, and approved by the user. Verify the actual repository and local working tree before each slice. Obtain explicit user approval before implementation or any state-changing command.
 
 | Slice | Task | Status | Boundary / completion evidence |
 |---|---|---|---|
@@ -44,8 +44,9 @@ Slices are prepared by DeepSeek Harness, implemented by OpenCode + Nemotron, ind
 | S2.2 | Update architecture-test coverage and references for intended modules | In progress | Boundary rules cover SharedKernel, Identity, Access and Tenant, with a documented temporary exception. Boundary enforcement now evaluates actual MSBuild project references (imports included), validates solution inventory/classification and the IVT policy. Tests have not been run as part of this documentation task. |
 | S3 | Review the Access migration | Under review | Access migration files are committed under `CoreKit.Access/Migrations/` at `43c2179`. Review schema, constraints, relationships and compatibility. Database application requires separate explicit authorization. |
 | S4.1 | Inventory Tenant-to-Identity references and classify each | Reported complete (not independently verified) | Previously reported inventory requires refresh against the current implementation and an approved artifact. |
-| S4.2 | Define and approve SharedKernel contracts for the dependency | Pending | Contract ownership and dependency direction must be approved before implementation. |
-| S4.3 | Remove Tenant's direct Identity dependency | Pending | `CoreKit.Tenant/CoreKit.Tenant.csproj` still references `CoreKit.Identity`. |
+| S4.2 | Tenant–Access foundation: establish public contract integration, tenant scope context, membership adapter, safe DI composition and fail-closed behavior | Pending | Access public contracts (`IAccessScopeContext`, `IAccessMembership`, `IAccessService`, `IPermissionChecker`) are available. Tenant adapter and DI composition not yet implemented. |
+| S4.3 | Platform authorization: define and implement explicit Access-owned platform/cross-tenant authorization | Pending | Platform authorization design not yet established. Must not be combined with tenant-scoped permission enforcement. |
+| S4.4 | Tenant permission enforcement: enforce named Access permissions across protected Tenant operations | Pending | Per-operation permission enforcement not yet implemented. Fail-closed behavior for missing/invalid authorization must be established. |
 | S5.1 | Inspect current Identity login and failed-attempt flow | Pending | Produce a focused design covering thresholds, duration, reset behavior, concurrency and rate limiting. |
 | S5.2 | Implement account lockout | Pending | Implement the accepted five-failed-attempt, fifteen-minute policy with focused tests. Tests are not run by AI unless separately authorized. |
 | S6.1 | Inventory role and permission ownership and dependencies | Reported complete (not independently verified) | Previously reported inventory and dependency map require refresh against current source and an approved artifact. |

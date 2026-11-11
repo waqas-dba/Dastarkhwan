@@ -9,12 +9,12 @@ Build a secure, reusable modular SaaS platform for food-item delivery and parcel
 - Verify the actual latest commit and local working-tree status before each task. `9555b8c` is the historical M0 baseline, not the current HEAD.
 - Inspect only relevant files. Do not assume a feature is missing without checking current code.
 - Break work into small, independently reviewable micro-slices; one approved slice per request.
-- Current agreed workflow: OpenCode prepares plans and technical handovers; OpenCode implements approved slices; ChatGPT Account 2 independently reviews read-only; ChatGPT Account 1 coordinates and recommends acceptance; the user approves, verifies manually and controls all Git operations.
+- Current agreed workflow: OpenCode prepares plans and technical handovers; OpenCode implements approved slices; ChatGPT Account 2 independently reviews read-only; ChatGPT Account 1 coordinates and recommends acceptance; the user approves, verifies manually and controls Git operation approval.
 - Only one agent modifies the shared working tree at a time. Every participating agent verifies and reports its own baseline SHA.
 - `CLAUDE.md`, `ai-tasks.md` and `AGENTS.md` state the current agent allocation and the mandatory task briefing standard (`ai-tasks.md` §13). Verify them before relying on role assignments.
 - **Implementation tasks:** relevant builds and automated tests may be run after implementation when explicitly included in the approved task. The agent must report exact commands, results, failures and skipped tests. Broader or expensive test suites require justification and approval where appropriate. Do not fix unrelated failures without approval. **Documentation-only tasks:** no builds or tests unless specifically requested.
 - AI does not execute migrations or modify databases without explicit permission. Creating migration files also requires approval for that specific slice.
-- **Git:** inspection commands are permitted without approval. Git operations that change repository state require explicit Project Owner approval before execution. AI never performs Git write operations without such approval. The user alone stages, commits, pushes, merges and controls repository history.
+- **Git:** inspection commands are permitted without approval. Git operations that change repository state require explicit Project Owner approval before execution. AI never performs Git write operations without such approval. The user retains final approval authority over repository history.
 - Update documentation only when facts, decisions or status change. Do not duplicate material across files.
 
 ## M0 — Repository baseline

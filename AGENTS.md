@@ -52,7 +52,7 @@ Never overwrite or discard existing work.
 - ChatGPT Account 2 reviews independently and remains read-only.
 - ChatGPT Account 1 coordinates and recommends acceptance; it does not modify repository files.
 - Only one AI agent may modify a shared working tree at a time.
-- The user controls all Git write operations.
+- The user retains final authority over Git write operations. Agents may execute Git write operations only after explicit Project Owner approval.
 - Git inspection commands are permitted without approval. Git operations that change repository state require explicit Project Owner approval before execution.
 - Never run tests, builds, or migrations without explicit authorization for that specific action. Relevant builds and automated tests may be run after implementation when explicitly included in an approved implementation task; documentation-only tasks do not run builds or tests unless specifically requested.
 - Creating migration files requires explicit approval.

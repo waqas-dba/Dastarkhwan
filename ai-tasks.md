@@ -5,9 +5,15 @@
 | Participant | Responsibility | Must avoid |
 |---|---|---|
 | ChatGPT Account 1 — Project Manager | Coordinates the project, defines tasks and acceptance criteria, maintains roadmap priorities, oversees architecture, evaluates reports, and recommends acceptance. | Editing repository files, Git writes, or independently approving architecture changes. |
-| OpenCode — Primary implementation agent | Owns primary implementation for approved tasks, makes the scoped changes, and supplies exact diffs and completion reports. | Scope expansion, unrelated refactoring, unauthorized commands, or Git writes. |
+| OpenCode — Primary implementation agent | Owns primary implementation for approved tasks, makes the scoped changes, and supplies exact diffs and completion reports. | Scope expansion, unrelated refactoring, unauthorized commands, or Git writes without explicit approval. |
 | ChatGPT Account 2 — Independent Reviewer | Independently reviews actual implementation, architecture, security, compatibility, and acceptance criteria. Read-only. | Editing implementation files, implementing fixes, or relying only on the developer's report. |
-| User — Project Owner | Approves scope and architecture, controls Git operations, performs manual testing, and makes final acceptance decisions. | Treating an unverified report as proof of completion. |
+| OpenHands — Repository exploration and planning | Repository exploration, planning, and separately assigned isolated implementation. Read-only unless explicitly assigned a separate task. | Editing files outside an explicitly assigned scope; modifying the same shared working tree as OpenCode simultaneously. |
+| Kimi — Architecture discussion and critique | Research, architecture discussion and critique. | Implementation or repository modification. |
+| DeepSeek Web — Research and technical preparation | Research and technical preparation only. Not DeepSeek Harness. Do not assign implementation work by implication. | Implementation work or repository modification. |
+| Claude — Difficult implementation reserve | Difficult implementation and security/architecture review reserve; limited usage. | Repository modification outside an explicitly assigned scope. |
+| Kilo — Unavailable | Do not assign until the Project Owner confirms availability. | Any repository work. |
+| DeepSeek Harness — Unavailable | Do not assign until the Project Owner confirms availability. | Any repository work. |
+| User — Project Owner | Approves scope and architecture, controls Git operation approval, performs manual testing, and makes final acceptance decisions. | Treating an unverified report as proof of completion. |
 
 The user is the final authority. AI agents coordinate and recommend; they do not independently approve architecture changes or releases.
 
@@ -100,7 +106,7 @@ Git inspection must remain read-only.
 
 7. **User — Verify and decide**
    - Run manual tests and any approved verification.
-   - Perform all Git write operations.
+   - Retains final authority over Git write operations; agents execute Git write operations only after explicit Project Owner approval.
    - Approve or reject the task's final acceptance.
 
 ### Coordination rules
@@ -194,7 +200,7 @@ Before using this template, complete the mandatory briefing standard in §13, in
 - Follow CLAUDE.md and accepted decisions.
 - Inspect existing implementation before changing it.
 - Keep the smallest compatible change.
-- Do not run tests/builds/migrations without explicit authorization.
+- Relevant builds and automated tests may be run after implementation when explicitly included in the approved task; documentation-only tasks do not run builds or tests unless specifically requested. Do not run builds, tests, or migrations without explicit authorization where the task does not include them.
 
 ## Completion report
 - Baseline hash and working-tree status:
@@ -262,7 +268,7 @@ An implementation report is not independent verification. A reviewer report is n
 
 ## 11. Git commit message guidance
 
-The user performs all Git write operations. AI may suggest a commit subject and body only after the implementation is complete, review findings are resolved, and required user verification has been performed.
+The user retains final authority over Git write operations. Agents may execute Git write operations only after explicit Project Owner approval. AI may suggest a commit subject and body only after the implementation is complete, review findings are resolved, and required user verification has been performed.
 
 Use:
 
@@ -287,7 +293,7 @@ Do not recommend a commit while critical review findings remain or verification 
 ChatGPT Account 1 coordinates and recommends.
 OpenCode prepares and implements approved tasks.
 ChatGPT Account 2 independently reviews.
-The user owns scope, architecture approval, Git operations, manual testing, and final acceptance.
+The user owns scope, architecture approval, manual testing, and final acceptance. The user retains final authority over Git write operations; agents execute Git write operations only after explicit Project Owner approval.
 
 ## 13. Mandatory task briefing standard
 

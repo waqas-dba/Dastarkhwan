@@ -65,7 +65,7 @@ A micro-task should normally change one concern and have a clear review boundary
 
 ## 6. Agent responsibilities
 
-The approved team consists of four AI participants and the user.
+The approved team consists of multiple AI participants and the user.
 
 | Participant | Responsibility |
 |---|---|
@@ -73,19 +73,20 @@ The approved team consists of four AI participants and the user.
 | OpenCode | Primary implementation agent. Implements approved development tasks, supplies exact diffs, and provides completion reports. |
 | ChatGPT Account 2 | Independent Reviewer. Reviews actual code, architecture, security, and the focused diff. Read-only. |
 | Kimi | Architecture discussion, research and critique. |
-| DeepSeek Web | Research and technical preparation. |
+| DeepSeek Web | Research and technical preparation only. |
 | OpenHands | Repository exploration and planning; isolated implementation only when explicitly assigned and not concurrently editing with OpenCode. |
 | Claude | Limited reserve for difficult implementation or security/architecture review. |
 | Kilo | Unavailable until the Project Owner says otherwise. |
 | DeepSeek Harness | Unavailable until the Project Owner says otherwise. |
-| User | Project Owner. Approves scope and architecture, controls Git operations, performs manual testing, and makes final acceptance decisions. |
+| User | Project Owner. Approves scope and architecture, controls Git operation approval, performs manual testing, and makes final acceptance decisions. |
 
 Coordination rules:
 
 - ChatGPT Account 1 coordinates but does not modify repository files or perform Git writes.
 - OpenCode normally prepares implementation plans and handovers.
 - OpenCode is the default implementation owner.
-- DeepSeek may implement only when the user explicitly assigns it a separate, isolated, low-risk implementation task. That task must have one clearly named owner.
+- DeepSeek Web may perform research and technical preparation only; it is not DeepSeek Harness and must not be assigned implementation work.
+- DeepSeek Harness may implement only when the user explicitly assigns it a separate, isolated, low-risk implementation task. That task must have one clearly named owner.
 - ChatGPT Account 2 performs independent read-only review and does not implement fixes.
 - One implementation owner per task.
 - Only one AI agent may modify a shared working tree at a time.
@@ -143,7 +144,7 @@ Do not start frontend/UI work or later business workflows until their roadmap de
 
 ## 10. Git restrictions
 
-The user alone controls Git write operations.
+The user retains final authority over Git write operations. Agents may execute Git write operations only after explicit Project Owner approval.
 
 Git inspection commands (`git status`, `git log`, `git diff`, branch listing) are permitted without approval.
 

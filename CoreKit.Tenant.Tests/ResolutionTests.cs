@@ -387,6 +387,67 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
     }
 
     [Fact]
+    public async Task AuthenticatedUser_WithValidNameIdentifierClaim_Proceeds()
+    {
+        var tenant = _env.AddTenant();
+        var userId = Guid.NewGuid();
+        _env.AddMember(tenant.Id, userId);
+
+        var context = new DefaultHttpContext();
+        context.User = new ClaimsPrincipal(new ClaimsIdentity(
+            new[]
+            {
+                new Claim(TenantClaimTypes.TenantId, tenant.Id.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, userId.ToString())
+            }, "test"));
+
+        var run = await RunAsync(context);
+
+        Assert.True(run.NextCalled);
+        Assert.Equal(tenant.Id, _env.CurrentTenant.Id);
+    }
+
+    [Fact]
+    public async Task AuthenticatedUser_WithMalformedNameIdentifierClaim_IsRejected()
+    {
+        var tenant = _env.AddTenant();
+
+        var context = new DefaultHttpContext();
+        context.User = new ClaimsPrincipal(new ClaimsIdentity(
+            new[]
+            {
+                new Claim(TenantClaimTypes.TenantId, tenant.Id.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, "not-a-guid")
+            }, "test"));
+
+        var run = await RunAsync(context);
+
+        Assert.False(run.NextCalled);
+        Assert.Equal(403, run.Context.Response.StatusCode);
+        Assert.False(_env.CurrentTenant.IsResolved);
+    }
+
+    [Fact]
+    public async Task AuthenticatedUser_WithEmptyGuidNameIdentifier_IsRejected()
+    {
+        var tenant = _env.AddTenant();
+
+        var context = new DefaultHttpContext();
+        context.User = new ClaimsPrincipal(new ClaimsIdentity(
+            new[]
+            {
+                new Claim(TenantClaimTypes.TenantId, tenant.Id.ToString()),
+                new Claim(ClaimTypes.NameIdentifier, Guid.Empty.ToString())
+            }, "test"));
+
+        var run = await RunAsync(context);
+
+        Assert.False(run.NextCalled);
+        Assert.Equal(403, run.Context.Response.StatusCode);
+        Assert.False(_env.CurrentTenant.IsResolved);
+    }
+
+    [Fact]
     public async Task MembershipLookupFailure_DeniesAccess()
     {
         var tenant = _env.AddTenant();

@@ -83,18 +83,21 @@ public sealed class TenantResolutionMiddleware
 
         // Validate current membership for authenticated users. A valid JWT with a tenant claim is
         // not enough — the user must currently be a member of the resolved tenant. Removed members
-        // are refused even when their token has not expired.
+        // are refused even when their token has not expired. An authenticated request without a
+        // valid user ID cannot be mapped to a member and is refused.
         if (context.User.Identity?.IsAuthenticated == true)
         {
             var userId = GetUserId(context.User);
-            if (userId is { } uid && userId != Guid.Empty)
+            if (userId is null)
             {
-                var member = await _membershipReader.FindAsync(tenant.Id, uid, ct);
-                if (member is null)
-                {
-                    await WriteErrorAsync(context, TenantErrors.Forbidden("You are not a member of this tenant."));
-                    return;
-                }
+                await WriteErrorAsync(context, TenantErrors.Forbidden("Invalid user identity."));
+                return;
+            }
+            var member = await _membershipReader.FindAsync(tenant.Id, userId.Value, ct);
+            if (member is null)
+            {
+                await WriteErrorAsync(context, TenantErrors.Forbidden("You are not a member of this tenant."));
+                return;
             }
         }
 

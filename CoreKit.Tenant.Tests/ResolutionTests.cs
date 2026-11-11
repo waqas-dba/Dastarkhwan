@@ -158,8 +158,10 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
     public async Task ClaimResolvesAnActiveTenant()
     {
         var tenant = _env.AddTenant();
+        var user = Guid.NewGuid();
+        _env.AddMember(tenant.Id, user);
 
-        var run = await RunAsync(Request(claim: tenant.Id));
+        var run = await RunAsync(Request(claim: tenant.Id, userId: user));
 
         Assert.True(run.NextCalled);
         Assert.Equal(tenant.Id, _env.CurrentTenant.Id);
@@ -207,8 +209,10 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
     {
         _env.Config.Resolution.TrustHeader = true;
         var tenant = _env.AddTenant();
+        var user = Guid.NewGuid();
+        _env.AddMember(tenant.Id, user);
 
-        var run = await RunAsync(Request(claim: tenant.Id, header: tenant.Id.ToString()));
+        var run = await RunAsync(Request(claim: tenant.Id, header: tenant.Id.ToString(), userId: user));
 
         Assert.True(run.NextCalled);
         Assert.Equal(tenant.Id, _env.CurrentTenant.Id);
@@ -220,8 +224,10 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
         _env.Config.Resolution.TrustHeader = true;
         var own = _env.AddTenant("Own", "own");
         var other = _env.AddTenant("Other", "other");
+        var user = Guid.NewGuid();
+        _env.AddMember(own.Id, user);
 
-        var run = await RunAsync(Request(claim: own.Id, header: other.Id.ToString()));
+        var run = await RunAsync(Request(claim: own.Id, header: other.Id.ToString(), userId: user));
 
         Assert.False(run.NextCalled);
         Assert.Equal(403, run.Context.Response.StatusCode);
@@ -260,7 +266,9 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
     public async Task SuspendingATenantBlocksItsNextRequestRightAway()
     {
         var tenant = _env.AddTenant();
-        Assert.True((await RunAsync(Request(claim: tenant.Id))).NextCalled);
+        var user = Guid.NewGuid();
+        _env.AddMember(tenant.Id, user);
+        Assert.True((await RunAsync(Request(claim: tenant.Id, userId: user))).NextCalled);
 
         // The platform administrator acts in a request of their own, where no tenant is resolved.
         using (_env.CurrentTenant.Change(null))
@@ -282,7 +290,7 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
         var user = Guid.NewGuid();
         _env.AddMember(tenant.Id, user);
 
-        var run = await RunAsync(Request(claim: tenant.Id));
+        var run = await RunAsync(Request(claim: tenant.Id, userId: user));
 
         Assert.True(run.NextCalled);
         Assert.Equal(tenant.Id, _env.CurrentTenant.Id);
@@ -318,6 +326,63 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
         Assert.False(run.NextCalled);
         Assert.Equal(403, run.Context.Response.StatusCode);
         Assert.Contains("You are not a member of this tenant", run.Body);
+        Assert.False(_env.CurrentTenant.IsResolved);
+    }
+
+    [Fact]
+    public async Task AuthenticatedUser_WithoutUserId_IsRejected()
+    {
+        var tenant = _env.AddTenant();
+
+        var context = new DefaultHttpContext();
+        context.User = new ClaimsPrincipal(new ClaimsIdentity(
+            new[] { new Claim(TenantClaimTypes.TenantId, tenant.Id.ToString()) },
+            "test"));
+
+        var run = await RunAsync(context);
+
+        Assert.False(run.NextCalled);
+        Assert.Equal(403, run.Context.Response.StatusCode);
+        Assert.False(_env.CurrentTenant.IsResolved);
+    }
+
+    [Fact]
+    public async Task AuthenticatedUser_WithMalformedUserId_IsRejected()
+    {
+        var tenant = _env.AddTenant();
+
+        var context = new DefaultHttpContext();
+        context.User = new ClaimsPrincipal(new ClaimsIdentity(
+            new[]
+            {
+                new Claim(TenantClaimTypes.TenantId, tenant.Id.ToString()),
+                new Claim("sub", "not-a-guid")
+            }, "test"));
+
+        var run = await RunAsync(context);
+
+        Assert.False(run.NextCalled);
+        Assert.Equal(403, run.Context.Response.StatusCode);
+        Assert.False(_env.CurrentTenant.IsResolved);
+    }
+
+    [Fact]
+    public async Task AuthenticatedUser_WithEmptyGuidUserId_IsRejected()
+    {
+        var tenant = _env.AddTenant();
+
+        var context = new DefaultHttpContext();
+        context.User = new ClaimsPrincipal(new ClaimsIdentity(
+            new[]
+            {
+                new Claim(TenantClaimTypes.TenantId, tenant.Id.ToString()),
+                new Claim("sub", Guid.Empty.ToString())
+            }, "test"));
+
+        var run = await RunAsync(context);
+
+        Assert.False(run.NextCalled);
+        Assert.Equal(403, run.Context.Response.StatusCode);
         Assert.False(_env.CurrentTenant.IsResolved);
     }
 

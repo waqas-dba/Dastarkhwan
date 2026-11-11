@@ -26,7 +26,7 @@ public class RoleAssignmentScopeConsistencyTests : IDisposable
     {
         _dbPath = Path.Combine(Path.GetTempPath(), $"RoleAssignmentScopeConsistency_{Guid.NewGuid():N}.db");
         var options = new DbContextOptionsBuilder<AccessDbContext>()
-            .UseSqlite($"DataSource={_dbPath}")
+            .UseSqlite($"DataSource={_dbPath};Foreign Keys=True")
             .Options;
         _db = new AccessDbContext(options);
         _db.Database.EnsureCreated();

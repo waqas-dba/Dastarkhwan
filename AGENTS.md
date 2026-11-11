@@ -12,7 +12,7 @@ Read the relevant instructions before acting. Do not assume another agent has al
 | OpenCode | Primary implementation agent |
 | ChatGPT Account 2 | Independent Reviewer — read-only |
 | Kimi | Architecture discussion, research and critique |
-| DeepSeek Web | Research and technical preparation |
+| DeepSeek Web | Research and technical preparation only. Not DeepSeek Harness; do not assign implementation work. |
 | OpenHands | Repository exploration and planning; isolated implementation only when explicitly assigned and not concurrently editing with OpenCode |
 | Claude | Limited reserve for difficult implementation or security/architecture review |
 | Kilo | Unavailable until the Project Owner says otherwise |

@@ -44,7 +44,7 @@ The latest repository snapshot is `beb0a0b`, a documentation-only commit. It cha
 
 The previous documentation synchronization commit is `45a5789`.
 
-The source-inspection baseline for the Tenant/Identity and Tenant/Access findings remains `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9`. That earlier baseline was used to inspect source code and classify Tenant's Identity dependency status. The documentation-only commits at `45a5789` and `beb0a0b` did not re-inspect source code; no claim is made that source behavior changed between these baselines.
+The source-inspection baseline for the Tenant/Identity and Tenant/Access findings remains `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9`. That earlier baseline was used to inspect source code and classify Tenant's Identity dependency status. The documentation-only commits at `45a5789`, `beb0a0b` and `d7585c3` did not re-inspect source code; no claim is made that source behavior changed between these baselines.
 
 The historical M0 baseline `9555b8c` remains unchanged.
 
@@ -163,13 +163,13 @@ Only one agent may modify the shared working tree at a time. All participating a
 
 ### Instruction-file synchronization
 
-`CLAUDE.md`, `ai-tasks.md`, `AGENTS.md`, `roadmap.md` and `current-state.md` now state the current agent allocation (ChatGPT Account 1, OpenCode, ChatGPT Account 2, Kimi, DeepSeek Web, OpenHands, Claude, Kilo unavailable, DeepSeek Harness unavailable, User) and the mandatory task briefing standard (`ai-tasks.md` §13). Verified at HEAD `beb0a0b` (2026-11-11).
+`CLAUDE.md`, `ai-tasks.md`, `AGENTS.md`, `roadmap.md` and `current-state.md` now state the current agent allocation (ChatGPT Account 1, OpenCode, ChatGPT Account 2, Kimi, DeepSeek Web, OpenHands, Claude, Kilo unavailable, DeepSeek Harness unavailable, User) and the mandatory task briefing standard (`ai-tasks.md` §13). Verified at HEAD `d7585c3` (2026-11-11).
 
 ## Next proposed work
 
 Follow the ordered micro-slices in `roadmap.md`.
 
-S1 documentation synchronization changes were committed at `45a5789` (2026-11-11). Correction tasks `DK-TENANT-ACCESS-DOCS-FIX1` and `DK-TENANT-ACCESS-DOCS-FIX2` address review findings. Governance corrections were committed at `beb0a0b` (2026-11-11). S1 remains Under review until independent review and Project Owner acceptance are complete.
+S1 documentation synchronization changes were committed at `45a5789` (2026-11-11). Correction tasks `DK-TENANT-ACCESS-DOCS-FIX1`, `DK-TENANT-ACCESS-DOCS-FIX2` and `DK-TENANT-ACCESS-DOCS-FIX3` address review findings. Governance corrections were committed at `d7585c3` (2026-11-11). S1 remains Under review until independent review and Project Owner acceptance are complete.
 
 After S1, follow the approved roadmap queue. Migration artifacts committed at `43c2179` require review; their presence does not authorize database application.
 
@@ -185,6 +185,7 @@ After S1, follow the approved roadmap queue. Migration artifacts committed at `4
 | 2026-11-11 | Snapshot refreshed to `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9`; D-016 (Tenant requires Access for authorization) recorded; D-015 direct-dependency marked completed at source level; Tenant–Access integration, platform authorization and per-operation enforcement recorded as Pending; agent allocation synchronized to current team | Committed-file inspection at `5dfa796c`; local tree clean at inspection; no tests or builds run |
 | 2026-11-11 | Documentation synchronization committed at `45a578958e555b9cb3fc77a5ae602f796fd270b1`; correction task `DK-TENANT-ACCESS-DOCS-FIX1` addresses review findings; S1 remains Under review; source-inspection baseline preserved at `5dfa796c` | Committed-file inspection at `45a5789`; local tree clean at inspection; no tests or builds run |
 | 2026-11-11 | Governance corrections committed at `beb0a0b550f1d825d416c48ae0a69fef188ea303`; snapshot updated to `beb0a0b`; source-inspection baseline preserved at `5dfa796c`; Git, build/test and agent-role wording harmonized | Committed-file inspection at `beb0a0b`; local tree clean at inspection; no tests or builds run |
+| 2026-11-11 | Final documentation evidence corrections committed at `d7585c34cd1c06d5119bb3c51ea29c7178273b39`; corrected commit attribution and instruction-file synchronization references; source-inspection baseline preserved at `5dfa796c`; DeepSeek Web restricted to research and technical preparation only | Committed-file inspection at `d7585c3`; local tree clean at inspection; no tests or builds run |
 
 ## Update rules
 

@@ -26,7 +26,7 @@ internal static class ModuleBoundaryMatrix
             ["CoreKit.SharedKernel"] = Array.Empty<string>(),
             ["CoreKit.Identity"] = new[] { "CoreKit.SharedKernel" },
             ["CoreKit.Access"] = Array.Empty<string>(),
-            ["CoreKit.Tenant"] = new[] { "CoreKit.SharedKernel" },
+            ["CoreKit.Tenant"] = new[] { "CoreKit.Access", "CoreKit.SharedKernel" },
         };
 
     /// <summary>
@@ -40,6 +40,7 @@ internal static class ModuleBoundaryMatrix
             ["CoreKit.Identity/CoreKit.Identity.csproj"] = new[] { "CoreKit.SharedKernel/CoreKit.SharedKernel.csproj" },
             ["CoreKit.Tenant/CoreKit.Tenant.csproj"] = new[]
             {
+                "CoreKit.Access/CoreKit.Access.csproj",
                 "CoreKit.SharedKernel/CoreKit.SharedKernel.csproj",
             },
             ["CoreKit.SharedKernel/CoreKit.SharedKernel.csproj"] = Array.Empty<string>(),

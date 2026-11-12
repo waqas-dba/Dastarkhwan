@@ -32,19 +32,24 @@ A status must describe the evidence available, not the intended architecture or 
 
 | Field | Value |
 |---|---|
-| Snapshot HEAD | `e3221563853887816bbda20df4c05a0304aa7ced` |
-| Parent commit | `45fb17f6fc511f6eace7d5444711e75bd899eba9` |
+| Snapshot HEAD | `548dca791009d094ef7e2e9bd917a3bc0b8b0f0c` |
+| Parent commit | `e3221563853887816bbda20df4c05a0304aa7ced` |
 | Branch | `master` |
 | Latest commit message | `docs: update current-state.md snapshot and implementation status` |
 | Evidence basis | Git metadata inspection at the snapshot HEAD. The remote was not queried; no claims are made about remote state. |
 | Local working-tree status | Clean at inspection time (`git status --short` returned empty). Not verified remotely. |
 | Scope | Point-in-time record of committed repository evidence |
 
-The latest repository HEAD is `e3221563853887816bbda20df4c05a0304aa7ced` (`docs: update current-state.md snapshot and implementation status`, 2026-11-12 20:52:19 +0500). This is a documentation-only commit that updates `current-state.md` and does not change application source code.
+The current pre-correction repository baseline is `548dca791009d094ef7e2e9bd917a3bc0b8b0f0c` (`docs: update current-state.md snapshot and implementation status`, 2026-11-12 21:05:43 +0500). This is a documentation-only commit that updates `current-state.md` and does not change application source code. The working tree at HEAD `e4f4284d41250f9d5b91e6b0e8050b0695d431fa` differs only by the unrelated `COMPLETION_AC-07-IMPL1.md` change; `current-state.md` is identical at `548dca` and HEAD. `e322156` is not the current HEAD; it is the parent of `548dca`.
 
-The previous documentation commit is `beb0a0b550f1d825d416c48ae0a69fef188ea303` (DK-TENANT-ACCESS-DOCS-FIX1, documentation-only).
+Four baselines are distinguished in this file:
 
-The source-inspection baseline for the Tenant/Identity and Tenant/Access findings remains `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9`. That earlier baseline was used to inspect source code and classify Tenant's Identity dependency status. Documentation-only commits at `45a5789`, `beb0a0b`, `d7585c3`, `335b9ed`, `0504f3a`, `6e79f13`, `c9d4b36`, and `959c6ab` did not re-inspect source code; no claim is made that source behavior changed between these baselines except where explicitly noted below.
+- Historical M0 baseline: `9555b8c` (2026-10-23) — inspection-only historical baseline from the M0 report.
+- Source-inspection baseline: `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9` (2026-11-11) — used to inspect source code and classify Tenant's Identity dependency status.
+- Historical documentation snapshot: `beb0a0b550f1d825d416c48ae0a69fef188ea303` (2026-11-11) — documentation/governance corrections commit, not a source-inspection baseline.
+- Current pre-correction repository baseline: `548dca791009d094ef7e2e9bd917a3bc0b8b0f0c` (2026-11-12) — the snapshot inspected for this correction.
+
+The source-inspection baseline for the Tenant/Identity and Tenant/Access findings remains `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9`. Documentation-only commits at `45a5789`, `beb0a0b`, `d7585c3`, `335b9ed`, `0504f3a`, `6e79f13`, and `c9d4b36` did not re-inspect source code; no claim is made that source behavior changed between these baselines except where explicitly noted below. Commit `959c6ab` is not documentation-only: it changed Tenant source, Tenant tests, Identity lockout migrations, and `commands.txt`.
 
 Note on commit attribution: The `335b9ed` commit (DK-TENANT-ACCESS-DOCS-FIX3) carries the immutable historical commit message "docs: correct FIX2 commit attribution and DeepSeek Web role." Although this message references FIX2 work, `335b9ed` is the FIX3 correction commit; it is recorded here as FIX3 to preserve the actual commit history without rewriting it.
 

@@ -40,11 +40,7 @@ public sealed class TenantAccessScopeContextTests
     public void Current_ReturnsNull_WhenTenantIdIsEmpty()
     {
         var current = new CurrentTenant();
-        current.Set(Guid.Empty);
-
-        var context = new TenantAccessScopeContext(current);
-
-        Assert.Null(context.Current);
+        Assert.Throws<ArgumentException>(() => current.Set(Guid.Empty));
     }
 }
 

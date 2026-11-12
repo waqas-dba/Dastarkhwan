@@ -1,6 +1,8 @@
 using CoreKit.Access.Abstractions;
 using CoreKit.Access.Constants;
+using CoreKit.Access.Extensions;
 using CoreKit.Tenant.Integration;
+using CoreKit.Tenant.Extensions;
 using Microsoft.Extensions.Configuration;
 
 namespace CoreKit.Tenant.Tests;
@@ -19,9 +21,9 @@ public sealed class TenantAccessScopeContextTests
         var scope = context.Current;
 
         Assert.NotNull(scope);
-        Assert.Equal(AccessScope.TenantType, scope!.Type);
-        Assert.Equal(tenantId, scope.Id);
-        Assert.True(scope.IsValid);
+        Assert.Equal(AccessScope.TenantType, scope.Value.Type);
+        Assert.Equal(tenantId, scope.Value.Id);
+        Assert.True(scope.Value.IsValid);
     }
 
     [Fact]
@@ -167,7 +169,7 @@ public sealed class AccessIntegrationDIRegistrationTests
         var services = new ServiceCollection();
 
         var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Tenant:MaxSettingsPerTenant"] = "1",
                 ["Tenant:InfoCacheSeconds"] = "0",
@@ -193,7 +195,7 @@ public sealed class AccessIntegrationDIRegistrationTests
         var services = new ServiceCollection();
 
         var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string>
+            .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Tenant:MaxSettingsPerTenant"] = "1",
                 ["Tenant:InfoCacheSeconds"] = "0",

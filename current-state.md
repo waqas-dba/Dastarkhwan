@@ -32,8 +32,8 @@ A status must describe the evidence available, not the intended architecture or 
 
 | Field | Value |
 |---|---|
-| Snapshot HEAD | `0504f3a14d707a8ceb4a1baf0dcb161e4e3b3de2` |
-| Parent commit | `335b9ed750e3f3b9f222c678067bb802d1b7e984` |
+| Snapshot HEAD | `959c6ab99f406eec56161f7dae71f94a5f432771` |
+| Parent commit | `c9d4b36ee56450d214599c4103520278442efd46` |
 | Branch | `master` |
 | Latest commit message | `docs: clarify historical governance commit attribution` |
 | Evidence basis | Git metadata inspection at the snapshot HEAD. The remote was not queried; no claims are made about remote state. |

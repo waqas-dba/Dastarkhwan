@@ -112,7 +112,7 @@ public sealed class AccessAuditLogTests : IDisposable
 
         var pageSize0 = ResultAssert.Ok(await Svc.ListAsync(page: 1, pageSize: 0));
         Assert.Equal(1, pageSize0.PageSize);
-        Assert.Equal(1, pageSize0.Items.Count);
+        Assert.Single(pageSize0.Items);
 
         var pageSizeLarge = ResultAssert.Ok(await Svc.ListAsync(page: 1, pageSize: 999));
         Assert.Equal(200, pageSizeLarge.PageSize);

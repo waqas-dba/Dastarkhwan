@@ -7,7 +7,7 @@ You need to set the PostgreSQL connection string in your current PowerShell sess
 Replace `YOUR_PASSWORD` with your actual PostgreSQL password:
 
 ```
-$env:ConnectionStrings__Identity = "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=YOUR_PASSWORD"
+$env:ConnectionStrings__Identity = "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123"
 ```
 
 If PostgreSQL is on another server, replace `127.0.0.1` with its actual IP address.
@@ -32,11 +32,50 @@ After inspecting and approving the generated migration:
 
 ```
 dotnet ef database update --project CoreKit.Identity --startup-project CoreKit.SampleHost --context IdentityDbContext
+dotnet ef database update --project CoreKit.Identity/CoreKit.Identity.csproj
 ```
 
-### Important
 
-- The environment variable remains available only in the current PowerShell session.
-- Do not paste your actual database password here.
-- Confirm the database is `dasterkhwan_db`, not `saas_db`.
-- Keep database update on hold: OpenCode's diagnostic fixes and the independent security review are not yet complete. Creating the migration should also wait until the implementation is reviewed.
+[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Identity", "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123", [System.EnvironmentVariableTarget]::User)
+[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Access", "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123", [System.EnvironmentVariableTarget]::User)
+[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Tenant", "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123", [System.EnvironmentVariableTarget]::User)
+
+
+"ConnectionStrings": {
+  "Iam": "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123",
+  "Tenant": "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123",
+  "Access": "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123"
+},
+
+
+
+{
+  "ConnectionStrings": {
+    "Iam": "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123",
+    "Tenant": "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123",
+    "Access": "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123"
+  },
+  "Iam": {
+    "Jwt": {
+      "SigningKey": "a-random-string-of-at-least-32-characters!!",
+      "Issuer": "iam-sample",
+      "Audience": "iam-sample-clients"
+    },
+    "Seed": {
+      "AdminEmail": "admin@example.com",
+      "AdminPassword": "a-long-test-password"
+    },
+    "EmailVerification": {
+      "RequireConfirmedEmail": true
+    }
+  }
+}
+
+PS D:\waqas-dba\Dastarkhwan> $env:ConnectionStrings__Access = "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123"
+PS D:\waqas-dba\Dastarkhwan> dotnet ef database update --project D:\waqas-dba\Dastarkhwan\CoreKit.Access\CoreKit.Access.csproj
+
+PS D:\waqas-dba\Dastarkhwan> $env:ConnectionStrings__Tenant = "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123"
+PS D:\waqas-dba\Dastarkhwan> dotnet ef database update --project D:\waqas-dba\Dastarkhwan\CoreKit.Tenant\CoreKit.Tenant.csproj
+
+PS D:\waqas-dba\Dastarkhwan> $env:ConnectionStrings__Identity = "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123"
+PS D:\waqas-dba\Dastarkhwan> dotnet ef database update --project D:\waqas-dba\Dastarkhwan\CoreKit.Identity\CoreKit.Identity.csproj

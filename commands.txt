@@ -1,81 +1,104 @@
-This error means Entity Framework cannot create `IdentityDbContext` because the required environment variable `ConnectionStrings__Identity` is not set.
+## CoreKit – EF Core & Environment Commands
 
-You need to set the PostgreSQL connection string in your current PowerShell session.
+Visual Studio → Tools → NuGet Package Manager → Package Manager Console
 
-### 1. Set the connection string
+### 1. Set PostgreSQL environment variables
 
-Replace `YOUR_PASSWORD` with your actual PostgreSQL password:
-
-```
-$env:ConnectionStrings__Identity = "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123"
-```
-
-If PostgreSQL is on another server, replace `127.0.0.1` with its actual IP address.
-
-### 2. Confirm the variable is set (without displaying the password)
+Replace `YOUR_PASSWORD` with your PostgreSQL password.
 
 ```
-if ($env:ConnectionStrings__Identity) {
-    "Identity connection string is configured."
-}
+$env:ConnectionStrings__Identity = "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=YOUR_PASSWORD"
+
+$env:ConnectionStrings__Tenant = "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=YOUR_PASSWORD"
+
+$env:ConnectionStrings__Access = "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=YOUR_PASSWORD"
 ```
 
-### 3. Create the migration
+### 2. Verify environment variables
 
 ```
-dotnet ef migrations add DK_Core_Security_03A --project CoreKit.Identity --startup-project CoreKit.SampleHost --context IdentityDbContext --output-dir Migrations
+"Identity: " + [bool]$env:ConnectionStrings__Identity
+"Tenant:   " + [bool]$env:ConnectionStrings__Tenant
+"Access:   " + [bool]$env:ConnectionStrings__Access
 ```
 
-### 4. Update the database
-
-After inspecting and approving the generated migration:
+### 3. Save environment variables permanently (Windows User)
 
 ```
-dotnet ef database update --project CoreKit.Identity --startup-project CoreKit.SampleHost --context IdentityDbContext
-dotnet ef database update --project CoreKit.Identity/CoreKit.Identity.csproj
+[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Identity", "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=YOUR_PASSWORD", "User")
+
+[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Tenant", "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=YOUR_PASSWORD", "User")
+
+[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Access", "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=YOUR_PASSWORD", "User")
+```
+
+Restart Visual Studio or open a new terminal to load permanent variables.
+
+### 4. EF Core – DbContext commands
+
+```
+Get-DbContext
+```
+
+### 5. List existing migrations
+
+```
+Get-Migration -Context IdentityDbContext
+Get-Migration -Context TenantDbContext
+Get-Migration -Context AccessDbContext
+```
+
+### 6. Recreate deleted database
+
+```
+Update-Database -Context IdentityDbContext
+Update-Database -Context TenantDbContext
+Update-Database -Context AccessDbContext
+```
+
+### 7. Create new migrations (only after model changes)
+
+```
+Add-Migration MigrationName -Context IdentityDbContext -OutputDir Migrations
+
+Add-Migration MigrationName -Context TenantDbContext -OutputDir Migrations
+
+Add-Migration MigrationName -Context AccessDbContext -OutputDir Migrations
+```
+
+### 8. Other useful EF commands
+
+| Purpose                 | Command                                                        |
+| ----------------------- | -------------------------------------------------------------- |
+| Remove latest migration | `Remove-Migration -Context IdentityDbContext`                  |
+| Generate SQL script     | `Script-Migration -Context IdentityDbContext`                  |
+| Roll back migration     | `Update-Database PreviousMigration -Context IdentityDbContext` |
+| Drop database           | `Drop-Database -Context IdentityDbContext`                     |
+
+### 9. Clear environment variables (if required)
+
+Current PowerShell session:
+
+```
+Remove-Item Env:ConnectionStrings__Identity
+Remove-Item Env:ConnectionStrings__Tenant
+Remove-Item Env:ConnectionStrings__Access
+```
+
+Permanently remove Windows User variables:
+
+```
+[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Identity", $null, "User")
+[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Tenant", $null, "User")
+[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Access", $null, "User")
 ```
 
 
-[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Identity", "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123", [System.EnvironmentVariableTarget]::User)
-[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Access", "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123", [System.EnvironmentVariableTarget]::User)
-[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Tenant", "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123", [System.EnvironmentVariableTarget]::User)
 
+Recommended
 
-"ConnectionStrings": {
-  "Iam": "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123",
-  "Tenant": "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123",
-  "Access": "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123"
-},
+&#x20;For your current database recreation, use sections 1, 2, 5 and 6. No new migration is required.
 
 
 
-{
-  "ConnectionStrings": {
-    "Iam": "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123",
-    "Tenant": "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123",
-    "Access": "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123"
-  },
-  "Iam": {
-    "Jwt": {
-      "SigningKey": "a-random-string-of-at-least-32-characters!!",
-      "Issuer": "iam-sample",
-      "Audience": "iam-sample-clients"
-    },
-    "Seed": {
-      "AdminEmail": "admin@example.com",
-      "AdminPassword": "a-long-test-password"
-    },
-    "EmailVerification": {
-      "RequireConfirmedEmail": true
-    }
-  }
-}
-
-PS D:\waqas-dba\Dastarkhwan> $env:ConnectionStrings__Access = "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123"
-PS D:\waqas-dba\Dastarkhwan> dotnet ef database update --project D:\waqas-dba\Dastarkhwan\CoreKit.Access\CoreKit.Access.csproj
-
-PS D:\waqas-dba\Dastarkhwan> $env:ConnectionStrings__Tenant = "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123"
-PS D:\waqas-dba\Dastarkhwan> dotnet ef database update --project D:\waqas-dba\Dastarkhwan\CoreKit.Tenant\CoreKit.Tenant.csproj
-
-PS D:\waqas-dba\Dastarkhwan> $env:ConnectionStrings__Identity = "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=123"
-PS D:\waqas-dba\Dastarkhwan> dotnet ef database update --project D:\waqas-dba\Dastarkhwan\CoreKit.Identity\CoreKit.Identity.csproj
+Security note: Avoid committing database passwords to Git or storing production credentials in source-controlled configuration files.

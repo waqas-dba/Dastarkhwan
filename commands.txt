@@ -1,104 +1,153 @@
-## CoreKit – EF Core & Environment Commands
+# CoreKit — Development, EF Core, Database, and Git Commands
 
-Visual Studio → Tools → NuGet Package Manager → Package Manager Console
+Reference for the approved/standardized development workflow (see `ai-tasks.md`, `CLAUDE.md`, `AGENTS.md`, and `decisions.md` D-017 Proposed). Use placeholders for all secrets. Never print, log, commit, or report passwords, connection strings, tokens, or other credentials.
 
-### 1. Set PostgreSQL environment variables
+## 0. Scope, safety, and automation boundaries
 
-Replace `YOUR_PASSWORD` with your PostgreSQL password.
+- **Routine (within an approved implementation task, if standing automation is approved):** inspect, implement approved scope, add/update focused tests, run relevant builds/tests/formatting/static analysis, generate/inspect EF Core migrations and SQL scripts when the task changes a model, apply migrations to a **positively identified development database** and verify when included in the task, stage only approved files, commit after required validation/review, and push to the already-authorized branch.
+- **Separate explicit Project Owner approval required:** production database changes; database deletion/recreation/destructive reset; data deletion or irreversible transformations; unapproved migration rollback/downgrade; changes to database credentials or infrastructure; any operation with uncertain target or destructive impact; branch create/switch, pull, merge, rebase, force-push, reset, clean, amend, or history rewriting.
+- **Positive identification:** never assume a database is development based only on its name or an environment variable. Confirm host, database name, purpose, and backup/rollback context before applying migrations.
+- **Unrelated changes:** stop and report if `git status --short` shows unrelated/pre-existing changes; never include them in the task commit.
 
+## 1. Actual repository EF Core configuration (verify before use)
+
+| Module / DbContext | Project | Migrations folder | Design-time factory | Connection string name |
+|---|---|---|---|---|
+| `IdentityDbContext` (`CoreKit.Identity.Persistence.IdentityDbContext`) | `CoreKit.Identity/CoreKit.Identity.csproj` | `CoreKit.Identity/Migrations` | `CoreKit.Identity/Persistence/IdentityDbContextFactory.cs` | `ConnectionStrings:Identity` / `ConnectionStrings__Identity` |
+| `AccessDbContext` (`CoreKit.Access.Persistence.AccessDbContext`) | `CoreKit.Access/CoreKit.Access.csproj` | `CoreKit.Access/Migrations` | `CoreKit.Access/Persistence/AccessDbContextFactory.cs` | `ConnectionStrings:Access` / `ConnectionStrings__Access` |
+| `TenantDbContext` (`CoreKit.Tenant.Persistence.TenantDbContext`) | `CoreKit.Tenant/CoreKit.Tenant.csproj` | `CoreKit.Tenant/Migrations` | `CoreKit.Tenant/Persistence/TenantDbContextFactory.cs` | `ConnectionStrings:Tenant` / `ConnectionStrings__Tenant` |
+
+- Solution: `Dastarkhwan.slnx`
+- Database provider: PostgreSQL (Npgsql), per module configurators/factories (inspect `*DbContextConfigurator.cs`/`*DbContextFactory.cs` for current behavior).
+- History tables and targets: do not assume; inspect `__EFMigrationsHistory` (or configured history table) in the positively identified target database.
+- `CoreKit.SampleHost/appsettings.json` is present; do not store real credentials in source-controlled files.
+
+## 2. Environment variables (PowerShell, placeholders only)
+
+Replace `YOUR_DEV_PASSWORD` and other placeholders only in a secure local session/configuration. Prefer user-secrets or secure environment configuration over source-controlled files.
+
+```powershell
+$env:ConnectionStrings__Identity = "Host=<DEV_HOST>;Port=5432;Database=<DEV_DB>;Username=<DEV_USER>;Password=YOUR_DEV_PASSWORD"
+$env:ConnectionStrings__Tenant   = "Host=<DEV_HOST>;Port=5432;Database=<DEV_DB>;Username=<DEV_USER>;Password=YOUR_DEV_PASSWORD"
+$env:ConnectionStrings__Access   = "Host=<DEV_HOST>;Port=5432;Database=<DEV_DB>;Username=<DEV_USER>;Password=YOUR_DEV_PASSWORD"
 ```
-$env:ConnectionStrings__Identity = "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=YOUR_PASSWORD"
 
-$env:ConnectionStrings__Tenant = "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=YOUR_PASSWORD"
+Verify presence only (never print values):
 
-$env:ConnectionStrings__Access = "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=YOUR_PASSWORD"
-```
-
-### 2. Verify environment variables
-
-```
+```powershell
 "Identity: " + [bool]$env:ConnectionStrings__Identity
 "Tenant:   " + [bool]$env:ConnectionStrings__Tenant
 "Access:   " + [bool]$env:ConnectionStrings__Access
 ```
 
-### 3. Save environment variables permanently (Windows User)
+## 3. Relevant build/test commands (run in approved implementation tasks; report exact results)
 
+```powershell
+dotnet build Dastarkhwan.slnx
+# Targeted examples (adjust to affected scope)
+dotnet test CoreKit.Access.Tests/CoreKit.Access.Tests.csproj
+dotnet test CoreKit.Identity.Tests/CoreKit.Identity.Tests.csproj
+dotnet test CoreKit.Tenant.Tests/CoreKit.Tenant.Tests.csproj
+dotnet test CoreKit.Architecture.Tests/CoreKit.Architecture.Tests.csproj
 ```
-[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Identity", "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=YOUR_PASSWORD", "User")
 
-[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Tenant", "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=YOUR_PASSWORD", "User")
+Run formatting/static analysis only if configured in the repo/task scope and report commands/results. Broader suites require justification where appropriate. Documentation-only tasks: do not run unless specifically requested.
 
-[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Access", "Host=127.0.0.1;Port=5432;Database=dasterkhwan_db;Username=postgres;Password=YOUR_PASSWORD", "User")
+## 4. EF Core migration workflow (when an approved task changes a model)
+
+**Before generating:** identify actual DbContext, migration project, provider, existing migrations, and migration history; confirm the change is in approved scope.
+
+### 4.1 dotnet-ef CLI (PowerShell, from repo root; adjust project/startup if needed)
+
+```powershell
+# Install/update tool if needed (requires approval/environment readiness)
+# dotnet tool install --global dotnet-ef
+# dotnet tool update --global dotnet-ef
+
+# List migrations
+dotnet ef migrations list --project CoreKit.Identity/CoreKit.Identity.csproj --startup-project CoreKit.Identity/CoreKit.Identity.csproj --context IdentityDbContext
+dotnet ef migrations list --project CoreKit.Access/CoreKit.Access.csproj   --startup-project CoreKit.Access/CoreKit.Access.csproj   --context AccessDbContext
+dotnet ef migrations list --project CoreKit.Tenant/CoreKit.Tenant.csproj   --startup-project CoreKit.Tenant/CoreKit.Tenant.csproj   --context TenantDbContext
+
+# Add migration (only for approved model changes; choose descriptive MigrationName)
+dotnet ef migrations add <MigrationName> --project CoreKit.Identity/CoreKit.Identity.csproj --startup-project CoreKit.Identity/CoreKit.Identity.csproj --context IdentityDbContext --output-dir Migrations
+dotnet ef migrations add <MigrationName> --project CoreKit.Access/CoreKit.Access.csproj   --startup-project CoreKit.Access/CoreKit.Access.csproj   --context AccessDbContext   --output-dir Migrations
+dotnet ef migrations add <MigrationName> --project CoreKit.Tenant/CoreKit.Tenant.csproj   --startup-project CoreKit.Tenant/CoreKit.Tenant.csproj   --context TenantDbContext   --output-dir Migrations
+
+# Inspect generated SQL before applying (idempotent script recommended for review)
+dotnet ef migrations script --idempotent --project CoreKit.Identity/CoreKit.Identity.csproj --startup-project CoreKit.Identity/CoreKit.Identity.csproj --context IdentityDbContext
+dotnet ef migrations script --idempotent --project CoreKit.Access/CoreKit.Access.csproj   --startup-project CoreKit.Access/CoreKit.Access.csproj   --context AccessDbContext
+dotnet ef migrations script --idempotent --project CoreKit.Tenant/CoreKit.Tenant.csproj   --startup-project CoreKit.Tenant/CoreKit.Tenant.csproj   --context TenantDbContext
+
+# Apply to POSITIVELY IDENTIFIED development database only (when included in approved task)
+dotnet ef database update --project CoreKit.Identity/CoreKit.Identity.csproj --startup-project CoreKit.Identity/CoreKit.Identity.csproj --context IdentityDbContext
+dotnet ef database update --project CoreKit.Access/CoreKit.Access.csproj   --startup-project CoreKit.Access/CoreKit.Access.csproj   --context AccessDbContext
+dotnet ef database update --project CoreKit.Tenant/CoreKit.Tenant.csproj   --startup-project CoreKit.Tenant/CoreKit.Tenant.csproj   --context TenantDbContext
 ```
 
-Restart Visual Studio or open a new terminal to load permanent variables.
+### 4.2 Visual Studio Package Manager Console (equivalent)
 
-### 4. EF Core – DbContext commands
-
-```
+```powershell
 Get-DbContext
-```
-
-### 5. List existing migrations
-
-```
 Get-Migration -Context IdentityDbContext
-Get-Migration -Context TenantDbContext
 Get-Migration -Context AccessDbContext
+Get-Migration -Context TenantDbContext
+
+Add-Migration <MigrationName> -Context IdentityDbContext -Project CoreKit.Identity -StartupProject CoreKit.SampleHost -OutputDir Migrations
+Add-Migration <MigrationName> -Context AccessDbContext   -Project CoreKit.Access   -StartupProject CoreKit.SampleHost -OutputDir Migrations
+Add-Migration <MigrationName> -Context TenantDbContext   -Project CoreKit.Tenant   -StartupProject CoreKit.SampleHost -OutputDir Migrations
+
+Script-Migration -Idempotent -Context IdentityDbContext -Project CoreKit.Identity -StartupProject CoreKit.SampleHost
+Script-Migration -Idempotent -Context AccessDbContext   -Project CoreKit.Access   -StartupProject CoreKit.SampleHost
+Script-Migration -Idempotent -Context TenantDbContext   -Project CoreKit.Tenant   -StartupProject CoreKit.SampleHost
+
+# Apply to positively identified development database only (when included in approved task)
+Update-Database -Context IdentityDbContext -Project CoreKit.Identity -StartupProject CoreKit.SampleHost
+Update-Database -Context AccessDbContext   -Project CoreKit.Access   -StartupProject CoreKit.SampleHost
+Update-Database -Context TenantDbContext   -Project CoreKit.Tenant   -StartupProject CoreKit.SampleHost
 ```
 
-### 6. Recreate deleted database
+**Notes:** Startup project/context resolution may vary by host/factory; verify actual behavior. `Remove-Migration`, `Drop-Database`, and rollback (`Update-Database <PreviousMigration>` / `database update <PreviousMigration>`) are destructive or state-changing and require separate explicit Project Owner approval with impact/backup/rollback review.
 
-```
-Update-Database -Context IdentityDbContext
-Update-Database -Context TenantDbContext
-Update-Database -Context AccessDbContext
-```
+## 5. Verification and reporting (after dev DB apply, when authorized)
 
-### 7. Create new migrations (only after model changes)
+- Re-run `migrations list` / query migration history in the positively identified dev DB to confirm the migration is applied.
+- Verify expected schema changes (tables/columns/indexes/constraints) for the approved scope.
+- Run affected builds/tests and report exact commands, pass/fail, and skipped tests.
+- Report: migration name(s), DbContext/module, project, database target metadata (host/db purpose only, no secrets), SQL review outcome, apply result, and verification evidence.
 
-```
-Add-Migration MigrationName -Context IdentityDbContext -OutputDir Migrations
+## 6. Weekly migration-drift monitoring (future, read-only — do not run as part of routine implementation)
 
-Add-Migration MigrationName -Context TenantDbContext -OutputDir Migrations
+To be scheduled separately after execution environment and secure DB access are confirmed. **Read-only checks only:** do not apply migrations, delete data, or modify databases.
 
-Add-Migration MigrationName -Context AccessDbContext -OutputDir Migrations
-```
+```powershell
+# Compare code migrations vs target DB state (read-only inspection)
+dotnet ef migrations list --project CoreKit.Identity/CoreKit.Identity.csproj --startup-project CoreKit.Identity/CoreKit.Identity.csproj --context IdentityDbContext
+dotnet ef migrations list --project CoreKit.Access/CoreKit.Access.csproj   --startup-project CoreKit.Access/CoreKit.Access.csproj   --context AccessDbContext
+dotnet ef migrations list --project CoreKit.Tenant/CoreKit.Tenant.csproj   --startup-project CoreKit.Tenant/CoreKit.Tenant.csproj   --context TenantDbContext
 
-### 8. Other useful EF commands
-
-| Purpose                 | Command                                                        |
-| ----------------------- | -------------------------------------------------------------- |
-| Remove latest migration | `Remove-Migration -Context IdentityDbContext`                  |
-| Generate SQL script     | `Script-Migration -Context IdentityDbContext`                  |
-| Roll back migration     | `Update-Database PreviousMigration -Context IdentityDbContext` |
-| Drop database           | `Drop-Database -Context IdentityDbContext`                     |
-
-### 9. Clear environment variables (if required)
-
-Current PowerShell session:
-
-```
-Remove-Item Env:ConnectionStrings__Identity
-Remove-Item Env:ConnectionStrings__Tenant
-Remove-Item Env:ConnectionStrings__Access
+# Optional: generate idempotent script for review/comparison (no DB changes)
+dotnet ef migrations script --idempotent --project CoreKit.Identity/CoreKit.Identity.csproj --startup-project CoreKit.Identity/CoreKit.Identity.csproj --context IdentityDbContext
 ```
 
-Permanently remove Windows User variables:
+Also inspect configured development databases' migration history tables and compare with committed migration files. Report affected module, database metadata (non-secret), migration names, pending migrations, history inconsistencies, and any reliably detectable schema drift. Schema-drift detection may be incomplete from history comparison alone.
 
+## 7. Git (routine, within approved implementation task, if standing automation is approved)
+
+```powershell
+git status --short
+git diff -- <approved-files>
+git add -- <approved-files-only>
+git commit -m "<type>(<scope>): <summary>" -m "<details; no secrets>"
+git push origin <already-authorized-branch>
 ```
-[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Identity", $null, "User")
-[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Tenant", $null, "User")
-[System.Environment]::SetEnvironmentVariable("ConnectionStrings__Access", $null, "User")
-```
 
+Do not include unrelated/pre-existing changes. Do not create/switch branches, pull, merge, rebase, force-push, reset, clean, amend, or rewrite history without separate explicit Project Owner approval.
 
+## 8. Security notes
 
-Recommended
+- Never commit database passwords, connection strings, tokens, or signing keys.
+- Avoid storing production credentials in source-controlled configuration.
+- Treat any previously committed secrets as compromised and rotate per security follow-up guidance.
 
-&#x20;For your current database recreation, use sections 1, 2, 5 and 6. No new migration is required.
-
-
-
-Security note: Avoid committing database passwords to Git or storing production credentials in source-controlled configuration files.
+Keep commands aligned with actual repository configuration; re-verify project paths, contexts, startup project, and database targets before execution.

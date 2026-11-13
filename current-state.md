@@ -32,26 +32,27 @@ A status must describe the evidence available, not the intended architecture or 
 
 | Field | Value |
 |---|---|
-| Snapshot HEAD | `70d757fd099c58de5976383677255ce64aac15e3` |
-| Parent commit | `0ad85149bd9e5dd2f3916c4916953f2b7cc4637c` |
+| Snapshot HEAD | `3f58add6da963669cbc6d113f2bc030478a112c6` |
+| Parent commit | `70d757fd099c58de5976383677255ce64aac15e3` |
 | Branch | `master` |
-| Latest commit message | `feat(access-platform): enforce explicit Platform-scope authorization for platform membership` |
-| Commit date | 2026-11-13 18:23:04 +0500 |
-| Evidence basis | Local Git inspection at HEAD on 2026-11-13 (`git rev-parse HEAD`, `git log -1`, `git show`, `git status --short`). The remote was not queried; no claims are made about remote state, push state, or remote history. |
-| Local working-tree status | Clean at inspection time (`git status --short` returned empty). Not verified remotely. |
-| Scope | Point-in-time record of committed repository evidence at the latest verified local baseline |
+| Latest commit message | `docs: sync status for access platform review and identity boundary planning` |
+| Commit date | 2026-11-13 19:00:39 +0500 |
+| Evidence basis | Local Git inspection at HEAD on 2026-11-13 (`git rev-parse HEAD`, `git log -1`, `git status --short`, `git remote -v`, `git branch -vv`). The remote was not queried for current state beyond configured local tracking; no claims are made about remote-only history. |
+| Local working-tree status | Documentation changes in progress for `DK-DEV-AUTOMATION-01` (authorized instruction/governance files only) at inspection time for this task; verify `git status --short` before relying on a clean tree. Not verified remotely. |
+| Scope | Point-in-time record of committed repository evidence at the latest verified local baseline, plus active documentation synchronization status for this task |
 
-The latest verified local repository baseline for this documentation task is `70d757fd099c58de5976383677255ce64aac15e3` (2026-11-13 18:23:04 +0500). This commit changes Access platform-membership authorization, Access platform-membership tests, and adds an out-of-scope Tenant test file change (see findings below). It is **Under review / Request Changes** and is not accepted implementation evidence. Historical commit information is preserved; this record does not rewrite history or imply retrospective approval for Git operations associated with the commit.
+The latest verified local repository baseline for this documentation task is `3f58add6da963669cbc6d113f2bc030478a112c6` (2026-11-13 19:00:39 +0500). Commit `3f58add` is documentation-only (`architecture.md`, `current-state.md`, `roadmap.md`) and records prior review/planning status synchronization. This record does not constitute independent review acceptance, Project Owner acceptance, or authorization for implementation/tests/builds/migrations/Git writes. Historical commit information is preserved; this record does not rewrite history or imply retrospective approval for Git operations associated with earlier commits.
 
-Five baselines are distinguished in this file:
+Six baselines are distinguished in this file:
 
 - Historical M0 baseline: `9555b8c` (2026-10-23) — inspection-only historical baseline from the M0 report.
 - Source-inspection baseline: `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9` (2026-11-11) — used to inspect source code and classify Tenant's Identity dependency status.
 - Historical documentation snapshot: `beb0a0b550f1d825d416c48ae0a69fef188ea303` (2026-11-11) — documentation/governance corrections commit, not a source-inspection baseline.
-- Previous documentation snapshot: `548dca791009d094ef7e2e9bd917a3bc0b8b0f0c` (2026-11-12) — documentation-only snapshot recorded before this sync.
-- Latest verified local repository baseline: `70d757fd099c58de5976383677255ce64aac15e3` (2026-11-13) — current local HEAD inspected for this task.
+- Previous documentation snapshot: `548dca791009d094ef7e2e9bd917a3bc0b8b0f0c` (2026-11-12) — documentation-only snapshot recorded before later syncs.
+- Previous latest verified local baseline: `70d757fd099c58de5976383677255ce64aac15e3` (2026-11-13) — implementation/review-evidence baseline for `DK-ACCESS-PLATFORM-SCOPE-01` (**Under review / Request Changes**, not accepted).
+- Latest verified local repository baseline: `3f58add6da963669cbc6d113f2bc030478a112c6` (2026-11-13) — current local HEAD inspected for this task.
 
-The source-inspection baseline for the Tenant/Identity and Tenant/Access findings remains `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9`. Documentation-only commits at `45a5789`, `beb0a0b`, `d7585c3`, `335b9ed`, `0504f3a`, `6e79f13`, `c9d4b36`, `548dca`, and related documentation corrections did not re-inspect source code; no claim is made that source behavior changed between these baselines except where explicitly noted. Commit `959c6ab` is not documentation-only (Tenant source/tests, Identity lockout migrations, `commands.txt`). Commit `70d757f` is not documentation-only and is under independent review (Request Changes), not accepted. Distinguish verified local evidence from remote/GitHub state; remote state was not queried.
+The source-inspection baseline for the Tenant/Identity and Tenant/Access findings remains `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9`. Documentation-only commits at `45a5789`, `beb0a0b`, `d7585c3`, `335b9ed`, `0504f3a`, `6e79f13`, `c9d4b36`, `548dca`, `959c6ab` (mixed only where previously recorded), and related documentation corrections did not re-inspect source code; no claim is made that source behavior changed between these baselines except where explicitly noted. Commit `70d757f` is not documentation-only and remains **Under review / Request Changes** (not accepted). Distinguish verified local evidence from remote/GitHub state.
 
 Note on commit attribution: The `335b9ed` commit (DK-TENANT-ACCESS-DOCS-FIX3) carries the immutable historical commit message "docs: correct FIX2 commit attribution and DeepSeek Web role." Although this message references FIX2 work, `335b9ed` is the FIX3 correction commit; it is recorded here as FIX3 to preserve the actual commit history without rewriting it.
 
@@ -148,21 +149,21 @@ Do not resolve these prematurely. Decide only when the dependent milestone needs
 The current agreed operating allocation is:
 
 - **ChatGPT Account 1 — Project Manager and Architecture Coordinator:** defines tasks, coordinates agents, maintains roadmap and milestones, evaluates reports, recommends acceptance. Does not modify repository files or perform Git writes.
-- **OpenCode — Primary implementation agent:** implements approved development tasks, supplies exact diffs, provides completion reports.
+- **OpenCode — Default primary implementation agent:** implements approved development tasks, supplies exact diffs, provides completion reports, and (when covered by approved task/standing automation) performs in-scope validation, EF Core migration/dev-DB steps, and scoped Git operations subject to safeguards and approvals.
+- **Kilo — Alternative primary implementation agent (when assigned):** may own approved implementation tasks following the same workflow, safeguards, reporting, and permission model as OpenCode.
 - **ChatGPT Account 2 — Independent read-only reviewer:** inspects actual implementation, architecture, security, and focused diff. Read-only.
 - **Kimi — Architecture discussion, research and critique.**
 - **DeepSeek Web — Research and technical preparation only. Not DeepSeek Harness; do not assign implementation work.**
-- **OpenHands — Repository exploration and planning; isolated implementation only when explicitly assigned and not concurrently editing with OpenCode.**
+- **OpenHands — Repository exploration and planning; isolated implementation only when explicitly assigned and not concurrently editing with OpenCode or Kilo.**
 - **Claude — Limited reserve for difficult implementation or security/architecture review.**
-- **Kilo — Unavailable until the Project Owner says otherwise.**
 - **DeepSeek Harness — Unavailable until the Project Owner says otherwise.**
-- **User — Project Owner:** final authority, manual testing, and approval of all Git write operations. Agents may execute Git write operations only after explicit Project Owner approval.
+- **User — Project Owner:** final authority, approves scope/architecture and standing automation (e.g. `decisions.md` D-017 if accepted), controls separately required approvals, performs manual testing, and makes final acceptance decisions.
 
-Only one agent may modify the shared working tree at a time. All participating agents must verify and report the same baseline SHA.
+Only one agent may modify the shared working tree at a time. All participating agents must verify and report the same baseline SHA. Routine implementation automation is **proposed** in `D-017` (not yet accepted); until accepted, current accepted decisions (`D-007`, `D-008`) govern command-by-command approvals and Git write operations.
 
 ### Instruction-file synchronization
 
-`CLAUDE.md`, `ai-tasks.md`, `AGENTS.md`, `roadmap.md`, `current-state.md`, `decisions.md`, and `architecture.md` are being synchronized in `DK-DOCS-SYNC-03` at latest verified local baseline `70d757fd099c58de5976383677255ce64aac15e3` (2026-11-13, clean working tree). This synchronization records verified source/review status and open findings/proposals; it does not constitute independent review acceptance, Project Owner acceptance, implementation approval, or authorization for tests/builds/migrations/Git writes. Prior allocation/briefing-standard synchronization remains historically evidenced at `959c6ab` (2026-11-11).
+`CLAUDE.md`, `ai-tasks.md`, `AGENTS.md`, `roadmap.md`, `current-state.md`, `decisions.md`, and `commands.txt` are being synchronized in `DK-DEV-AUTOMATION-01` at latest verified local baseline `3f58add6da963669cbc6d113f2bc030478a112c6` (2026-11-13, documentation-only authorized scope). This synchronization documents the proposed D-017 automation workflow/safeguards and actual EF Core/dev-DB/Git guidance; it does not constitute Project Owner acceptance of D-017, independent review acceptance, implementation approval, or authorization for tests/builds/migrations/Git writes. Prior synchronization remains historically evidenced (including `DK-DOCS-SYNC-03` context recorded for baseline `70d757fd` and earlier commits).
 
 ## Active review and planning items (evidence at latest verified local baseline `70d757fd`)
 

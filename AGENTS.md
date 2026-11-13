@@ -9,13 +9,13 @@ Read the relevant instructions before acting. Do not assume another agent has al
 | Participant | Role |
 |---|---|
 | ChatGPT Account 1 | Project Manager and Architecture Coordinator |
-| OpenCode | Primary implementation agent |
+| OpenCode | Default primary implementation agent |
+| Kilo | Alternative primary implementation agent (follows the same approved workflow and safeguards as OpenCode) |
 | ChatGPT Account 2 | Independent Reviewer — read-only |
 | Kimi | Architecture discussion, research and critique |
 | DeepSeek Web | Research and technical preparation only. Not DeepSeek Harness; do not assign implementation work. |
-| OpenHands | Repository exploration and planning; isolated implementation only when explicitly assigned and not concurrently editing with OpenCode |
+| OpenHands | Repository exploration and planning; isolated implementation only when explicitly assigned and not concurrently editing with OpenCode or Kilo |
 | Claude | Limited reserve for difficult implementation or security/architecture review |
-| Kilo | Unavailable until the Project Owner says otherwise |
 | DeepSeek Harness | Unavailable until the Project Owner says otherwise |
 | User | Project Owner and final decision-maker |
 
@@ -47,21 +47,16 @@ Never overwrite or discard existing work.
 
 ## 4. Non-negotiable rules
 
-- One implementation owner per task.
-- OpenCode is the default primary implementation agent. OpenCode prepares technical plans and handovers and implements only explicitly approved tasks within the assigned scope.
-- ChatGPT Account 2 reviews independently and remains read-only.
-- ChatGPT Account 1 coordinates and recommends acceptance; it does not modify repository files.
-- Only one AI agent may modify a shared working tree at a time.
-- The user retains final authority over Git write operations. Agents may execute Git write operations only after explicit Project Owner approval.
-- Git inspection commands are permitted without approval. Git operations that change repository state require explicit Project Owner approval before execution.
-- Never run tests, builds, or migrations without explicit authorization for that specific action. Relevant builds and automated tests may be run after implementation when explicitly included in an approved implementation task; documentation-only tasks do not run builds or tests unless specifically requested.
-- Creating migration files requires explicit approval.
-- Never expand task scope or modify unapproved files.
-- Never claim unobserved results.
+- One implementation owner per task. Only one AI agent may modify a shared working tree at a time.
+- OpenCode is the default primary implementation agent; Kilo is the alternative primary implementation agent when assigned. Both follow the same approved workflow and safeguards.
+- ChatGPT Account 2 reviews independently and remains read-only. ChatGPT Account 1 coordinates and recommends acceptance; it does not modify repository files.
+- **Approved implementation tasks (proposed standing automation, `decisions.md` D-017 — requires Project Owner acceptance):** the assigned agent may, within approved scope/baseline/authorized branch, inspect, implement, add/update focused tests, run relevant builds/tests/formatting/static analysis, fix implementation-related failures, generate/inspect EF Core migrations and SQL scripts when the model changes, apply migrations to a positively identified development database and verify when included in the task, and stage only approved files, commit after required validation/review, and push to the already-authorized branch. Report exact commands/results/failures/skips and migration/DB verification metadata (non-secret).
+- **Always stop/protect:** unrelated or pre-existing changes must not be included; never expand scope; never claim unobserved results; never expose secrets.
+- **Separate explicit Project Owner approval always required:** production DB changes; DB deletion/recreation/destructive reset; data deletion/irreversible transformations; unapproved rollback/downgrade; DB credential/infrastructure changes; uncertain-target or destructive operations; branch create/switch, pull, merge, rebase, force-push, reset, clean, amend, cherry-pick, revert/history rewriting; actions outside approved scope.
+- **Until D-017 is accepted:** routine command-by-command approvals remain governed by existing accepted decisions (`D-007`, `D-008`) and current authoritative instructions.
+- **Documentation-only tasks:** no builds/tests/migrations/scheduled checks unless specifically requested.
 - Security-critical and architectural changes require explicit user approval and independent review.
-- Every task must use the nine-part briefing and the four owner actions defined in `ai-tasks.md` §13 before implementation starts.
-- Documentation and code comments must follow `ai-tasks.md` §14: business meaning first, technical detail second, and no comment that merely restates code.
-- Keep secrets out of files, logs, and reports.
+- Every task must use the nine-part briefing and four owner actions in `ai-tasks.md` §13. Documentation and code comments must follow `ai-tasks.md` §14. Keep secrets out of files, logs, and reports. Refer to `commands.txt` for actual EF Core/migration command examples (placeholders only).
 
 ## 5. Architecture boundaries
 
@@ -81,15 +76,16 @@ Consult `architecture.md` and `decisions.md` before proposing boundary changes.
 
 Unavailable until the Project Owner says otherwise.
 
-## 7. OpenCode
+## 7. OpenCode and Kilo (implementation agents)
 
-Primary implementation responsibilities:
+Implementation responsibilities (when assigned as owner):
 
-- Verify the approved baseline and working-tree state.
-- Follow the task brief and approved scope.
-- Implement only the assigned micro-task.
-- Provide exact diffs and a concise completion report.
-- Report tests as not run unless explicitly authorized.
+- Verify the approved baseline and working-tree state; stop on mismatch or unexpected/unrelated changes.
+- Follow the task brief and approved scope; implement only assigned work.
+- Add/update focused tests and run relevant validation (builds/tests/formatting/static analysis) as included/authorized; report exact commands, results, failures, and skipped tests.
+- For approved model changes, handle EF Core migration generation/SQL review and, when included, apply/verify against a positively identified development database; report migration names and non-secret target metadata/verification.
+- Stage only approved files, commit after required validation/review, and push to the already-authorized branch only when covered by approved standing automation (D-017, if accepted) or explicit approval; never include unrelated/pre-existing changes.
+- Provide exact diffs and a complete, factual completion report. Do not claim unobserved results.
 
 ## 8. ChatGPT Account 2
 

@@ -70,21 +70,21 @@ The approved team consists of multiple AI participants and the user.
 | Participant | Responsibility |
 |---|---|
 | ChatGPT Account 1 | Project Manager and Architecture Coordinator. Defines tasks, coordinates agents, maintains roadmap and milestones, evaluates reports, and recommends acceptance. |
-| OpenCode | Primary implementation agent. Implements approved development tasks, supplies exact diffs, and provides completion reports. |
+| OpenCode | Default primary implementation agent. Implements approved tasks, runs approved-task validation, supplies exact diffs, and provides completion reports. |
+| Kilo | Alternative primary implementation agent. May own approved implementation tasks when explicitly assigned, following the same workflow and safeguards as OpenCode. |
 | ChatGPT Account 2 | Independent Reviewer. Reviews actual code, architecture, security, and the focused diff. Read-only. |
 | Kimi | Architecture discussion, research and critique. |
 | DeepSeek Web | Research and technical preparation only. |
-| OpenHands | Repository exploration and planning; isolated implementation only when explicitly assigned and not concurrently editing with OpenCode. |
+| OpenHands | Repository exploration and planning; isolated implementation only when explicitly assigned and not concurrently editing with OpenCode or Kilo. |
 | Claude | Limited reserve for difficult implementation or security/architecture review. |
-| Kilo | Unavailable until the Project Owner says otherwise. |
 | DeepSeek Harness | Unavailable until the Project Owner says otherwise. |
-| User | Project Owner. Approves scope and architecture, controls Git operation approval, performs manual testing, and makes final acceptance decisions. |
+| User | Project Owner. Approves scope and architecture, controls standing/explicit approvals, performs manual testing, and makes final acceptance decisions. |
 
 Coordination rules:
 
 - ChatGPT Account 1 coordinates but does not modify repository files or perform Git writes.
-- OpenCode normally prepares implementation plans and handovers.
-- OpenCode is the default implementation owner.
+- OpenCode or Kilo may prepare plans/handover and, when assigned, implement the approved task.
+- OpenCode is the default implementation owner; Kilo is the alternative implementation owner when assigned.
 - DeepSeek Web may perform research and technical preparation only; it is not DeepSeek Harness and must not be assigned implementation work.
 - DeepSeek Harness may implement only when the user explicitly assigns it a separate, isolated, low-risk implementation task. That task must have one clearly named owner.
 - ChatGPT Account 2 performs independent read-only review and does not implement fixes.
@@ -95,6 +95,8 @@ Coordination rules:
 - No agent may silently expand scope or take over another agent's responsibility.
 - Security-critical and architectural changes require explicit user approval and independent review.
 - The user decides which review findings to accept.
+
+Full role definitions and handover rules are in `ai-tasks.md`. Routine standing automation for approved implementation tasks is documented as proposed in `decisions.md` D-017 and requires Project Owner acceptance before it becomes authoritative over prior command-by-command approval text.
 
 Full role definitions and handover rules are in `ai-tasks.md`.
 
@@ -137,32 +139,24 @@ Do not start frontend/UI work or later business workflows until their roadmap de
 - Enforce scope in application services and authorization, and test cross-tenant denial.
 - Keep secrets out of source control and logs.
 - Use parameterized data access, validation, safe errors, appropriate constraints, short transactions, and idempotency where required.
-- Add focused positive and negative tests for relevant changes, especially authorization and cross-tenant access. Relevant builds and automated tests may be run after implementation when explicitly included in an approved implementation task; the agent must report exact commands, results, failures and skipped tests. Broader test suites require justification and approval. Documentation-only tasks do not run builds or tests unless specifically requested. Do not fix unrelated failures without approval.
-- Do not execute database migrations or modify a database unless explicitly authorized.
-- Creating migration files also requires explicit approval for that task.
-- Never claim a test, build, migration, or deployment succeeded unless its result was actually observed and authorized.
+- Add focused positive and negative tests for relevant changes, especially authorization and cross-tenant access.
+- **Approved implementation tasks:** run relevant builds, tests, formatting, and static analysis; report exact commands, results, failures, and skipped tests. Fix implementation-related failures and rerun required checks. Broader suites may be run when justified; do not fix unrelated failures without approval.
+- **EF Core/migrations (when included in approved task and model changes):** identify actual DbContext/migration project/provider/history, generate and inspect migrations and SQL scripts, build/test, and apply only to a positively identified development database; verify migration history and expected schema changes and report migration name, target metadata (non-secret), and verification results. Never assume development by name/environment variable.
+- **Documentation-only tasks:** do not run builds, tests, migrations, or scheduled checks unless specifically requested.
+- **Separate explicit Project Owner approval required:** production database changes; database deletion/recreation/destructive reset; data deletion or irreversible transformations; unapproved migration rollback/downgrade; database credential/infrastructure changes; any uncertain-target or destructive operation. Creating/applying migrations outside approved development-task scope also requires explicit approval.
+- Never claim a test, build, migration, or deployment succeeded unless its result was actually observed and authorized. Never expose secrets in files, logs, commits, or reports.
 
 ## 10. Git restrictions
 
-The user retains final authority over Git write operations. Agents may execute Git write operations only after explicit Project Owner approval.
+The user retains final authority over Git write operations and final acceptance. Git inspection commands (`git status`, `git log`, `git diff`, branch listing) are permitted without approval.
 
-Git inspection commands (`git status`, `git log`, `git diff`, branch listing) are permitted without approval.
+**Within an approved implementation task (subject to Project Owner acceptance of D-017 standing automation):** the assigned implementation agent may stage only approved task files, commit after required validation/review, and push to the already-authorized branch. Review the complete diff first, stop if unrelated/pre-existing changes are present, and never include unrelated work.
 
-AI agents must not perform Git operations that change repository state without explicit Project Owner approval:
+**Always require separate explicit Project Owner approval:** branch creation/switching, pull, merge, rebase, force-push, reset, clean, amend, cherry-pick, revert/history rewriting, and Git config/hook changes. Do not perform these automatically.
 
-- Stage or commit.
-- Push or pull.
-- Create or switch branches.
-- Merge, rebase, reset, cherry-pick, clean, amend, or rewrite history.
-- Change Git configuration or hooks.
+**Outside approved implementation-task standing automation (or until D-017 is accepted):** state-changing Git operations require explicit Project Owner approval before execution; explain purpose, exact command, benefits, risks/consequences, and affected branches/commits/remotes, then wait for explicit approval.
 
-Before requesting approval, the agent must explain the purpose, exact command, benefits, risks and consequences, and whether branches, commits or remote repositories will be affected. Asking for approval is not authorization; the agent must wait for explicit approval.
-
-Read-only inspection is permitted.
-
-After a coherent slice is complete and reviewed, an agent may suggest a manual checkpoint and prepare a commit message. The user decides whether and when to commit.
-
-Do not suggest a commit for incomplete work, unreviewed changes, or unresolved critical security/data issues.
+Do not suggest or create a commit for incomplete work, unreviewed required changes, unresolved critical security/data issues, or when unrelated changes would be included. Prepare clear commit messages and report exact Git actions/results.
 
 ## 11. Completion report
 

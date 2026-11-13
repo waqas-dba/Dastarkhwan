@@ -93,6 +93,20 @@ Use this log for decisions affecting product behavior, security, data, compatibi
 - The dependency-registration mechanism is an implementation-design item to resolve; it is not invented here.
 **Review trigger:** Evidence that Tenant–Access authorization integration cannot be established through Access public contracts alone, or that platform authorization semantics conflict with tenant-scoped authorization.
 
+## D-017 — Approved implementation-task automation (standing authorization)
+**Status:** Proposed  
+**Date:** 2026-11-13  
+**Decision (proposed):** For each Project Owner–approved implementation task, the assigned implementation agent (OpenCode or Kilo, one at a time) has standing authorization to perform routine scoped development actions within that task without requesting command-by-command approval: inspect/read, implement approved scope, add/update focused tests, run relevant builds/tests/formatting/static analysis, fix implementation-related failures, review the diff, generate/inspect EF Core migrations and SQL scripts when the approved task changes a model, apply migrations to a positively identified development database and verify results when included in the approved task, and stage only approved task files, commit after required validation/review, and push to the already-authorized branch.
+**Context:** Current documentation requires per-command approval for many routine build/test/migration/Git actions, creating inconsistent guidance and friction. The Project Owner requested one standard, auditable workflow for OpenCode and Kilo while preserving safety boundaries.
+**Consequences (if accepted):**
+- Standing authorization applies only within the explicitly approved task scope, baseline, and authorized branch; it does not authorize unrelated work or pre-existing/unrelated changes.
+- Development database migration application requires positive identification of the target as a development database (never assumed from name/environment variable alone); migration names, target metadata (non-secret), and verification results must be reported.
+- Separate explicit Project Owner approval remains required for: production database changes; database deletion/recreation/destructive reset; data deletion or irreversible transformations; unapproved migration rollback/downgrade; changes to database credentials or infrastructure; any operation with uncertain target or destructive impact; branch creation/switching, pull, merge, rebase, force-push, reset, clean, amend, or history rewriting; and any action outside the approved scope.
+- If accepted, this decision would supersede/conflict-resolve routine command-approval language in D-007 and D-008 for actions covered above; D-007/D-008 remain authoritative until the Project Owner accepts this decision.
+- Independent review requirements, final owner acceptance, and architecture/security approval boundaries remain unchanged.
+- Weekly migration-drift monitoring is documented as a separate future read-only scheduled workflow and is not authorized to modify databases.
+**Review trigger:** Evidence of unsafe automation, baseline/scope violations, incorrect database targeting, or need to narrow/expand standing authorization.
+
 ## Decision template
 ### D-XXX — Title
 **Status:** Proposed / Accepted / Rejected / Superseded  

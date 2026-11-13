@@ -475,15 +475,84 @@ public sealed class PlatformMembershipTests : IDisposable
     [Fact]
     public async Task PlatformAddMemberWorksRegardlessOfAmbientTenantScope()
     {
-        // Arrange: platform admin, but ambient scope is switched to a tenant — must not matter
-        SignInAsPlatformManager(); // platform owner, ScopeContext.Current = PlatformScope
-        _env.ScopeContext.Current = TenantScope; // override ambient to tenant
-        var targetUser = Guid.NewGuid();
+        // Arrange: platform manager who is NOT a tenant owner and NOT an Access owner.
+        // Holds platform.members.manage only through a role assignment at PlatformScope.
+        var managerId = Guid.NewGuid();
+        _env.SignIn(managerId);
+        _env.Membership.Set(PlatformScope, managerId, isOwner: false);
+        var role = _env.AddRole("PlatformMgr", new[] { AccessPermissionNames.PlatformMembersManage }, PlatformScope);
+        _env.Assign(managerId, role);
 
-        // Act: platform admin adds platform member despite tenant ambient scope
+        // Ambient scope is the tenant — the old ambient-scope guard would deny here
+        // because the user has no platform.members.manage in the tenant scope.
+        _env.ScopeContext.Current = TenantScope;
+
+        // Act: platform manager adds platform member despite tenant ambient scope
+        var targetUser = Guid.NewGuid();
         var result = await Svc.AddMemberAsync(targetUser);
 
-        // Assert: succeeds — platform scope is fixed, not derived from ambient context
+        // Assert: succeeds — platform scope is fixed, tenant ownership not required
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task PlatformRevokeMemberWorksRegardlessOfAmbientTenantScope()
+    {
+        // Arrange: platform manager who is NOT a tenant owner and NOT an Access owner.
+        var managerId = Guid.NewGuid();
+        _env.SignIn(managerId);
+        _env.Membership.Set(PlatformScope, managerId, isOwner: false);
+        var role = _env.AddRole("PlatformMgr", new[] { AccessPermissionNames.PlatformMembersManage }, PlatformScope);
+        _env.Assign(managerId, role);
+        var target = Guid.NewGuid();
+        Assert.True((await Svc.AddMemberAsync(target)).IsSuccess);
+
+        // Ambient scope is the tenant
+        _env.ScopeContext.Current = TenantScope;
+
+        // Act: platform manager revokes platform member despite tenant ambient scope
+        var result = await Svc.RevokeMemberAsync(target);
+
+        // Assert: succeeds — platform scope is fixed
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task PlatformManagerWithRealDatabaseMembershipCanManageMembers()
+    {
+        // Arrange: real PlatformAccessMembership backed by database rows (not FakeMembership).
+        // This exercises the production membership path used in production DI composition.
+        var managerId = Guid.NewGuid();
+        _env.Seed(db => db.PlatformMembers.Add(new AccessPlatformMember
+        {
+            UserId = managerId,
+            PlatformId = AccessScope.PlatformId,
+            MembershipGeneration = 1,
+            JoinedAt = DateTime.UtcNow,
+            RevokedAt = null
+        }));
+
+        // Grant platform.members.manage via a role assignment at PlatformScope
+        var role = _env.AddRole("PlatformMgr", new[] { AccessPermissionNames.PlatformMembersManage }, PlatformScope);
+        _env.Assign(managerId, role);
+
+        // Wire the real production adapters: PlatformAccessMembership reads ACCESS_PlatformMembers
+        var realMembership = new PlatformAccessMembership(_env.Db);
+        var composite = new CompositeAccessMembership(new[] { realMembership });
+        var accessService = new AccessService(composite, _env.Assignments, _env.Cache, _env.Catalog,
+            _env.ScopeContext, _env.User);
+        var guard = new AccessGuard(_env.ScopeContext, _env.User, accessService);
+        var svc = new PlatformMembershipService(_env.Db, _env.UnitOfWork, _env.Audit, _env.User,
+            _env.Cache, _env.Time, guard);
+
+        _env.SignIn(managerId);
+        _env.ScopeContext.Current = TenantScope; // ambient tenant — must not matter
+        var targetUser = Guid.NewGuid();
+
+        // Act
+        var result = await svc.AddMemberAsync(targetUser);
+
+        // Assert: succeeds with real production membership adapter
         Assert.True(result.IsSuccess);
     }
 

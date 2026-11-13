@@ -417,4 +417,68 @@ public sealed class PlatformMembershipTests : IDisposable
         Assert.False(r2.IsSuccess);
         Assert.Equal("access.denied", r2.ErrorCode);
     }
+
+    // ---- platform scope is fixed, never ambient tenant scope ----
+
+    [Fact]
+    public async Task TenantScopedPlatformPermissionCannotAddPlatformMember()
+    {
+        // Arrange: tenant owner holds ALL tenant-scope permissions including platform.members.manage,
+        // but is NOT a platform member. Ambient scope is the tenant.
+        var tenantOwner = _env.SignInOwner(); // tenant-scope owner, ScopeContext.Current = TenantScope
+        var targetUser = Guid.NewGuid();
+
+        // Act: tenant owner tries to add a platform member using tenant-scoped authority
+        var result = await Svc.AddMemberAsync(targetUser);
+
+        // Assert: denied — tenant-scoped platform.members.manage cannot authorize platform operations
+        Assert.False(result.IsSuccess);
+        Assert.Equal("access.denied", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task TenantScopedPlatformPermissionCannotRevokePlatformMember()
+    {
+        // Arrange: tenant owner holds ALL tenant-scope permissions including platform.members.manage,
+        // but is NOT a platform member. Ambient scope is the tenant.
+        var tenantOwner = _env.SignInOwner();
+        var targetUser = Guid.NewGuid();
+
+        // Act: tenant owner tries to revoke a platform member using tenant-scoped authority
+        var result = await Svc.RevokeMemberAsync(targetUser);
+
+        // Assert: denied
+        Assert.False(result.IsSuccess);
+        Assert.Equal("access.denied", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task PlatformAddMemberWorksRegardlessOfAmbientTenantScope()
+    {
+        // Arrange: platform admin, but ambient scope is switched to a tenant — must not matter
+        SignInAsPlatformManager(); // platform owner, ScopeContext.Current = PlatformScope
+        _env.ScopeContext.Current = TenantScope; // override ambient to tenant
+        var targetUser = Guid.NewGuid();
+
+        // Act: platform admin adds platform member despite tenant ambient scope
+        var result = await Svc.AddMemberAsync(targetUser);
+
+        // Assert: succeeds — platform scope is fixed, not derived from ambient context
+        Assert.True(result.IsSuccess);
+    }
+
+    [Fact]
+    public async Task PlatformAddMemberDeniedWhenUnauthenticated()
+    {
+        // Arrange: no signed-in user
+        _env.User.UserId = null;
+        var targetUser = Guid.NewGuid();
+
+        // Act
+        var result = await Svc.AddMemberAsync(targetUser);
+
+        // Assert: denied — no authenticated actor
+        Assert.False(result.IsSuccess);
+        Assert.Equal("access.not_authenticated", result.ErrorCode);
+    }
 }

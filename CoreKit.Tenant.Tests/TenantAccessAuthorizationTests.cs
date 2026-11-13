@@ -105,6 +105,42 @@ public sealed class TenantAccessAuthorizationTests : IDisposable
         Assert.False(hasPermission);
     }
 
+    [Fact]
+    public async Task HasPermissionAsync_ReturnsFalse_WhenTenantOwnerIsNotAccessMember()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        _currentTenant.Set(tenantId);
+        _currentUser.UserId = userId;
+
+        _tenantDb.Tenants.Add(new CoreKit.Tenant.Entities.TenantEntity
+        {
+            Id = tenantId,
+            Name = "Test Tenant",
+            Slug = "test-tenant",
+            Status = CoreKit.Tenant.Entities.TenantStatus.Active,
+            CreatedAt = DateTime.UtcNow,
+            StatusChangedAt = DateTime.UtcNow,
+            ConcurrencyStamp = Guid.NewGuid()
+        });
+        _tenantDb.Members.Add(new CoreKit.Tenant.Entities.TenantMember
+        {
+            TenantId = tenantId,
+            UserId = userId,
+            IsOwner = true,
+            IsDefault = true,
+            JoinedAt = DateTime.UtcNow
+        });
+        _tenantDb.SaveChanges();
+
+        var checker = _provider.GetRequiredService<CoreKit.Access.Abstractions.IPermissionChecker>();
+
+        var hasPermission = await checker.HasPermissionAsync("tenants.read");
+
+        Assert.False(hasPermission);
+    }
+
     private sealed class TestAccessCurrentUser : IAccessCurrentUser
     {
         public TestAccessCurrentUser(Guid? userId, bool isAuthenticated)

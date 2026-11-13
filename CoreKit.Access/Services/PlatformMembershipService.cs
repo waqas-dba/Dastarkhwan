@@ -43,7 +43,7 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
         if (userId == Guid.Empty)
             return PlatformMemberResult.Fail("validation.failed", "A user id is required.");
 
-        var guardResult = await _guard.RequireAsync(AccessPermissionNames.PlatformMembersManage, ct);
+        var guardResult = await _guard.RequirePlatformScopePermissionAsync(AccessPermissionNames.PlatformMembersManage, ct);
         if (guardResult.IsFailure)
             return PlatformMemberResult.Fail("access.denied", guardResult.Error!.Message);
 
@@ -106,7 +106,7 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
         if (userId == Guid.Empty)
             return PlatformMemberResult.Fail("validation.failed", "A user id is required.");
 
-        var guardResult = await _guard.RequireAsync(AccessPermissionNames.PlatformMembersManage, ct);
+        var guardResult = await _guard.RequirePlatformScopePermissionAsync(AccessPermissionNames.PlatformMembersManage, ct);
         if (guardResult.IsFailure)
             return PlatformMemberResult.Fail("access.denied", guardResult.Error!.Message);
 

@@ -1,6 +1,8 @@
 using CoreKit.Access.Abstractions;
 using CoreKit.Access.Constants;
+using CoreKit.Access.Entities;
 using CoreKit.Access.Extensions;
+using CoreKit.Access.Persistence;
 using CoreKit.Tenant.Integration;
 using CoreKit.Tenant.Extensions;
 using Microsoft.Extensions.Configuration;
@@ -170,45 +172,52 @@ public sealed class TenantAccessMembershipReaderTests
     }
 }
 
-public sealed class AccessIntegrationDIRegistrationTests : IDisposable
-{
-    private readonly SqliteConnection _sharedConnection;
-
-    public AccessIntegrationDIRegistrationTests()
+    public sealed class AccessIntegrationDIRegistrationTests : IDisposable
     {
-        // One in-memory database shared by Tenant and Access, kept open for the test's lifetime.
-        _sharedConnection = new SqliteConnection("DataSource=:memory:;Foreign Keys=True");
-        _sharedConnection.Open();
-    }
+        private readonly SqliteConnection _accessConnection;
+        private readonly SqliteConnection _tenantConnection;
 
-    public void Dispose() => _sharedConnection.Dispose();
+        public AccessIntegrationDIRegistrationTests()
+        {
+            // Separate in-memory databases so each DbContext's EnsureCreated works independently.
+            _accessConnection = new SqliteConnection("DataSource=:memory:;Foreign Keys=True");
+            _accessConnection.Open();
+            _tenantConnection = new SqliteConnection("DataSource=:memory:;Foreign Keys=True");
+            _tenantConnection.Open();
+        }
 
-    private static IServiceCollection NewServices(SqliteConnection connection)
-    {
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Tenant:MaxSettingsPerTenant"] = "1",
-                ["Tenant:InfoCacheSeconds"] = "0",
-                ["Tenant:Resolution:HeaderName"] = "X-Tenant-Id",
-                ["Tenant:Resolution:ClaimType"] = "tenant_id",
-                ["Access:MaxRolesPerScope"] = "1",
-                ["Access:MaxRolesPerUser"] = "1",
-                ["Access:CacheSeconds"] = "0",
-                ["Access:UserIdClaimType"] = "sub",
-            })
-            .Build();
+        public void Dispose()
+        {
+            _accessConnection.Dispose();
+            _tenantConnection.Dispose();
+        }
 
-        var services = new ServiceCollection();
-        services.AddTenant(config, options => options.UseSqlite(connection));
-        services.AddAccess(config, options => options.UseSqlite(connection));
-        return services;
-    }
+        private static IServiceCollection NewServices(SqliteConnection accessConnection, SqliteConnection tenantConnection)
+        {
+            var config = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Tenant:MaxSettingsPerTenant"] = "1",
+                    ["Tenant:InfoCacheSeconds"] = "0",
+                    ["Tenant:Resolution:HeaderName"] = "X-Tenant-Id",
+                    ["Tenant:Resolution:ClaimType"] = "tenant_id",
+                    ["Access:MaxRolesPerScope"] = "1",
+                    ["Access:MaxRolesPerUser"] = "1",
+                    ["Access:CacheSeconds"] = "0",
+                    ["Access:UserIdClaimType"] = "sub",
+                })
+                .Build();
 
-    [Fact]
-    public async Task AddTenant_ThenAddAccess_ComposesTenantAndPlatformAdapters()
-    {
-        var provider = NewServices(_sharedConnection).BuildServiceProvider();
+            var services = new ServiceCollection();
+            services.AddTenant(config, options => options.UseSqlite(tenantConnection));
+            services.AddAccess(config, options => options.UseSqlite(accessConnection));
+            return services;
+        }
+
+        [Fact]
+        public async Task AddTenant_ThenAddAccess_ComposesTenantAndPlatformAdapters()
+        {
+            var provider = NewServices(_accessConnection, _tenantConnection).BuildServiceProvider();
 
         var membership = provider.GetRequiredService<IAccessMembership>();
         var adapters = provider.GetRequiredService<IEnumerable<IAccessMembershipAdapter>>().ToList();
@@ -219,18 +228,27 @@ public sealed class AccessIntegrationDIRegistrationTests : IDisposable
 
         // Tenant membership resolves through the composed service.
         var tenantId = Guid.NewGuid();
-        var userId = Guid.NewGuid();
-        await SeedTenantMemberAsync(provider, tenantId, userId);
+        var tenantUser = Guid.NewGuid();
+        await SeedTenantMemberAsync(provider, tenantId, tenantUser);
 
-        var member = await membership.FindAsync(AccessScope.ForTenant(tenantId), userId);
-        Assert.NotNull(member);
-        Assert.False(member!.IsOwner);
+        var tenantMember = await membership.FindAsync(AccessScope.ForTenant(tenantId), tenantUser);
+        Assert.NotNull(tenantMember);
+        Assert.False(tenantMember!.IsOwner);
+
+        // Platform membership resolves through the same composed service.
+        var platformUser = Guid.NewGuid();
+        await SeedPlatformMemberAsync(provider, platformUser);
+
+        var platformMember = await membership.FindAsync(AccessScope.ForPlatform(AccessScope.PlatformId), platformUser);
+        Assert.NotNull(platformMember);
+        Assert.False(platformMember!.IsOwner);
+        Assert.Equal(1L, platformMember.MembershipGeneration);
     }
 
-    [Fact]
-    public async Task AddAccess_ThenAddTenant_ComposesTenantAndPlatformAdapters()
-    {
-        var provider = NewServices(_sharedConnection).BuildServiceProvider();
+        [Fact]
+        public async Task AddAccess_ThenAddTenant_ComposesTenantAndPlatformAdapters()
+        {
+            var provider = NewServices(_accessConnection, _tenantConnection).BuildServiceProvider();
 
         var membership = provider.GetRequiredService<IAccessMembership>();
         var adapters = provider.GetRequiredService<IEnumerable<IAccessMembershipAdapter>>().ToList();
@@ -238,13 +256,23 @@ public sealed class AccessIntegrationDIRegistrationTests : IDisposable
         Assert.NotNull(membership);
         Assert.Single(adapters.OfType<TenantAccessMembership>());
 
+        // Tenant membership resolves through the composed service.
         var tenantId = Guid.NewGuid();
-        var userId = Guid.NewGuid();
-        await SeedTenantMemberAsync(provider, tenantId, userId);
+        var tenantUser = Guid.NewGuid();
+        await SeedTenantMemberAsync(provider, tenantId, tenantUser);
 
-        var member = await membership.FindAsync(AccessScope.ForTenant(tenantId), userId);
-        Assert.NotNull(member);
-        Assert.False(member!.IsOwner);
+        var tenantMember = await membership.FindAsync(AccessScope.ForTenant(tenantId), tenantUser);
+        Assert.NotNull(tenantMember);
+        Assert.False(tenantMember!.IsOwner);
+
+        // Platform membership resolves through the same composed service.
+        var platformUser = Guid.NewGuid();
+        await SeedPlatformMemberAsync(provider, platformUser);
+
+        var platformMember = await membership.FindAsync(AccessScope.ForPlatform(AccessScope.PlatformId), platformUser);
+        Assert.NotNull(platformMember);
+        Assert.False(platformMember!.IsOwner);
+        Assert.Equal(1L, platformMember.MembershipGeneration);
     }
 
     private static async Task SeedTenantMemberAsync(IServiceProvider provider, Guid tenantId, Guid userId)
@@ -270,6 +298,22 @@ public sealed class AccessIntegrationDIRegistrationTests : IDisposable
             IsDefault = true,
             JoinedAt = DateTime.UtcNow,
             MembershipGeneration = 1
+        });
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task SeedPlatformMemberAsync(IServiceProvider provider, Guid userId)
+    {
+        using var scope = provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AccessDbContext>();
+        db.Database.EnsureCreated();
+        db.PlatformMembers.Add(new AccessPlatformMember
+        {
+            UserId = userId,
+            PlatformId = AccessScope.PlatformId,
+            MembershipGeneration = 1,
+            JoinedAt = DateTime.UtcNow,
+            RevokedAt = null
         });
         await db.SaveChangesAsync();
     }

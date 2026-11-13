@@ -367,4 +367,54 @@ public sealed class PlatformMembershipTests : IDisposable
         Assert.False(result.IsSuccess);
         Assert.Equal("access.denied", result.ErrorCode);
     }
+
+    [Fact]
+    public async Task RoleGenerationRefresh_Denied_WhenCallerLacksRolePermissions()
+    {
+        // Arrange: manager holds access.assignments.manage on PlatformScope, but not the stale role's permissions
+        var manager = Guid.NewGuid();
+        _env.Membership.Set(PlatformScope, manager, membershipGeneration: 1);
+        var mgrRole = _env.AddRole("PlatformMgr", new[] { AccessPermissionNames.AssignmentsManage }, PlatformScope);
+        _env.Assign(manager, mgrRole);
+        _env.SignIn(manager);
+        _env.ScopeContext.Current = PlatformScope;
+
+        // Target user: member at gen 1, holds StaleRole (gen 1) with platform.roles.manage
+        var role = _env.AddRole("StaleRole", new[] { "platform.roles.manage" }, PlatformScope);
+        var user = Guid.NewGuid();
+        _env.Membership.Set(PlatformScope, user, membershipGeneration: 1);
+        _env.Assign(user, role);
+
+        // Rejoin at gen 3 — assignment stays at gen 1, needs a generation refresh
+        _env.Membership.Set(PlatformScope, user, membershipGeneration: 3);
+
+        // Act: manager re-affirms StaleRole at gen 3 (refresh only, no add/remove)
+        var result = await _env.CreateAssignmentService().SetRolesAsync(user,
+            new SetAccessUserRolesRequest { RoleIds = new List<Guid> { role.Id } });
+
+        // Assert: denied because manager doesn't hold platform.roles.manage
+        Assert.False(result.IsSuccess);
+        Assert.Equal("access.escalation", result.Error!.Code);
+    }
+
+    [Fact]
+    public async Task AddMember_DeniedAfterAuthorityRevoked()
+    {
+        // Arrange: platform manager adds a member
+        SignInAsPlatformManager();
+        var user1 = Guid.NewGuid();
+        var r1 = await Svc.AddMemberAsync(user1);
+        Assert.True(r1.IsSuccess);
+
+        // Revoke the manager's platform membership — authority is gone
+        _env.Membership.Remove(PlatformScope, _env.User.UserId!.Value);
+
+        // Act: manager tries to add another member using stale cached authority
+        var user2 = Guid.NewGuid();
+        var r2 = await Svc.AddMemberAsync(user2);
+
+        // Assert: denied by fresh authority check
+        Assert.False(r2.IsSuccess);
+        Assert.Equal("access.denied", r2.ErrorCode);
+    }
 }

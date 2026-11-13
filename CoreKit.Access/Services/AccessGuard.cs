@@ -41,7 +41,9 @@ internal sealed class AccessGuard
     }
 
     private static bool RequiresFreshAuthority(string permission)
-        => permission is AccessPermissionNames.RolesManage or AccessPermissionNames.AssignmentsManage;
+        => permission is AccessPermissionNames.RolesManage
+            or AccessPermissionNames.AssignmentsManage
+            or AccessPermissionNames.PlatformMembersManage;
 
     /// <summary>Nobody can hand out or change a permission they do not hold. Owners hold all of them.</summary>
     public static bool Holds(EffectiveAccess actor, IEnumerable<string> permissions)

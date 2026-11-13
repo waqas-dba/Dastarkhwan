@@ -93,7 +93,13 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
         if (addedIds.Count == 0 && removedIds.Count == 0 && !needsGenerationRefresh)
             return AccessResult.Success(await LoadRolesAsync(scope, userId, member.MembershipGeneration, ct));
 
-        var changedRoles = await _roles.FindManyAsync(scope, addedIds.Concat(removedIds).ToList(), ct);
+        var changedRoleIds = addedIds
+            .Concat(removedIds)
+            .Concat(current.Where(a => wanted.Contains(a.RoleId) && a.MembershipGeneration != member.MembershipGeneration).Select(a => a.RoleId))
+            .Distinct()
+            .ToList();
+
+        var changedRoles = await _roles.FindManyAsync(scope, changedRoleIds, ct);
 
         if (!AccessGuard.Holds(access, changedRoles.SelectMany(r => r.Permissions.Select(p => p.Permission))))
             return AccessErrors.Escalation;

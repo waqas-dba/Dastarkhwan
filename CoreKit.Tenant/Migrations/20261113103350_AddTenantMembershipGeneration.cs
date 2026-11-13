@@ -16,7 +16,7 @@ namespace CoreKit.Tenant.Migrations
                 table: "TENANT_Members",
                 type: "bigint",
                 nullable: false,
-                defaultValue: 0L);
+                defaultValue: 1L);
 
             migrationBuilder.AddColumn<DateTime>(
                 name: "RemovedAt",

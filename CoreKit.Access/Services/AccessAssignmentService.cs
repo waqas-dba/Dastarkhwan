@@ -44,7 +44,11 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
         if (userId == Guid.Empty)
             return AccessErrors.Validation("A user id is required.");
 
-        return AccessResult.Success(await LoadRolesAsync(call.Value.Scope, userId, ct));
+        var member = await _membership.FindAsync(call.Value.Scope, userId, ct);
+        if (member is null)
+            return AccessErrors.Validation("The user is not a member of this scope.");
+
+        return AccessResult.Success(await LoadRolesAsync(call.Value.Scope, userId, member.MembershipGeneration, ct));
     }
 
     public async Task<AccessResult<IReadOnlyList<AccessRoleDto>>> SetRolesAsync(
@@ -61,7 +65,8 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
             return AccessErrors.Validation("A user id is required.");
 
         // Only people who belong to the scope can hold roles in it.
-        if (await _membership.FindAsync(scope, userId, ct) is null)
+        var member = await _membership.FindAsync(scope, userId, ct);
+        if (member is null)
             return AccessErrors.Validation("The user is not a member of this scope.");
 
         var wanted = (request.RoleIds ?? new List<Guid>()).Where(id => id != Guid.Empty).Distinct().ToList();
@@ -81,7 +86,7 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
         var removedIds = currentIds.Where(id => !wanted.Contains(id)).ToList();
 
         if (addedIds.Count == 0 && removedIds.Count == 0)
-            return AccessResult.Success(await LoadRolesAsync(scope, userId, ct));
+            return AccessResult.Success(await LoadRolesAsync(scope, userId, member.MembershipGeneration, ct));
 
         // You can only give or take away roles whose permissions you hold, so nobody can promote
         // themselves or someone else past their own level, or strip someone more powerful.
@@ -102,6 +107,7 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
                 UserId = userId,
                 ScopeType = scope.Type,
                 ScopeId = scope.Id,
+                MembershipGeneration = member.MembershipGeneration,
                 AssignedAt = now,
                 AssignedBy = actorId
             });
@@ -124,12 +130,13 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
 
         _cache.InvalidateUser(scope, userId);
 
-        return AccessResult.Success(await LoadRolesAsync(scope, userId, ct));
+        return AccessResult.Success(await LoadRolesAsync(scope, userId, member.MembershipGeneration, ct));
     }
 
-    private async Task<IReadOnlyList<AccessRoleDto>> LoadRolesAsync(AccessScope scope, Guid userId, CancellationToken ct)
+    private async Task<IReadOnlyList<AccessRoleDto>> LoadRolesAsync(
+        AccessScope scope, Guid userId, long membershipGeneration, CancellationToken ct)
     {
-        var roles = await _assignments.ListRolesForUserAsync(scope, userId, ct);
+        var roles = await _assignments.ListRolesForUserAsync(scope, userId, membershipGeneration, ct);
         var counts = await _assignments.CountByRoleAsync(scope, ct);
 
         return roles.Select(r => AccessMapper.ToDto(r, counts.GetValueOrDefault(r.Id))).ToList();

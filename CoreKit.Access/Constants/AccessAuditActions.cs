@@ -10,4 +10,6 @@ public static class AccessAuditActions
     public const string UserRemoved = "access.user_removed";
     public const string ScopeProvisioned = "access.scope_provisioned";
     public const string ScopeRemoved = "access.scope_removed";
+    public const string MemberAdded = "access.member_added";
+    public const string MemberRevoked = "access.member_revoked";
 }

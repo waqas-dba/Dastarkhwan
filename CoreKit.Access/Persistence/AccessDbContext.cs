@@ -15,6 +15,8 @@ public sealed class AccessDbContext : DbContext
 
     public DbSet<AccessAuditEntry> AuditEntries => Set<AccessAuditEntry>();
 
+    public DbSet<AccessPlatformMember> PlatformMembers => Set<AccessPlatformMember>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AccessRole>(b =>
@@ -50,6 +52,7 @@ public sealed class AccessDbContext : DbContext
             b.ToTable("ACCESS_Assignments");
             b.HasKey(x => new { x.RoleId, x.UserId });
             b.Property(x => x.ScopeType).IsRequired().HasMaxLength(AccessScope.MaxTypeLength);
+            b.Property(x => x.MembershipGeneration).IsRequired();
             b.HasIndex(x => new { x.ScopeType, x.ScopeId, x.UserId });
             b.HasIndex(x => new { x.RoleId, x.ScopeType, x.ScopeId });
 
@@ -57,6 +60,16 @@ public sealed class AccessDbContext : DbContext
                 .HasForeignKey(x => new { x.RoleId, x.ScopeType, x.ScopeId })
                 .HasPrincipalKey(x => new { x.Id, x.ScopeType, x.ScopeId })
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AccessPlatformMember>(b =>
+        {
+            b.ToTable("ACCESS_PlatformMembers");
+            b.HasKey(x => x.UserId);
+            b.Property(x => x.PlatformId).IsRequired();
+            b.Property(x => x.MembershipGeneration).IsRequired();
+            b.Property(x => x.JoinedAt).IsRequired();
+            b.HasIndex(x => new { x.PlatformId, x.UserId });
         });
 
         modelBuilder.Entity<AccessAuditEntry>(b =>

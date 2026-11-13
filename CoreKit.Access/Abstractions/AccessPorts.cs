@@ -10,7 +10,7 @@ public interface IAccessScopeContext
 }
 
 /// <summary>A person's standing in a scope. Owners hold every permission.</summary>
-public sealed record AccessMember(bool IsOwner);
+public sealed record AccessMember(bool IsOwner, long MembershipGeneration = 1);
 
 /// <summary>
 /// Who belongs to a scope. By default tenant membership (from the shared kernel's ITenantMembershipReader).
@@ -21,3 +21,9 @@ public interface IAccessMembership
     /// <summary>Null when the user does not belong to the scope.</summary>
     Task<AccessMember?> FindAsync(AccessScope scope, Guid userId, CancellationToken ct = default);
 }
+
+/// <summary>
+/// A membership adapter registered alongside the composite router. The composite depends on
+/// IEnumerable<IAccessMembershipAdapter> so it never sees itself, avoiding a circular DI dependency.
+/// </summary>
+public interface IAccessMembershipAdapter : IAccessMembership { }

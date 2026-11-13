@@ -45,7 +45,7 @@ internal sealed class DefaultAccessScopeContext : IAccessScopeContext
 /// belongs anywhere, so nobody is granted anything. The default implementation returns null:
 /// not a member, no access.
 /// </summary>
-internal sealed class DefaultAccessMembership : IAccessMembership
+internal sealed class DefaultAccessMembership : IAccessMembershipAdapter
 {
     public Task<AccessMember?> FindAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
         => Task.FromResult<AccessMember?>(null);

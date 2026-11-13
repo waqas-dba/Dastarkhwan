@@ -47,11 +47,28 @@ public sealed class AccessAssignment
 
     public Guid ScopeId { get; set; }
 
+    public long MembershipGeneration { get; set; }
+
     public DateTime AssignedAt { get; set; }
 
     public Guid? AssignedBy { get; set; }
 
     public AccessRole Role { get; set; } = null!;
+}
+
+/// <summary>Independent platform membership record. Exists separately from role assignments;
+/// a platform member with no assignments holds no permissions.</summary>
+public sealed class AccessPlatformMember
+{
+    public Guid UserId { get; set; }
+
+    public Guid PlatformId { get; set; }
+
+    public long MembershipGeneration { get; set; }
+
+    public DateTime JoinedAt { get; set; }
+
+    public DateTime? RevokedAt { get; set; }
 }
 
 /// <summary>One recorded change. No foreign key, so history survives when a scope is deleted.</summary>

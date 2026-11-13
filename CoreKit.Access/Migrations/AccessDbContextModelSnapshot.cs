@@ -36,6 +36,9 @@ namespace CoreKit.Access.Migrations
                     b.Property<Guid?>("AssignedBy")
                         .HasColumnType("uuid");
 
+                    b.Property<long>("MembershipGeneration")
+                        .HasColumnType("bigint");
+
                     b.Property<Guid>("ScopeId")
                         .HasColumnType("uuid");
 
@@ -86,6 +89,31 @@ namespace CoreKit.Access.Migrations
                     b.HasIndex("ScopeType", "ScopeId", "OccurredAt");
 
                     b.ToTable("ACCESS_AuditEntries", (string)null);
+                });
+
+            modelBuilder.Entity("CoreKit.Access.Entities.AccessPlatformMember", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("JoinedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("MembershipGeneration")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("PlatformId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("UserId");
+
+                    b.HasIndex("PlatformId", "UserId");
+
+                    b.ToTable("ACCESS_PlatformMembers", (string)null);
                 });
 
             modelBuilder.Entity("CoreKit.Access.Entities.AccessRole", b =>

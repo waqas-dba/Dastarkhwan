@@ -3,7 +3,7 @@
 internal interface IAccessAssignmentRepository
 {
     /// <summary>Read-only. The roles a user holds in a scope, with their permissions.</summary>
-    Task<IReadOnlyList<AccessRole>> ListRolesForUserAsync(AccessScope scope, Guid userId, CancellationToken ct = default);
+    Task<IReadOnlyList<AccessRole>> ListRolesForUserAsync(AccessScope scope, Guid userId, long membershipGeneration, CancellationToken ct = default);
 
     /// <summary>Tracked. The user's assignments in a scope.</summary>
     Task<IReadOnlyList<AccessAssignment>> ListForUserForUpdateAsync(AccessScope scope, Guid userId, CancellationToken ct = default);
@@ -29,12 +29,13 @@ internal sealed class AccessAssignmentRepository : IAccessAssignmentRepository
     public AccessAssignmentRepository(AccessDbContext db) => _db = db;
 
     public async Task<IReadOnlyList<AccessRole>> ListRolesForUserAsync(
-        AccessScope scope, Guid userId, CancellationToken ct = default)
+        AccessScope scope, Guid userId, long membershipGeneration, CancellationToken ct = default)
         => await _db.Roles.AsNoTracking()
             .Include(r => r.Permissions)
             .Where(r => r.ScopeType == scope.Type && r.ScopeId == scope.Id)
             .Where(r => _db.Assignments.Any(a =>
-                a.RoleId == r.Id && a.ScopeType == scope.Type && a.ScopeId == scope.Id && a.UserId == userId))
+                a.RoleId == r.Id && a.ScopeType == scope.Type && a.ScopeId == scope.Id &&
+                a.UserId == userId && a.MembershipGeneration == membershipGeneration))
             .OrderBy(r => r.NormalizedName)
             .ToListAsync(ct);
 

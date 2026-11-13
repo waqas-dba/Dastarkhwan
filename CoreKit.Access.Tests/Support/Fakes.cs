@@ -30,8 +30,8 @@ public sealed class FakeMembership : IAccessMembership
 
     public int Lookups { get; private set; }
 
-    public void Set(AccessScope scope, Guid userId, bool isOwner = false)
-        => _members[(scope, userId)] = new AccessMember(isOwner);
+    public void Set(AccessScope scope, Guid userId, bool isOwner = false, long membershipGeneration = 1)
+        => _members[(scope, userId)] = new AccessMember(isOwner, membershipGeneration);
 
     public void Remove(AccessScope scope, Guid userId) => _members.Remove((scope, userId));
 

@@ -71,8 +71,19 @@ public static class AccessServiceCollectionExtensions
         services.TryAddScoped<IAccessScopeContext, DefaultAccessScopeContext>();
 
         // Default membership: nobody is a member, so nobody is granted anything. A membership module
-        // (Tenant) may override.
-        services.TryAddScoped<IAccessMembership, DefaultAccessMembership>();
+        // (Tenant) may override. TryAddScoped keeps the default as a fallback.
+        services.TryAddScoped<IAccessMembershipAdapter, DefaultAccessMembership>();
+
+        // Platform membership adapter: handles platform-scoped lookups.
+        services.AddScoped<IAccessMembershipAdapter, PlatformAccessMembership>();
+
+        // Composite router: tries each adapter in order, returns first match. Registered as the single
+        // IAccessMembership so AccessService and other consumers get one implementation. TryAddScoped lets
+        // a host or test register its own IAccessMembership instead.
+        services.TryAddScoped<IAccessMembership, CompositeAccessMembership>();
+
+        // Platform membership management: add, revoke, is-member.
+        services.AddScoped<IPlatformMembershipService, PlatformMembershipService>();
 
         // What Access offers other modules, through Access's own abstractions.
         services.AddScoped<IPermissionChecker, AccessPermissionChecker>();

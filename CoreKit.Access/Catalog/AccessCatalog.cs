@@ -5,7 +5,7 @@ namespace CoreKit.Access.Catalog;
 public sealed record AccessPermissionDefinition(string Name, string Description);
 
 /// <summary>A role every new scope starts with. After that the scope owns its copy and can change it.</summary>
-public sealed record AccessRoleTemplate(string Name, string? Description, IReadOnlyList<string> Permissions);
+public sealed record AccessRoleTemplate(string Name, string? Description, IReadOnlyList<string> Permissions, string ScopeType = AccessScope.TenantType);
 
 /// <summary>Where an application (or any module) declares the permissions it uses.</summary>
 public sealed class AccessCatalogBuilder
@@ -36,12 +36,29 @@ public sealed class AccessCatalogBuilder
 
     /// <summary>Declares a role that every new scope receives. Its permissions must be declared too.</summary>
     public AccessCatalogBuilder AddRoleTemplate(string name, string? description, params string[] permissions)
+        => AddRoleTemplateForScope(name, description, AccessScope.TenantType, permissions);
+
+    /// <summary>
+    /// Declares a role template for a specific scope type (for example "platform"). Platform templates
+    /// are only provisioned into platform scopes; tenant templates only into tenant scopes.
+    /// </summary>
+    public AccessCatalogBuilder AddRoleTemplateForScope(string name, string? description, string scopeType, params string[] permissions)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("A role template needs a name.", nameof(name));
 
+        if (string.IsNullOrWhiteSpace(scopeType))
+            throw new ArgumentException("A role template needs a scope type.", nameof(scopeType));
+
+        if (scopeType.Length > AccessScope.MaxTypeLength)
+            throw new ArgumentException(
+                $"The scope type '{scopeType}' is too long (max {AccessScope.MaxTypeLength} characters).",
+                nameof(scopeType));
+
         _templates.Add(new AccessRoleTemplate(
-            name.Trim(), description, permissions.Select(p => p.Trim().ToLowerInvariant()).Distinct().ToList()));
+            name.Trim(), description,
+            permissions.Select(p => p.Trim().ToLowerInvariant()).Distinct().ToList(),
+            scopeType.Trim()));
 
         return this;
     }

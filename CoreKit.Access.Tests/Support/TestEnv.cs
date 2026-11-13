@@ -141,13 +141,14 @@ internal sealed class TestEnv : IDisposable
         return role;
     }
 
-    public void Assign(Guid userId, AccessRole role)
+    public void Assign(Guid userId, AccessRole role, long membershipGeneration = 1)
         => Seed(db => db.Assignments.Add(new AccessAssignment
         {
             RoleId = role.Id,
             UserId = userId,
             ScopeType = role.ScopeType,
             ScopeId = role.ScopeId,
+            MembershipGeneration = membershipGeneration,
             AssignedAt = UtcNow
         }));
 

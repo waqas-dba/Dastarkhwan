@@ -71,7 +71,9 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
         if (member is null)
             return EffectiveAccess.None;
 
-        var roles = await _assignments.ListRolesForUserAsync(scope, userId, ct);
+        // Only assignments created under the current membership generation grant permissions.
+        // A removed and rejoined member starts a new generation, so old assignments stay inactive.
+        var roles = await _assignments.ListRolesForUserAsync(scope, userId, member.MembershipGeneration, ct);
 
         var permissions = roles
             .SelectMany(r => r.Permissions.Select(p => p.Permission))

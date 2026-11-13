@@ -12,6 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace CoreKit.Identity.Migrations
 {
     [DbContext(typeof(IdentityDbContext))]
+    [Migration("20261113000000_AddMobileColumns")]
     public partial class AddMobileColumns : Migration
     {
         /// <inheritdoc />

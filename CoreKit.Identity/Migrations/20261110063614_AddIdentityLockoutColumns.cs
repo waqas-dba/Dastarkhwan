@@ -1,3 +1,4 @@
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
@@ -5,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace CoreKit.Identity.Migrations
 {
     /// <inheritdoc />
-    public partial class AddLockoutColumns : Migration
+    public partial class AddIdentityLockoutColumns : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)

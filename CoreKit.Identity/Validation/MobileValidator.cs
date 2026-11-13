@@ -42,21 +42,25 @@ public static class MobileValidator
 
         var hasPlus = false;
         var digitCount = 0;
+        var digitSeen = false;
 
         for (var i = 0; i < trimmed.Length; i++)
         {
             var c = trimmed[i];
 
-            if (char.IsDigit(c))
+            if (c >= '0' && c <= '9')
             {
                 digitCount++;
+                digitSeen = true;
                 continue;
             }
 
             if (c == '+')
             {
-                // Plus is allowed only once, and only as the first character.
-                if (hasPlus || i != 0) return null;
+                // Plus is allowed only once, and only before any digit has appeared.
+                // Leading formatting characters (for example an opening parenthesis)
+                // may precede it, as in "(+44) 7700 900123".
+                if (hasPlus || digitSeen) return null;
                 hasPlus = true;
                 continue;
             }
@@ -69,7 +73,7 @@ public static class MobileValidator
 
         if (digitCount < MinDigits || digitCount > MaxDigits) return null;
 
-        var digits = new string(trimmed.Where(char.IsDigit).ToArray());
+        var digits = new string(trimmed.Where(c => c >= '0' && c <= '9').ToArray());
         return (hasPlus ? "+" : string.Empty) + digits;
     }
 

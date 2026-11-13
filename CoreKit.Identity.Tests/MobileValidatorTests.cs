@@ -43,6 +43,8 @@ public sealed class MobileValidatorTests
     [InlineData("+1+2345678")]
     [InlineData("1+2345678")]
     [InlineData("++12345678")]
+    [InlineData("٠١٢٣٤٥٦")]
+    [InlineData("+٠١٢٣٤٥٦٧")]
     public void IsValid_RejectsMissingOrInvalidMobileNumbers(string? mobile)
     {
         Assert.False(MobileValidator.IsValid(mobile));
@@ -73,6 +75,8 @@ public sealed class MobileValidatorTests
     [InlineData("not-a-phone")]
     [InlineData("abc1234567")]
     [InlineData("+1+2345678")]
+    [InlineData("٠١٢٣٤٥٦")]
+    [InlineData("+٠١٢٣٤٥٦٧")]
     public void Normalize_ReturnsNullForInvalid(string? mobile)
     {
         Assert.Null(MobileValidator.Normalize(mobile));
@@ -109,5 +113,23 @@ public sealed class MobileValidatorTests
     {
         Assert.Null(MobileValidator.Normalize("abc1234567"));
         Assert.Null(MobileValidator.Normalize("123abc4567"));
+    }
+
+    [Fact]
+    public void Normalize_RejectsNonAsciiDecimalDigits()
+    {
+        // Arabic-Indic digits (٠١٢٣٤٥٦٧٨٩) are Unicode decimal digits but not ASCII 0–9.
+        // They must be rejected, not silently converted or stored inconsistently.
+        Assert.Null(MobileValidator.Normalize("٠١٢٣٤٥٦"));
+        Assert.Null(MobileValidator.Normalize("+٠١٢٣٤٥٦٧"));
+        Assert.Null(MobileValidator.Normalize("1234567٨٩0"));
+    }
+
+    [Fact]
+    public void Normalize_AcceptsAsciiDigitsOnly()
+    {
+        Assert.Equal("+447700900123", MobileValidator.Normalize("(+44) 7700 900123"));
+        Assert.Equal("03001234567", MobileValidator.Normalize("03001234567"));
+        Assert.Equal("+15551000001", MobileValidator.Normalize("+1 555 100 0001"));
     }
 }

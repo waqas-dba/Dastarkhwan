@@ -171,6 +171,46 @@ public sealed class UserServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task UserRepository_DuplicateMobile_ReturnsFalseWithoutThrowing()
+    {
+        // Use the repository directly to simulate a concurrent duplicate mobile
+        // submission that bypasses UserService's MobileExistsAsync pre-check.
+        using var db = _env.NewContext();
+        var repo = new UserRepository(db);
+
+        var userA = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = "repo-user-a@example.com",
+            NormalizedEmail = IdentityNormalizer.NormalizeEmail("repo-user-a@example.com"),
+            Mobile = "+15551000077",
+            NormalizedMobile = "+15551000077",
+            PasswordHash = _env.Hasher.Hash("Pass123!"),
+            IsActive = true,
+            CreatedAt = _env.Time.GetUtcNow().UtcDateTime
+        };
+
+        Assert.True(await repo.CreateAsync(userA, CancellationToken.None));
+
+        var userB = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = "repo-user-b@example.com",
+            NormalizedEmail = IdentityNormalizer.NormalizeEmail("repo-user-b@example.com"),
+            Mobile = "+15551000077",
+            NormalizedMobile = "+15551000077",
+            PasswordHash = _env.Hasher.Hash("Pass123!"),
+            IsActive = true,
+            CreatedAt = _env.Time.GetUtcNow().UtcDateTime
+        };
+
+        // The second create hits the unique index. TrySaveAsync catches
+        // DbUpdateException, confirms the conflict via MobileExistsAsync, and
+        // returns false instead of propagating an unhandled exception.
+        Assert.False(await repo.CreateAsync(userB, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task CreateUser_WithAlphabeticMobile_Fails()
     {
         _env.SignInOwner();

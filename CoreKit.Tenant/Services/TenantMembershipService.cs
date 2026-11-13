@@ -94,21 +94,39 @@ public sealed class TenantMembershipService : ITenantMembershipService
             return TenantErrors.NotFound("Tenant");
         }
 
-        if (await _members.FindAsync(tenantId, request.UserId, ct) is not null)
-            return TenantErrors.Conflict("The user is already a member of this tenant.");
-
         var now = Now();
+        TenantMember member;
 
-        var member = new TenantMember
+        if (await _members.FindIncludingRemovedAsync(tenantId, request.UserId, ct) is { } existing)
         {
-            TenantId = tenantId,
-            UserId = request.UserId,
-            IsOwner = request.IsOwner,
-            IsDefault = !await _members.HasDefaultAsync(request.UserId, ct),
-            JoinedAt = now
-        };
+            if (existing.RemovedAt is null)
+                return TenantErrors.Conflict("The user is already a member of this tenant.");
 
-        _members.Add(member);
+            // Reactivate a previously removed member with a new generation so old Access role
+            // assignments stay inactive until explicitly re-assigned.
+            existing.RemovedAt = null;
+            existing.MembershipGeneration++;
+            existing.JoinedAt = now;
+            existing.IsOwner = request.IsOwner;
+            existing.IsDefault = !await _members.HasDefaultAsync(request.UserId, ct);
+
+            member = existing;
+        }
+        else
+        {
+            var memberEntity = new TenantMember
+            {
+                TenantId = tenantId,
+                UserId = request.UserId,
+                IsOwner = request.IsOwner,
+                IsDefault = !await _members.HasDefaultAsync(request.UserId, ct),
+                JoinedAt = now,
+                MembershipGeneration = 1
+            };
+            _members.Add(memberEntity);
+            member = memberEntity;
+        }
+
         _audit.Record(tenantId, TenantAuditActions.MemberAdded, request.IsOwner ? $"user: {request.UserId}; owner" : $"user: {request.UserId}");
 
         if (request.IsOwner)
@@ -155,7 +173,10 @@ public sealed class TenantMembershipService : ITenantMembershipService
 
         var wasDefault = member.IsDefault;
 
-        _members.Remove(member);
+        // Soft-delete: keep the row (and its generation) so Access can enforce that old
+        // assignments stay inactive after the member rejoins with a new generation.
+        member.RemovedAt = _time.GetUtcNow().UtcDateTime;
+        member.MembershipGeneration++;
 
         if (wasDefault)
         {

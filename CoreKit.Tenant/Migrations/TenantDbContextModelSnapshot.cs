@@ -117,6 +117,12 @@ namespace CoreKit.Tenant.Migrations
                     b.Property<DateTime>("JoinedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<long>("MembershipGeneration")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("RemovedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.HasKey("TenantId", "UserId");
 
                     b.HasIndex("UserId");

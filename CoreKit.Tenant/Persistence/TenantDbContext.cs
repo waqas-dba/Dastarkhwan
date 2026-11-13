@@ -57,6 +57,10 @@ public sealed class TenantDbContext : DbContext
             b.ToTable("TENANT_Members");
             b.HasKey(x => new { x.TenantId, x.UserId });
             b.HasIndex(x => x.UserId);
+
+            // Soft-deleted members are excluded from every query: a removal must end membership
+            // even though the row (and its generation) is kept for Access generation enforcement.
+            b.HasQueryFilter(m => m.RemovedAt == null);
         });
 
         modelBuilder.Entity<TenantAuditEntry>(b =>

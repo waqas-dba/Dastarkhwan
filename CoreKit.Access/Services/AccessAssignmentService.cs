@@ -85,11 +85,14 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
         var addedIds = wanted.Where(id => !currentIds.Contains(id)).ToList();
         var removedIds = currentIds.Where(id => !wanted.Contains(id)).ToList();
 
-        if (addedIds.Count == 0 && removedIds.Count == 0)
+        // Re-affirming a role at the current membership generation makes an old-generation
+        // assignment effective again after the member rejoins. The (RoleId, UserId) key means
+        // we update the existing row in place rather than inserting a duplicate.
+        var needsGenerationRefresh = current.Any(a => wanted.Contains(a.RoleId) && a.MembershipGeneration != member.MembershipGeneration);
+
+        if (addedIds.Count == 0 && removedIds.Count == 0 && !needsGenerationRefresh)
             return AccessResult.Success(await LoadRolesAsync(scope, userId, member.MembershipGeneration, ct));
 
-        // You can only give or take away roles whose permissions you hold, so nobody can promote
-        // themselves or someone else past their own level, or strip someone more powerful.
         var changedRoles = await _roles.FindManyAsync(scope, addedIds.Concat(removedIds).ToList(), ct);
 
         if (!AccessGuard.Holds(access, changedRoles.SelectMany(r => r.Permissions.Select(p => p.Permission))))
@@ -100,17 +103,29 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
         foreach (var assignment in current.Where(a => removedIds.Contains(a.RoleId)))
             _assignments.Remove(assignment);
 
-        foreach (var roleId in addedIds)
-            _assignments.Add(new AccessAssignment
+        foreach (var roleId in wanted)
+        {
+            var existing = current.FirstOrDefault(a => a.RoleId == roleId);
+            if (existing is not null)
             {
-                RoleId = roleId,
-                UserId = userId,
-                ScopeType = scope.Type,
-                ScopeId = scope.Id,
-                MembershipGeneration = member.MembershipGeneration,
-                AssignedAt = now,
-                AssignedBy = actorId
-            });
+                existing.MembershipGeneration = member.MembershipGeneration;
+                existing.AssignedAt = now;
+                existing.AssignedBy = actorId;
+            }
+            else
+            {
+                _assignments.Add(new AccessAssignment
+                {
+                    RoleId = roleId,
+                    UserId = userId,
+                    ScopeType = scope.Type,
+                    ScopeId = scope.Id,
+                    MembershipGeneration = member.MembershipGeneration,
+                    AssignedAt = now,
+                    AssignedBy = actorId
+                });
+            }
+        }
 
         // The entry says who ends up with which roles, and also exactly what this call added and removed.
         var namesById = changedRoles.ToDictionary(r => r.Id, r => r.Name);

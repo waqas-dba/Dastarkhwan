@@ -175,8 +175,8 @@ public sealed class TestEnv : IDisposable
 
 public sealed class FakeTenantMembershipReader : ITenantMembershipReader
 {
-    public Dictionary<(Guid TenantId, Guid UserId), bool> Members { get; } = new();
+    public Dictionary<(Guid TenantId, Guid UserId), TenantMemberInfo> Members { get; } = new();
 
     public Task<TenantMemberInfo?> FindAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
-        => Task.FromResult(Members.TryGetValue((tenantId, userId), out var isOwner) ? new TenantMemberInfo(isOwner) : null);
+        => Task.FromResult(Members.TryGetValue((tenantId, userId), out var info) ? info : null);
 }

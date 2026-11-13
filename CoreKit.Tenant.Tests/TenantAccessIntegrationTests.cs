@@ -60,7 +60,7 @@ public sealed class TenantAccessMembershipTests
     {
         var scope = AccessScope.ForTenant(Guid.NewGuid());
         var userId = Guid.NewGuid();
-        _reader.Members[(scope.Id, userId)] = true;
+        _reader.Members[(scope.Id, userId)] = new TenantMemberInfo(true);
 
         var result = await _membership.FindAsync(scope, userId);
 
@@ -73,12 +73,25 @@ public sealed class TenantAccessMembershipTests
     {
         var scope = AccessScope.ForTenant(Guid.NewGuid());
         var userId = Guid.NewGuid();
-        _reader.Members[(scope.Id, userId)] = true; // tenant owner
+        _reader.Members[(scope.Id, userId)] = new TenantMemberInfo(true); // tenant owner
 
         var result = await _membership.FindAsync(scope, userId);
 
         Assert.NotNull(result);
         Assert.False(result!.IsOwner); // Tenant owner is NOT Access owner — no super permissions
+    }
+
+    [Fact]
+    public async Task FindAsync_ReturnsTheCurrentMembershipGeneration()
+    {
+        var scope = AccessScope.ForTenant(Guid.NewGuid());
+        var userId = Guid.NewGuid();
+        _reader.Members[(scope.Id, userId)] = new TenantMemberInfo(false, 7);
+
+        var result = await _membership.FindAsync(scope, userId);
+
+        Assert.NotNull(result);
+        Assert.Equal(7L, result!.MembershipGeneration);
     }
 
     [Fact]
@@ -97,7 +110,7 @@ public sealed class TenantAccessMembershipTests
     {
         var scope = new AccessScope("store", Guid.NewGuid());
         var userId = Guid.NewGuid();
-        _reader.Members[(Guid.NewGuid(), userId)] = true;
+        _reader.Members[(Guid.NewGuid(), userId)] = new TenantMemberInfo(true);
 
         var result = await _membership.FindAsync(scope, userId);
 
@@ -140,7 +153,7 @@ public sealed class TenantAccessMembershipReaderTests
     {
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
-        _reader.Members[(tenantId, userId)] = true;
+        _reader.Members[(tenantId, userId)] = new TenantMemberInfo(true);
 
         var result = await _reader.FindAsync(tenantId, userId);
 
@@ -157,39 +170,21 @@ public sealed class TenantAccessMembershipReaderTests
     }
 }
 
-public sealed class AccessIntegrationDIRegistrationTests
+public sealed class AccessIntegrationDIRegistrationTests : IDisposable
 {
-    [Fact]
-    public void AddTenant_RegistersTenantAccessScopeContext_AndTenantAccessMembership()
+    private readonly SqliteConnection _sharedConnection;
+
+    public AccessIntegrationDIRegistrationTests()
     {
-        var services = new ServiceCollection();
-
-        var config = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["Tenant:MaxSettingsPerTenant"] = "1",
-                ["Tenant:InfoCacheSeconds"] = "0",
-                ["Tenant:Resolution:HeaderName"] = "X-Tenant-Id",
-                ["Tenant:Resolution:ClaimType"] = "tenant_id",
-            })
-            .Build();
-
-        services.AddTenant(config, options => options.UseSqlite("DataSource=:memory:"));
-
-        var provider = services.BuildServiceProvider();
-
-        var scopeContext = provider.GetRequiredService<IAccessScopeContext>();
-        var membership = provider.GetRequiredService<IAccessMembership>();
-
-        Assert.IsType<TenantAccessScopeContext>(scopeContext);
-        Assert.IsType<TenantAccessMembership>(membership);
+        // One in-memory database shared by Tenant and Access, kept open for the test's lifetime.
+        _sharedConnection = new SqliteConnection("DataSource=:memory:;Foreign Keys=True");
+        _sharedConnection.Open();
     }
 
-    [Fact]
-    public void AddTenant_ThenAddAccess_KeepsTenantAdapters()
-    {
-        var services = new ServiceCollection();
+    public void Dispose() => _sharedConnection.Dispose();
 
+    private static IServiceCollection NewServices(SqliteConnection connection)
+    {
         var config = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
@@ -204,15 +199,78 @@ public sealed class AccessIntegrationDIRegistrationTests
             })
             .Build();
 
-        services.AddTenant(config, options => options.UseSqlite("DataSource=:memory:"));
-        services.AddAccess(config, options => options.UseSqlite("DataSource=:memory:"));
+        var services = new ServiceCollection();
+        services.AddTenant(config, options => options.UseSqlite(connection));
+        services.AddAccess(config, options => options.UseSqlite(connection));
+        return services;
+    }
 
-        var provider = services.BuildServiceProvider();
+    [Fact]
+    public async Task AddTenant_ThenAddAccess_ComposesTenantAndPlatformAdapters()
+    {
+        var provider = NewServices(_sharedConnection).BuildServiceProvider();
 
-        var scopeContext = provider.GetRequiredService<IAccessScopeContext>();
         var membership = provider.GetRequiredService<IAccessMembership>();
+        var adapters = provider.GetRequiredService<IEnumerable<IAccessMembershipAdapter>>().ToList();
 
-        Assert.IsType<TenantAccessScopeContext>(scopeContext);
-        Assert.IsType<TenantAccessMembership>(membership);
+        // One composed IAccessMembership; Tenant's membership is an adapter, not the service itself.
+        Assert.NotNull(membership);
+        Assert.Single(adapters.OfType<TenantAccessMembership>());
+
+        // Tenant membership resolves through the composed service.
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        await SeedTenantMemberAsync(provider, tenantId, userId);
+
+        var member = await membership.FindAsync(AccessScope.ForTenant(tenantId), userId);
+        Assert.NotNull(member);
+        Assert.False(member!.IsOwner);
+    }
+
+    [Fact]
+    public async Task AddAccess_ThenAddTenant_ComposesTenantAndPlatformAdapters()
+    {
+        var provider = NewServices(_sharedConnection).BuildServiceProvider();
+
+        var membership = provider.GetRequiredService<IAccessMembership>();
+        var adapters = provider.GetRequiredService<IEnumerable<IAccessMembershipAdapter>>().ToList();
+
+        Assert.NotNull(membership);
+        Assert.Single(adapters.OfType<TenantAccessMembership>());
+
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        await SeedTenantMemberAsync(provider, tenantId, userId);
+
+        var member = await membership.FindAsync(AccessScope.ForTenant(tenantId), userId);
+        Assert.NotNull(member);
+        Assert.False(member!.IsOwner);
+    }
+
+    private static async Task SeedTenantMemberAsync(IServiceProvider provider, Guid tenantId, Guid userId)
+    {
+        using var scope = provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TenantDbContext>();
+        db.Database.EnsureCreated();
+        db.Tenants.Add(new TenantEntity
+        {
+            Id = tenantId,
+            Name = "Acme",
+            Slug = "acme",
+            Status = TenantStatus.Active,
+            CreatedAt = DateTime.UtcNow,
+            StatusChangedAt = DateTime.UtcNow,
+            ConcurrencyStamp = Guid.NewGuid()
+        });
+        db.Members.Add(new TenantMember
+        {
+            TenantId = tenantId,
+            UserId = userId,
+            IsOwner = false,
+            IsDefault = true,
+            JoinedAt = DateTime.UtcNow,
+            MembershipGeneration = 1
+        });
+        await db.SaveChangesAsync();
     }
 }

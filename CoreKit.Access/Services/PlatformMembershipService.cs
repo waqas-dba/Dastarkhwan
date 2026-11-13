@@ -2,6 +2,7 @@ using CoreKit.Access.Abstractions;
 using CoreKit.Access.Constants;
 using CoreKit.Access.Entities;
 using CoreKit.Access.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace CoreKit.Access.Services;
 
@@ -17,6 +18,7 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
     private readonly IAccessCurrentUser _actor;
     private readonly IAccessCache _cache;
     private readonly TimeProvider _time;
+    private readonly AccessGuard _guard;
 
     public PlatformMembershipService(
         AccessDbContext db,
@@ -24,7 +26,8 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
         IAccessAuditRecorder audit,
         IAccessCurrentUser actor,
         IAccessCache cache,
-        TimeProvider time)
+        TimeProvider time,
+        AccessGuard guard)
     {
         _db = db;
         _unitOfWork = unitOfWork;
@@ -32,12 +35,17 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
         _actor = actor;
         _cache = cache;
         _time = time;
+        _guard = guard;
     }
 
     public async Task<PlatformMemberResult> AddMemberAsync(Guid userId, CancellationToken ct = default)
     {
         if (userId == Guid.Empty)
             return PlatformMemberResult.Fail("validation.failed", "A user id is required.");
+
+        var guardResult = await _guard.RequireAsync(AccessPermissionNames.PlatformMembersManage, ct);
+        if (guardResult.IsFailure)
+            return PlatformMemberResult.Fail("access.denied", guardResult.Error!.Message);
 
         var existing = await _db.PlatformMembers
             .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId, ct);
@@ -70,8 +78,24 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
         _audit.Record(AccessScope.ForPlatform(AccessScope.PlatformId),
             AccessAuditActions.MemberAdded, $"user: {userId}");
 
-        if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
-            return PlatformMemberResult.Fail(saveError.Code, saveError.Message);
+        try
+        {
+            if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
+                return PlatformMemberResult.Fail(saveError.Code, saveError.Message);
+        }
+        catch (DbUpdateException)
+        {
+            // Concurrent AddMember for the same user: another request inserted first.
+            // Reread the persisted state and succeed if the member is now active.
+            var raced = await _db.PlatformMembers
+                .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId, ct);
+            if (raced is not null && raced.RevokedAt is null)
+            {
+                _cache.InvalidateUser(AccessScope.ForPlatform(AccessScope.PlatformId), userId);
+                return PlatformMemberResult.Ok();
+            }
+            throw;
+        }
 
         _cache.InvalidateUser(AccessScope.ForPlatform(AccessScope.PlatformId), userId);
         return PlatformMemberResult.Ok();
@@ -81,6 +105,10 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
     {
         if (userId == Guid.Empty)
             return PlatformMemberResult.Fail("validation.failed", "A user id is required.");
+
+        var guardResult = await _guard.RequireAsync(AccessPermissionNames.PlatformMembersManage, ct);
+        if (guardResult.IsFailure)
+            return PlatformMemberResult.Fail("access.denied", guardResult.Error!.Message);
 
         var existing = await _db.PlatformMembers
             .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId, ct);

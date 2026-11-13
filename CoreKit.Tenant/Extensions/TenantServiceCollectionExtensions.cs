@@ -88,10 +88,10 @@ public static class TenantServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IAccessTokenClaimsContributor, TenantClaimsContributor>());
 
         // Expose Tenant's scope and membership to Access through public contracts.
-        // Registered with AddScoped (not TryAddScoped) so Access's TryAddScoped defaults
-        // in AddAccess do not override these when the host calls AddTenant before AddAccess.
+        // Tenant membership is an adapter: Access composes it with the platform (and default)
+        // adapter behind a single CompositeAccessMembership registered by AddAccess.
         services.AddScoped<IAccessScopeContext, TenantAccessScopeContext>();
-        services.AddScoped<IAccessMembership, TenantAccessMembership>();
+        services.AddScoped<IAccessMembershipAdapter, TenantAccessMembership>();
 
         return services;
     }

@@ -17,6 +17,6 @@ public sealed class TenantMembershipReader : ITenantMembershipReader
 
         var member = await _members.FindAsync(tenantId, userId, ct);
 
-        return member is null ? null : new TenantMemberInfo(member.IsOwner);
+        return member is null ? null : new TenantMemberInfo(member.IsOwner, member.MembershipGeneration);
     }
 }

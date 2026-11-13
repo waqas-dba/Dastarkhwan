@@ -8,6 +8,9 @@ public interface ITenantMemberRepository
     /// <summary>Tracked.</summary>
     Task<TenantMember?> FindForUpdateAsync(Guid tenantId, Guid userId, CancellationToken ct = default);
 
+    /// <summary>Tracked, including soft-deleted rows. Used to reactivate a removed member.</summary>
+    Task<TenantMember?> FindIncludingRemovedAsync(Guid tenantId, Guid userId, CancellationToken ct = default);
+
     /// <summary>Read-only, oldest member first.</summary>
     Task<IReadOnlyList<TenantMember>> ListAsync(Guid tenantId, CancellationToken ct = default);
 
@@ -40,6 +43,9 @@ public sealed class TenantMemberRepository : ITenantMemberRepository
 
     public Task<TenantMember?> FindForUpdateAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
         => _db.Members.FirstOrDefaultAsync(m => m.TenantId == tenantId && m.UserId == userId, ct);
+
+    public Task<TenantMember?> FindIncludingRemovedAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
+        => _db.Members.IgnoreQueryFilters().FirstOrDefaultAsync(m => m.TenantId == tenantId && m.UserId == userId, ct);
 
     public async Task<IReadOnlyList<TenantMember>> ListAsync(Guid tenantId, CancellationToken ct = default)
         => await _db.Members.AsNoTracking()

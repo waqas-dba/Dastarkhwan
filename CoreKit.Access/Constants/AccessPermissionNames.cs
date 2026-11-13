@@ -9,12 +9,16 @@ public static class AccessPermissionNames
     public const string AssignmentsManage = "access.assignments.manage";
     public const string AuditRead = "access.audit.read";
 
+    /// <summary>Add or remove platform members (grant/revoke platform membership).</summary>
+    public const string PlatformMembersManage = "platform.members.manage";
+
     public static IReadOnlyList<AccessPermissionDefinition> All { get; } = new List<AccessPermissionDefinition>
     {
         new(RolesRead, "View roles and the permission list"),
         new(RolesManage, "Create, change and delete roles"),
         new(AssignmentsRead, "View which roles a person holds"),
         new(AssignmentsManage, "Give and remove roles"),
-        new(AuditRead, "View the history of role and permission changes")
+        new(AuditRead, "View the history of role and permission changes"),
+        new(PlatformMembersManage, "Add or remove platform members")
     };
 }

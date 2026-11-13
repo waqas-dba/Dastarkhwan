@@ -310,6 +310,32 @@ public sealed class TenantMembershipServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Remove_ThenRejoin_IncrementsMembershipGeneration()
+    {
+        var owner = Guid.NewGuid();
+        var user = Guid.NewGuid();
+        _env.AddMember(_tenant.Id, owner, isOwner: true);
+        _env.AddMember(_tenant.Id, user);
+
+        var before = _env.Read(db => db.Members.Single(m => m.UserId == user).MembershipGeneration);
+        Assert.Equal(1L, before);
+
+        ResultAssert.Ok(await Svc.RemoveMemberAsync(_tenant.Id, user));
+
+        // The removed row is kept (soft-delete) so its generation survives removal.
+        var removed = _env.Read(db => db.Members.IgnoreQueryFilters().Single(m => m.UserId == user));
+        Assert.NotNull(removed.RemovedAt);
+        Assert.Equal(2L, removed.MembershipGeneration);
+
+        // Rejoin: reactivated with a new generation.
+        ResultAssert.Ok(await Svc.AddMemberAsync(_tenant.Id, new AddTenantMemberRequest { UserId = user }));
+
+        var after = _env.Read(db => db.Members.Single(m => m.UserId == user).MembershipGeneration);
+        Assert.Equal(3L, after);
+        Assert.True(await Svc.IsMemberAsync(_tenant.Id, user));
+    }
+
+    [Fact]
     public async Task Remove_RefusesTheLastOwner_ButNotWhenAnotherOwnerExists()
     {
         var a = Guid.NewGuid();

@@ -1,7 +1,7 @@
 ﻿namespace CoreKit.SharedKernel;
 
 /// <summary>A person's standing in a tenant.</summary>
-public sealed record TenantMemberInfo(bool IsOwner);
+public sealed record TenantMemberInfo(bool IsOwner, long MembershipGeneration = 1);
 
 /// <summary>
 /// Who belongs to a tenant. The Tenant module provides it. Other modules (for example Access) use it to

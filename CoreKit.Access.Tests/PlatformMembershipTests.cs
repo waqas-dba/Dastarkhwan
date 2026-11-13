@@ -36,7 +36,15 @@ public sealed class PlatformMembershipTests : IDisposable
     private AccessScope PlatformScope { get; }
     private AccessScope TenantScope => _env.Scope;
     private PlatformMembershipService Svc =>
-        new(_env.Db, _env.UnitOfWork, _env.Audit, _env.User, _env.Cache, _env.Time);
+        new(_env.Db, _env.UnitOfWork, _env.Audit, _env.User, _env.Cache, _env.Time,
+            new AccessGuard(_env.ScopeContext, _env.User, _env.Access));
+
+    private void SignInAsPlatformManager()
+    {
+        _env.SignInOwner();
+        _env.Membership.Set(PlatformScope, _env.User.UserId!.Value, isOwner: true);
+        _env.ScopeContext.Current = PlatformScope;
+    }
 
     // ---- platform membership is independent of assignments ----
 
@@ -114,7 +122,7 @@ public sealed class PlatformMembershipTests : IDisposable
     public async Task AssignmentFromEarlierGenerationGrantsNothingAfterRevoke()
     {
         // Arrange: member gets a role at generation 1, then is revoked (generation 2)
-        _env.SignInOwner();
+        SignInAsPlatformManager();
         var role = _env.AddRole("TestRole", new[] { "platform.members.manage" }, PlatformScope);
         var user = Guid.NewGuid();
         _env.Membership.Set(PlatformScope, user, membershipGeneration: 1);
@@ -135,7 +143,7 @@ public sealed class PlatformMembershipTests : IDisposable
     public async Task RejoiningCreatesNewGenerationAndOldAssignmentsStayInactive()
     {
         // Arrange: member at generation 1 with a role
-        _env.SignInOwner();
+        SignInAsPlatformManager();
         var role = _env.AddRole("TestRole", new[] { "platform.members.manage" }, PlatformScope);
         var user = Guid.NewGuid();
         _env.Membership.Set(PlatformScope, user, membershipGeneration: 1);
@@ -158,6 +166,8 @@ public sealed class PlatformMembershipTests : IDisposable
     {
         // Arrange: member at generation 1, revoked (gen 2), rejoined (gen 3), new role assigned at gen 3
         _env.SignInOwner();
+        _env.Membership.Set(PlatformScope, _env.User.UserId!.Value, isOwner: true);
+        _env.ScopeContext.Current = PlatformScope;
         var role = _env.AddRole("TestRole", new[] { "platform.members.manage" }, PlatformScope);
         var user = Guid.NewGuid();
 
@@ -166,16 +176,13 @@ public sealed class PlatformMembershipTests : IDisposable
         await Svc.RevokeMemberAsync(user); // gen 2
         await Svc.AddMemberAsync(user); // gen 3
 
-        // Act: assign role at gen 3
+        // Act: assign role at gen 3 (same role, new generation — service refreshes the row in place)
         _env.Membership.Set(PlatformScope, user, membershipGeneration: 3);
-        _env.Seed(db =>
-        {
-            var old = db.Assignments.FirstOrDefault(a => a.UserId == user && a.RoleId == role.Id);
-            if (old is not null) db.Assignments.Remove(old);
-        });
-        _env.Assign(user, role, membershipGeneration: 3);
+        var result = await _env.CreateAssignmentService().SetRolesAsync(user,
+            new SetAccessUserRolesRequest { RoleIds = new List<Guid> { role.Id } });
+        ResultAssert.Ok(result);
 
-        // Assert: new assignment at gen 3 grants permissions
+        // Assert: assignment at gen 3 grants permissions
         var access = await _env.Access.GetAccessAsync(user, PlatformScope);
         Assert.True(access.Has("platform.members.manage"));
     }
@@ -259,6 +266,7 @@ public sealed class PlatformMembershipTests : IDisposable
     public async Task AddMemberIsIdempotentWhenAlreadyActive()
     {
         // Arrange
+        SignInAsPlatformManager();
         var user = Guid.NewGuid();
         _env.Membership.Set(PlatformScope, user, membershipGeneration: 1);
 
@@ -280,6 +288,9 @@ public sealed class PlatformMembershipTests : IDisposable
     [Fact]
     public async Task RevokeNonexistentMemberIsNoop()
     {
+        // Arrange
+        SignInAsPlatformManager();
+
         // Act
         var result = await Svc.RevokeMemberAsync(Guid.NewGuid());
 
@@ -292,6 +303,7 @@ public sealed class PlatformMembershipTests : IDisposable
     public async Task PlatformMembershipIsPersistedInAccessDbContext()
     {
         // Arrange
+        SignInAsPlatformManager();
         var user = Guid.NewGuid();
 
         // Act
@@ -304,5 +316,55 @@ public sealed class PlatformMembershipTests : IDisposable
         Assert.Equal(AccessScope.PlatformId, member.PlatformId);
         Assert.Equal(1L, member.MembershipGeneration);
         Assert.Null(member.RevokedAt);
+    }
+
+    [Fact]
+    public async Task ConcurrentAddMemberIsIdempotent()
+    {
+        // Arrange: platform manager, two separate service graphs racing to add the same member
+        SignInAsPlatformManager();
+        var user = Guid.NewGuid();
+
+        var dbA = _env.NewContext();
+        var dbB = _env.NewContext();
+        var uowA = new AccessUnitOfWork(dbA, NullLogger<AccessUnitOfWork>.Instance);
+        var uowB = new AccessUnitOfWork(dbB, NullLogger<AccessUnitOfWork>.Instance);
+        var auditA = new AccessAuditRecorder(new AccessAuditRepository(dbA), _env.User, _env.Time);
+        var auditB = new AccessAuditRecorder(new AccessAuditRepository(dbB), _env.User, _env.Time);
+        var guard = new AccessGuard(_env.ScopeContext, _env.User, _env.Access);
+
+        var svcA = new PlatformMembershipService(dbA, uowA, auditA, _env.User, _env.Cache, _env.Time, guard);
+        var svcB = new PlatformMembershipService(dbB, uowB, auditB, _env.User, _env.Cache, _env.Time, guard);
+
+        // Act: both add the same member concurrently
+        var results = await Task.WhenAll(svcA.AddMemberAsync(user), svcB.AddMemberAsync(user));
+        var resultA = results[0];
+        var resultB = results[1];
+
+        // Assert: both succeed and exactly one active membership row exists
+        Assert.True(resultA.IsSuccess);
+        Assert.True(resultB.IsSuccess);
+        var row = _env.Read(db => db.PlatformMembers.Single());
+        Assert.Equal(user, row.UserId);
+        Assert.Null(row.RevokedAt);
+
+        dbA.Dispose();
+        dbB.Dispose();
+    }
+
+    [Fact]
+    public async Task AddMember_RejectedForUntrustedCaller()
+    {
+        // Arrange: signed-in caller with no platform.members.manage permission
+        _env.SignInOwner(); // tenant-scope owner only, not a platform member
+        _env.ScopeContext.Current = PlatformScope;
+        var user = Guid.NewGuid();
+
+        // Act
+        var result = await Svc.AddMemberAsync(user);
+
+        // Assert: untrusted caller cannot invoke platform membership management
+        Assert.False(result.IsSuccess);
+        Assert.Equal("access.denied", result.ErrorCode);
     }
 }

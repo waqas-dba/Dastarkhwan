@@ -1,3 +1,4 @@
+using System.Linq;
 using CoreKit.Access.Abstractions;
 using CoreKit.Access.Constants;
 using CoreKit.Access.Entities;
@@ -225,17 +226,49 @@ public sealed class AccessIntegrationDIRegistrationTests : IDisposable
         return services;
     }
 
+    private static void AssertMembershipComposition(IServiceCollection services)
+    {
+        // Exactly one IAccessMembership registration regardless of module order.
+        var membershipDescriptors = services.Where(d => d.ServiceType == typeof(IAccessMembership)).ToList();
+        Assert.Single(membershipDescriptors);
+
+        var membershipDescriptor = membershipDescriptors[0];
+        Assert.Equal(ServiceLifetime.Scoped, membershipDescriptor.Lifetime);
+        Assert.NotNull(membershipDescriptor.ImplementationType);
+        // CompositeAccessMembership is internal; verify by name without making it public.
+        Assert.Equal("CompositeAccessMembership", membershipDescriptor.ImplementationType.Name);
+        Assert.Equal("CoreKit.Access.Abstractions", membershipDescriptor.ImplementationType.Namespace);
+
+        // Both adapters must be present so the composite can route tenant and platform lookups.
+        // (The default adapter may or may not be present depending on registration order due to
+        // TryAddScoped/AddScoped interaction — see L-1 observation.)
+        var adapterDescriptors = services.Where(d => d.ServiceType == typeof(IAccessMembershipAdapter)).ToList();
+        Assert.Contains(adapterDescriptors, d => d.ImplementationType?.Name == "TenantAccessMembership");
+        Assert.Contains(adapterDescriptors, d => d.ImplementationType?.Name == "PlatformAccessMembership");
+    }
+
     [Fact]
     public async Task AddTenant_ThenAddAccess_ComposesTenantAndPlatformAdapters()
     {
-        var provider = NewServices(_accessConnection, _tenantConnection, accessFirst: false).BuildServiceProvider();
+        var services = NewServices(_accessConnection, _tenantConnection, accessFirst: false);
 
-        var membership = provider.GetRequiredService<IAccessMembership>();
-        var adapters = provider.GetRequiredService<IEnumerable<IAccessMembershipAdapter>>().ToList();
+        // Assert before building: exactly one composite IAccessMembership descriptor.
+        AssertMembershipComposition(services);
 
-        // One composed IAccessMembership; Tenant's membership is an adapter, not the service itself.
+        // Build with scope validation so scoped services cannot leak from the root provider.
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+        using var scope = provider.CreateScope();
+        var scopeProvider = scope.ServiceProvider;
+
+        // The resolved implementation must be the composite (verified by name, internal type).
+        var membership = scopeProvider.GetRequiredService<IAccessMembership>();
         Assert.NotNull(membership);
-        Assert.Single(adapters.OfType<TenantAccessMembership>());
+        Assert.Equal("CompositeAccessMembership", membership.GetType().Name);
+        Assert.Equal("CoreKit.Access.Abstractions", membership.GetType().Namespace);
+
+        // Tenant's scope context must win regardless of registration order.
+        var scopeContext = scopeProvider.GetRequiredService<IAccessScopeContext>();
+        Assert.IsType<TenantAccessScopeContext>(scopeContext);
 
         // Tenant membership resolves through the composed service.
         var tenantId = Guid.NewGuid();
@@ -259,14 +292,25 @@ public sealed class AccessIntegrationDIRegistrationTests : IDisposable
     [Fact]
     public async Task AddAccess_ThenAddTenant_ComposesTenantAndPlatformAdapters()
     {
-        var provider = NewServices(_accessConnection, _tenantConnection, accessFirst: true).BuildServiceProvider();
+        var services = NewServices(_accessConnection, _tenantConnection, accessFirst: true);
 
-        var membership = provider.GetRequiredService<IAccessMembership>();
-        var adapters = provider.GetRequiredService<IEnumerable<IAccessMembershipAdapter>>().ToList();
+        // Assert before building: exactly one composite IAccessMembership descriptor.
+        AssertMembershipComposition(services);
 
-        // One composed IAccessMembership; Tenant's membership is an adapter, not the service itself.
+        // Build with scope validation so scoped services cannot leak from the root provider.
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+        using var scope = provider.CreateScope();
+        var scopeProvider = scope.ServiceProvider;
+
+        // The resolved implementation must be the composite (verified by name, internal type).
+        var membership = scopeProvider.GetRequiredService<IAccessMembership>();
         Assert.NotNull(membership);
-        Assert.Single(adapters.OfType<TenantAccessMembership>());
+        Assert.Equal("CompositeAccessMembership", membership.GetType().Name);
+        Assert.Equal("CoreKit.Access.Abstractions", membership.GetType().Namespace);
+
+        // Tenant's scope context must win regardless of registration order.
+        var scopeContext = scopeProvider.GetRequiredService<IAccessScopeContext>();
+        Assert.IsType<TenantAccessScopeContext>(scopeContext);
 
         // Tenant membership resolves through the composed service.
         var tenantId = Guid.NewGuid();

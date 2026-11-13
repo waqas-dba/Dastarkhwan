@@ -238,7 +238,8 @@ namespace CoreKit.Identity.Migrations
 
                     b.HasIndex("NormalizedMobile")
                         .IsUnique()
-                        .HasDatabaseName("UX_Identity_Users_NormalizedMobile");
+                        .HasDatabaseName("UX_Identity_Users_NormalizedMobile")
+                        .HasFilter("\"NormalizedMobile\" IS NOT NULL");
 
                     b.ToTable("Identity_Users", (string)null);
                 });

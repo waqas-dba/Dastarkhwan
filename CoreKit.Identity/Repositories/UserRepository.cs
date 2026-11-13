@@ -158,8 +158,8 @@ public sealed class UserRepository : IUserRepository
     }
 
     /// <summary>
-    /// Two requests can both pass an "email is free" check. The unique index then rejects the second
-    /// one, and this turns that database error into a plain false.
+    /// Two requests can both pass an "email is free" or "mobile is free" check. The unique index
+    /// then rejects the second one, and this turns that database error into a plain false.
     /// </summary>
     private async Task<bool> TrySaveAsync(User user, CancellationToken ct)
     {
@@ -171,11 +171,19 @@ public sealed class UserRepository : IUserRepository
         catch (DbUpdateException)
         {
             var normalizedEmail = user.NormalizedEmail;
+            var normalizedMobile = user.NormalizedMobile;
             var userId = user.Id;
 
             _db.ChangeTracker.Clear();
 
-            if (await _db.Users.AnyAsync(u => u.NormalizedEmail == normalizedEmail && u.Id != userId, ct))
+            var emailConflict = await _db.Users.AnyAsync(
+                u => u.NormalizedEmail == normalizedEmail && u.Id != userId, ct);
+
+            var mobileConflict = normalizedMobile is not null &&
+                await _db.Users.AnyAsync(
+                    u => u.NormalizedMobile == normalizedMobile && u.Id != userId, ct);
+
+            if (emailConflict || mobileConflict)
                 return false;
 
             throw;

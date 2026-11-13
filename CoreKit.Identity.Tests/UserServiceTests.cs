@@ -170,6 +170,72 @@ public sealed class UserServiceTests : IDisposable
         ResultAssert.Fails(result, IdentityErrorKind.Conflict, "conflict");
     }
 
+    [Fact]
+    public async Task CreateUser_WithAlphabeticMobile_Fails()
+    {
+        _env.SignInOwner();
+
+        var result = await _env.UserService.CreateAsync(new CreateUserRequest
+        {
+            Email = "alpha-mobile@example.com",
+            Password = "AlphaMobilePass123!",
+            Mobile = "abc1234567"
+        });
+
+        ResultAssert.Fails(result, IdentityErrorKind.Validation, "validation.failed");
+    }
+
+    [Fact]
+    public async Task CreateUser_WithInternalPlusMobile_Fails()
+    {
+        _env.SignInOwner();
+
+        var result = await _env.UserService.CreateAsync(new CreateUserRequest
+        {
+            Email = "plus-mobile@example.com",
+            Password = "PlusMobilePass123!",
+            Mobile = "1+2345678"
+        });
+
+        ResultAssert.Fails(result, IdentityErrorKind.Validation, "validation.failed");
+    }
+
+    [Fact]
+    public async Task UpdateUser_WithOwnMobile_Succeeds()
+    {
+        _env.SignInOwner();
+
+        // Setting mobile to the same value is a no-op — the change block is skipped.
+        var result = await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
+        {
+            Mobile = "+15551000002"
+        });
+
+        var dto = ResultAssert.Ok(result);
+        Assert.Equal("+15551000002", dto.Mobile);
+    }
+
+    [Fact]
+    public async Task UpdateUser_WithOwnMobileFormattedDifferently_Succeeds()
+    {
+        _env.SignInOwner();
+
+        // Same digits, different formatting → normalizes to the same canonical value → no change.
+        var result = await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
+        {
+            Mobile = "+1 555 100 0002"
+        });
+
+        var dto = ResultAssert.Ok(result);
+        // Mobile stores the trimmed original input; NormalizedMobile holds the canonical form.
+        Assert.Equal("+1 555 100 0002", dto.Mobile);
+
+        using var db = _env.NewContext();
+        var user = await db.Users.FindAsync(_env.StaffUserId);
+        Assert.NotNull(user);
+        Assert.Equal("+15551000002", user.NormalizedMobile);
+    }
+
     // ---- Get ----
 
     [Fact]

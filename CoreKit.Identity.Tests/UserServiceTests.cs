@@ -856,6 +856,23 @@ public sealed class UserServiceTests : IDisposable
         Assert.True(userAfter.LockoutEnd.HasValue); // 10 >= 5, so locked
     }
 
+    [Fact]
+    public async Task IncrementAccessFailedCountAsync_WithCancelledToken_ThrowsAndDoesNotTreatTokenAsSqlParameter()
+    {
+        using var db = _env.NewContext();
+        var repo = new UserRepository(db);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => repo.IncrementAccessFailedCountAsync(_env.StaffUserId, cts.Token));
+
+        using var verify = _env.NewContext();
+        var user = await verify.Users.FirstOrDefaultAsync(u => u.Id == _env.StaffUserId);
+        Assert.NotNull(user);
+        Assert.Equal(0, user.AccessFailedCount);
+    }
+
     private IAuthService CreateAuthService()
     {
         var db = _env.NewContext();

@@ -112,7 +112,8 @@ public sealed class UserRepository : IUserRepository
         // Database-side atomic increment: no lost increments under concurrent load.
         await _db.Database.ExecuteSqlRawAsync(
             "UPDATE \"Identity_Users\" SET \"AccessFailedCount\" = \"AccessFailedCount\" + 1 WHERE \"Id\" = {0}",
-            userId, ct);
+            new object[] { userId },
+            ct);
 
         return await _db.Users
             .AsNoTracking()

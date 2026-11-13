@@ -735,6 +735,116 @@ public sealed class UserServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Login_ValidCredentialsDuringLockout_Rejected()
+    {
+        var user = _env.StaffUserId;
+
+        // Lock the account by failing 5 times
+        for (int i = 0; i < 5; i++)
+        {
+            await _env.AuthService.LoginAsync(new LoginRequest
+            {
+                Email = "staff@example.com",
+                Password = "wrong-password"
+            }, CancellationToken.None);
+        }
+
+        // Capture the lockout end set by the 5th failure
+        using var lockedDb = _env.NewContext();
+        var lockedUser = await lockedDb.Users.FirstOrDefaultAsync(u => u.Id == user);
+        Assert.NotNull(lockedUser);
+        var lockoutEnd = lockedUser!.LockoutEnd;
+        Assert.True(lockoutEnd.HasValue);
+
+        // Correct password during lockout must still be rejected (generic failure,
+        // no account-enumeration leakage), and the counter increments on the locked branch.
+        var result = await _env.AuthService.LoginAsync(new LoginRequest
+        {
+            Email = "staff@example.com",
+            Password = "StaffPass123!"
+        }, CancellationToken.None);
+
+        ResultAssert.Fails(result, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
+
+        using var db = _env.NewContext();
+        var userAfter = await db.Users.FirstOrDefaultAsync(u => u.Id == user);
+        Assert.NotNull(userAfter);
+        Assert.Equal(6, userAfter.AccessFailedCount);
+        Assert.Equal(lockoutEnd, userAfter.LockoutEnd); // lockout not extended or reset
+    }
+
+    [Fact]
+    public async Task Login_FourthFailureNoLock_FifthFailureLocks()
+    {
+        var user = _env.StaffUserId;
+
+        // 4 failed attempts: no lockout yet
+        for (int i = 0; i < 4; i++)
+        {
+            await _env.AuthService.LoginAsync(new LoginRequest
+            {
+                Email = "staff@example.com",
+                Password = "wrong-password"
+            }, CancellationToken.None);
+        }
+
+        using var db4 = _env.NewContext();
+        var user4 = await db4.Users.FirstOrDefaultAsync(u => u.Id == user);
+        Assert.NotNull(user4);
+        Assert.Equal(4, user4.AccessFailedCount);
+        Assert.Null(user4.LockoutEnd);
+
+        // 5th failure locks the account for 15 minutes
+        await _env.AuthService.LoginAsync(new LoginRequest
+        {
+            Email = "staff@example.com",
+            Password = "wrong-password"
+        }, CancellationToken.None);
+
+        using var db5 = _env.NewContext();
+        var user5 = await db5.Users.FirstOrDefaultAsync(u => u.Id == user);
+        Assert.NotNull(user5);
+        Assert.Equal(5, user5.AccessFailedCount);
+        Assert.True(user5.LockoutEnd.HasValue);
+        Assert.True(user5.LockoutEnd.Value > _env.Time.GetUtcNow().UtcDateTime);
+    }
+
+    [Fact]
+    public async Task Login_LockedAttemptIncrementsCounterButDoesNotExtendLockout()
+    {
+        var user = _env.StaffUserId;
+
+        // Lock the account by failing 5 times
+        for (int i = 0; i < 5; i++)
+        {
+            await _env.AuthService.LoginAsync(new LoginRequest
+            {
+                Email = "staff@example.com",
+                Password = "wrong-password"
+            }, CancellationToken.None);
+        }
+
+        using var lockedDb = _env.NewContext();
+        var lockedUser = await lockedDb.Users.FirstOrDefaultAsync(u => u.Id == user);
+        Assert.NotNull(lockedUser);
+        var originalLockoutEnd = lockedUser!.LockoutEnd;
+        Assert.True(originalLockoutEnd.HasValue);
+
+        // Another failed attempt while locked increments the counter but leaves LockoutEnd unchanged
+        await _env.AuthService.LoginAsync(new LoginRequest
+        {
+            Email = "staff@example.com",
+            Password = "wrong-password"
+        }, CancellationToken.None);
+
+        using var db = _env.NewContext();
+        var userAfter = await db.Users.FirstOrDefaultAsync(u => u.Id == user);
+        Assert.NotNull(userAfter);
+        Assert.Equal(6, userAfter.AccessFailedCount);
+        Assert.Equal(originalLockoutEnd, userAfter.LockoutEnd);
+    }
+
+    [Fact]
     public async Task Login_AfterLockoutExpires_ResetsAttempts()
     {
         var user = _env.StaffUserId;

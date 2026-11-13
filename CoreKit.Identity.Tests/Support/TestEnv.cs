@@ -3,6 +3,7 @@ using CoreKit.Identity.Security;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using System.Collections.Generic;
 using System.IO;
 using System.Security.Claims;
 using System.Threading;
@@ -18,18 +19,15 @@ namespace CoreKit.Identity.Tests.Support;
 internal sealed class TestEnv : IDisposable
 {
     private readonly string _databasePath;
-    private readonly SqliteConnection _connection;
-    private readonly DbContextOptions<IdentityDbContext> _dbOptions;
+    private readonly List<SqliteConnection> _connections = new();
 
     public TestEnv()
     {
         _databasePath = Path.Combine(Path.GetTempPath(), $"corekit_identity_tests_{Guid.NewGuid():N}.db");
-        _connection = new SqliteConnection($"Data Source={_databasePath};Foreign Keys=True");
-        _connection.Open();
 
-        _dbOptions = new DbContextOptionsBuilder<IdentityDbContext>()
-            .UseSqlite(_connection)
-            .Options;
+        var seedConnection = new SqliteConnection($"Data Source={_databasePath};Foreign Keys=True");
+        seedConnection.Open();
+        _connections.Add(seedConnection);
 
         using (var setup = NewContext())
             setup.Database.EnsureCreated();
@@ -232,9 +230,15 @@ internal sealed class TestEnv : IDisposable
 
     public Guid UserUpdatePermissionId { get; }
 
-    public IdentityDbContext NewContext() => new(new DbContextOptionsBuilder<IdentityDbContext>()
-        .UseSqlite(new SqliteConnection($"Data Source={_databasePath};Foreign Keys=True"))
-        .Options);
+    public IdentityDbContext NewContext()
+    {
+        var connection = new SqliteConnection($"Data Source={_databasePath};Foreign Keys=True");
+        connection.Open();
+        _connections.Add(connection);
+        return new IdentityDbContext(new DbContextOptionsBuilder<IdentityDbContext>()
+            .UseSqlite(connection)
+            .Options);
+    }
 
     public void SignInOwner()
     {
@@ -275,7 +279,7 @@ internal sealed class TestEnv : IDisposable
     public void Dispose()
     {
         Db.Dispose();
-        _connection.Dispose();
+        foreach (var c in _connections) c.Dispose();
         try { File.Delete(_databasePath); } catch { /* best-effort cleanup */ }
     }
 }

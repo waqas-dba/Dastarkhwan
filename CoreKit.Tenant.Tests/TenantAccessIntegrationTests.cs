@@ -172,52 +172,63 @@ public sealed class TenantAccessMembershipReaderTests
     }
 }
 
-    public sealed class AccessIntegrationDIRegistrationTests : IDisposable
+public sealed class AccessIntegrationDIRegistrationTests : IDisposable
+{
+    private readonly SqliteConnection _accessConnection;
+    private readonly SqliteConnection _tenantConnection;
+
+    public AccessIntegrationDIRegistrationTests()
     {
-        private readonly SqliteConnection _accessConnection;
-        private readonly SqliteConnection _tenantConnection;
+        // Separate in-memory databases so each DbContext's EnsureCreated works independently.
+        _accessConnection = new SqliteConnection("DataSource=:memory:;Foreign Keys=True");
+        _accessConnection.Open();
+        _tenantConnection = new SqliteConnection("DataSource=:memory:;Foreign Keys=True");
+        _tenantConnection.Open();
+    }
 
-        public AccessIntegrationDIRegistrationTests()
+    public void Dispose()
+    {
+        _accessConnection.Dispose();
+        _tenantConnection.Dispose();
+    }
+
+    private static IServiceCollection NewServices(
+        SqliteConnection accessConnection,
+        SqliteConnection tenantConnection,
+        bool accessFirst)
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Tenant:MaxSettingsPerTenant"] = "1",
+                ["Tenant:InfoCacheSeconds"] = "0",
+                ["Tenant:Resolution:HeaderName"] = "X-Tenant-Id",
+                ["Tenant:Resolution:ClaimType"] = "tenant_id",
+                ["Access:MaxRolesPerScope"] = "1",
+                ["Access:MaxRolesPerUser"] = "1",
+                ["Access:CacheSeconds"] = "0",
+                ["Access:UserIdClaimType"] = "sub",
+            })
+            .Build();
+
+        var services = new ServiceCollection();
+        if (accessFirst)
         {
-            // Separate in-memory databases so each DbContext's EnsureCreated works independently.
-            _accessConnection = new SqliteConnection("DataSource=:memory:;Foreign Keys=True");
-            _accessConnection.Open();
-            _tenantConnection = new SqliteConnection("DataSource=:memory:;Foreign Keys=True");
-            _tenantConnection.Open();
+            services.AddAccess(config, options => options.UseSqlite(accessConnection));
+            services.AddTenant(config, options => options.UseSqlite(tenantConnection));
         }
-
-        public void Dispose()
+        else
         {
-            _accessConnection.Dispose();
-            _tenantConnection.Dispose();
-        }
-
-        private static IServiceCollection NewServices(SqliteConnection accessConnection, SqliteConnection tenantConnection)
-        {
-            var config = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string?>
-                {
-                    ["Tenant:MaxSettingsPerTenant"] = "1",
-                    ["Tenant:InfoCacheSeconds"] = "0",
-                    ["Tenant:Resolution:HeaderName"] = "X-Tenant-Id",
-                    ["Tenant:Resolution:ClaimType"] = "tenant_id",
-                    ["Access:MaxRolesPerScope"] = "1",
-                    ["Access:MaxRolesPerUser"] = "1",
-                    ["Access:CacheSeconds"] = "0",
-                    ["Access:UserIdClaimType"] = "sub",
-                })
-                .Build();
-
-            var services = new ServiceCollection();
             services.AddTenant(config, options => options.UseSqlite(tenantConnection));
             services.AddAccess(config, options => options.UseSqlite(accessConnection));
-            return services;
         }
+        return services;
+    }
 
-        [Fact]
-        public async Task AddTenant_ThenAddAccess_ComposesTenantAndPlatformAdapters()
-        {
-            var provider = NewServices(_accessConnection, _tenantConnection).BuildServiceProvider();
+    [Fact]
+    public async Task AddTenant_ThenAddAccess_ComposesTenantAndPlatformAdapters()
+    {
+        var provider = NewServices(_accessConnection, _tenantConnection, accessFirst: false).BuildServiceProvider();
 
         var membership = provider.GetRequiredService<IAccessMembership>();
         var adapters = provider.GetRequiredService<IEnumerable<IAccessMembershipAdapter>>().ToList();
@@ -245,14 +256,15 @@ public sealed class TenantAccessMembershipReaderTests
         Assert.Equal(1L, platformMember.MembershipGeneration);
     }
 
-        [Fact]
-        public async Task AddAccess_ThenAddTenant_ComposesTenantAndPlatformAdapters()
-        {
-            var provider = NewServices(_accessConnection, _tenantConnection).BuildServiceProvider();
+    [Fact]
+    public async Task AddAccess_ThenAddTenant_ComposesTenantAndPlatformAdapters()
+    {
+        var provider = NewServices(_accessConnection, _tenantConnection, accessFirst: true).BuildServiceProvider();
 
         var membership = provider.GetRequiredService<IAccessMembership>();
         var adapters = provider.GetRequiredService<IEnumerable<IAccessMembershipAdapter>>().ToList();
 
+        // One composed IAccessMembership; Tenant's membership is an adapter, not the service itself.
         Assert.NotNull(membership);
         Assert.Single(adapters.OfType<TenantAccessMembership>());
 

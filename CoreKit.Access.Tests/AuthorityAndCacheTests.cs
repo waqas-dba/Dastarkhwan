@@ -62,6 +62,50 @@ public sealed class FreshAuthorityTests : IDisposable
 
         Assert.Equal(1, _env.Membership.Lookups);
     }
+
+    [Fact]
+    public async Task HasPermissionAsync_Denies_WhenUserIdSetButNotAuthenticated()
+    {
+        // Arrange: actor has a non-empty UserId but is not authenticated.
+        _env.User.UserId = Guid.NewGuid();
+        _env.User.IsAuthenticatedOverride = false;
+        _env.ScopeContext.Current = _env.Scope;
+
+        // Act
+        var hasPermission = await _env.Access.HasPermissionAsync("sales.create");
+
+        // Assert: a non-empty UserId alone is not proof of authentication.
+        Assert.False(hasPermission);
+    }
+
+    [Fact]
+    public async Task HasPermissionAsync_Denies_WhenUserIdNull()
+    {
+        // Arrange: no authenticated user.
+        _env.User.UserId = null;
+        _env.User.IsAuthenticatedOverride = null;
+        _env.ScopeContext.Current = _env.Scope;
+
+        // Act
+        var hasPermission = await _env.Access.HasPermissionAsync("sales.create");
+
+        // Assert: missing identity is denied.
+        Assert.False(hasPermission);
+    }
+
+    [Fact]
+    public async Task HasPermissionAsync_Allows_WhenAuthenticatedUserHasPermission()
+    {
+        // Arrange: authenticated user with the permission in the current scope.
+        _env.SignInAs("sales.create");
+        _env.ScopeContext.Current = _env.Scope;
+
+        // Act
+        var hasPermission = await _env.Access.HasPermissionAsync("sales.create");
+
+        // Assert: authenticated behaviour is preserved.
+        Assert.True(hasPermission);
+    }
 }
 
 /// <summary>

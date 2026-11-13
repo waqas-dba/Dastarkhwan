@@ -35,8 +35,9 @@ public static class EndpointPermissionExtensions
             if (scopeContext.Current is not { } scope || !scope.IsValid)
                 return AccessErrors.ScopeRequired.ToHttpResult();
 
-            // Fail closed: not authenticated.
-            if (currentUser.UserId is not { } userId)
+            // Fail closed: not authenticated. A non-empty UserId alone is not proof of
+            // authentication; IsAuthenticated must also be true.
+            if (!currentUser.IsAuthenticated || currentUser.UserId is not { } userId)
                 return AccessErrors.NotAuthenticated.ToHttpResult();
 
             // Check permission through Access (fresh authority for management operations).

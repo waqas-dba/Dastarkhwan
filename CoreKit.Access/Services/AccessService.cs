@@ -92,7 +92,9 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
 
     public async Task<bool> HasPermissionAsync(string permission, CancellationToken ct = default)
     {
-        if (_scopeContext.Current is not { } scope || _actor.UserId is not { } userId)
+        // Fail closed: no scope, no user, or not authenticated. A non-empty UserId alone is not
+        // proof of authentication; IsAuthenticated must also be true.
+        if (_scopeContext.Current is not { } scope || _actor.UserId is not { } userId || !_actor.IsAuthenticated)
             return false;
 
         return await HasPermissionAsync(userId, scope, permission, ct);
@@ -103,7 +105,7 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
         if (_scopeContext.Current is not { } scope || !scope.IsValid)
             return AccessErrors.ScopeRequired;
 
-        if (_actor.UserId is not { } userId)
+        if (_actor.UserId is not { } userId || !_actor.IsAuthenticated)
             return AccessErrors.NotAuthenticated;
 
         return AccessResult.Success(await GetAccessAsync(userId, scope, ct));

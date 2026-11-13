@@ -10,6 +10,8 @@ public sealed class IdentitySeedOptions
 
     public string? AdminEmail { get; set; }
 
+    public string? AdminMobile { get; set; }
+
     public string? AdminPassword { get; set; }
 
     public string? AdminDisplayName { get; set; } = "Administrator";

@@ -21,6 +21,12 @@ public sealed class User
 
     public bool EmailConfirmed { get; set; }
 
+    /// <summary>Mobile number as provided by the user (trimmed). A contact channel, not a login identifier.</summary>
+    public string? Mobile { get; set; }
+
+    /// <summary>Digits-only copy of Mobile (with optional leading '+'), used for uniqueness and lookup.</summary>
+    public string? NormalizedMobile { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime? UpdatedAt { get; set; }

@@ -22,6 +22,8 @@ public interface IUserRepository
 
     Task<bool> EmailExistsAsync(string normalizedEmail, Guid? excludingUserId = null, CancellationToken ct = default);
 
+    Task<bool> MobileExistsAsync(string normalizedMobile, Guid? excludingUserId = null, CancellationToken ct = default);
+
     Task<(IReadOnlyList<User> Items, int TotalCount)> ListAsync(
         string? search, bool? isActive, int page, int pageSize, CancellationToken ct = default);
 

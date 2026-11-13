@@ -33,12 +33,14 @@ public sealed class UserServiceTests : IDisposable
         {
             Email = "newuser@example.com",
             Password = "NewUserPass123!",
+            Mobile = "+15551000010",
             DisplayName = "New User",
             RoleIds = new List<Guid> { _env.StaffRoleId }
         });
 
         var dto = ResultAssert.Ok(result);
         Assert.Equal("newuser@example.com", dto.Email);
+        Assert.Equal("+15551000010", dto.Mobile);
         Assert.Equal("New User", dto.DisplayName);
         Assert.True(dto.IsActive);
         Assert.Contains(IdentityRoleNames.Staff, dto.Roles);
@@ -53,6 +55,7 @@ public sealed class UserServiceTests : IDisposable
         {
             Email = "OWNER@example.com",
             Password = "DupPass123!",
+            Mobile = "+15551000011",
             DisplayName = "Duplicate"
         });
 
@@ -67,7 +70,8 @@ public sealed class UserServiceTests : IDisposable
         var result = await _env.UserService.CreateAsync(new CreateUserRequest
         {
             Email = "not-an-email",
-            Password = "BadEmailPass123!"
+            Password = "BadEmailPass123!",
+            Mobile = "+15551000012"
         });
 
         ResultAssert.Fails(result, IdentityErrorKind.Validation, "validation.failed");
@@ -81,7 +85,8 @@ public sealed class UserServiceTests : IDisposable
         var result = await _env.UserService.CreateAsync(new CreateUserRequest
         {
             Email = "shortpw@example.com",
-            Password = "short"
+            Password = "short",
+            Mobile = "+15551000013"
         });
 
         ResultAssert.Fails(result, IdentityErrorKind.Validation, "validation.failed");
@@ -95,7 +100,8 @@ public sealed class UserServiceTests : IDisposable
         var result = await _env.UserService.CreateAsync(new CreateUserRequest
         {
             Email = "same@example.com",
-            Password = "same@example.com"
+            Password = "same@example.com",
+            Mobile = "+15551000014"
         });
 
         ResultAssert.Fails(result, IdentityErrorKind.Validation, "validation.failed");
@@ -110,10 +116,58 @@ public sealed class UserServiceTests : IDisposable
         {
             Email = "norele@example.com",
             Password = "NoRolePass123!",
+            Mobile = "+15551000015",
             RoleIds = new List<Guid> { Guid.NewGuid() }
         });
 
         ResultAssert.Fails(result, IdentityErrorKind.Validation, "validation.failed");
+    }
+
+    // ---- Mobile validation on create ----
+
+    [Fact]
+    public async Task CreateUser_WithoutMobile_Fails()
+    {
+        _env.SignInOwner();
+
+        var result = await _env.UserService.CreateAsync(new CreateUserRequest
+        {
+            Email = "nomobile@example.com",
+            Password = "NoMobilePass123!"
+        });
+
+        ResultAssert.Fails(result, IdentityErrorKind.Validation, "validation.failed");
+    }
+
+    [Fact]
+    public async Task CreateUser_WithInvalidMobile_Fails()
+    {
+        _env.SignInOwner();
+
+        var result = await _env.UserService.CreateAsync(new CreateUserRequest
+        {
+            Email = "badmobile@example.com",
+            Password = "BadMobilePass123!",
+            Mobile = "not-a-phone"
+        });
+
+        ResultAssert.Fails(result, IdentityErrorKind.Validation, "validation.failed");
+    }
+
+    [Fact]
+    public async Task CreateUser_WithDuplicateMobile_Fails()
+    {
+        _env.SignInOwner();
+
+        // Staff user already has mobile +15551000002
+        var result = await _env.UserService.CreateAsync(new CreateUserRequest
+        {
+            Email = "dup-mobile@example.com",
+            Password = "DupMobilePass123!",
+            Mobile = "+15551000002"
+        });
+
+        ResultAssert.Fails(result, IdentityErrorKind.Conflict, "conflict");
     }
 
     // ---- Get ----
@@ -185,6 +239,75 @@ public sealed class UserServiceTests : IDisposable
         var user = await db.Users.FindAsync(_env.StaffUserId);
         Assert.NotNull(user);
         Assert.NotEqual("StaffPass123!", user.PasswordHash);
+    }
+
+    [Fact]
+    public async Task UpdateUser_Mobile_Succeeds()
+    {
+        _env.SignInOwner();
+
+        var result = await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
+        {
+            Mobile = "+15551000020"
+        });
+
+        var dto = ResultAssert.Ok(result);
+        Assert.Equal("+15551000020", dto.Mobile);
+
+        using var db = _env.NewContext();
+        var user = await db.Users.FindAsync(_env.StaffUserId);
+        Assert.NotNull(user);
+        Assert.Equal("+15551000020", user.Mobile);
+        Assert.Equal("+15551000020", user.NormalizedMobile);
+    }
+
+    [Fact]
+    public async Task UpdateUser_WithInvalidMobile_Fails()
+    {
+        _env.SignInOwner();
+
+        ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
+        {
+            Mobile = "not-a-phone"
+        }), IdentityErrorKind.Validation, "validation.failed");
+    }
+
+    [Fact]
+    public async Task UpdateUser_WithDuplicateMobile_Fails()
+    {
+        _env.SignInOwner();
+
+        // Owner already has mobile +15551000001
+        ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
+        {
+            Mobile = "+15551000001"
+        }), IdentityErrorKind.Conflict, "conflict");
+    }
+
+    [Fact]
+    public async Task UpdateUser_MobileClearedWhenSetToEmpty_Fails()
+    {
+        _env.SignInOwner();
+
+        // Empty string is not a valid mobile number
+        ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
+        {
+            Mobile = string.Empty
+        }), IdentityErrorKind.Validation, "validation.failed");
+    }
+
+    [Fact]
+    public async Task UpdateUser_WithoutMobile_LeavesExistingMobileUnchanged()
+    {
+        _env.SignInOwner();
+
+        var result = await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
+        {
+            DisplayName = "New Display Name"
+        });
+
+        var dto = ResultAssert.Ok(result);
+        Assert.Equal("+15551000002", dto.Mobile);
     }
 
     [Fact]
@@ -286,7 +409,8 @@ public sealed class UserServiceTests : IDisposable
         ResultAssert.Fails(await _env.UserService.CreateAsync(new CreateUserRequest
         {
             Email = "newuser@example.com",
-            Password = "NewUserPass123!"
+            Password = "NewUserPass123!",
+            Mobile = "+15551000016"
         }), IdentityErrorKind.Forbidden, "access.denied");
     }
 
@@ -323,6 +447,7 @@ public sealed class UserServiceTests : IDisposable
         {
             Email = "createonly@example.com",
             Password = "CreateOnlyPass123!",
+            Mobile = "+15551000017",
             DisplayName = "Create Only",
             RoleIds = new List<Guid> { _env.StaffRoleId }
         }));
@@ -360,6 +485,7 @@ public sealed class UserServiceTests : IDisposable
         {
             Email = "newadmin@example.com",
             Password = "NewAdminPass123!",
+            Mobile = "+15551000018",
             RoleIds = new List<Guid> { _env.AdministratorRoleId }
         }), IdentityErrorKind.Forbidden, "access.denied");
     }

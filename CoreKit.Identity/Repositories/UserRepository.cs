@@ -44,6 +44,13 @@ public sealed class UserRepository : IUserRepository
                  (excludingUserId == null || u.Id != excludingUserId.Value),
             ct);
 
+    public Task<bool> MobileExistsAsync(
+        string normalizedMobile, Guid? excludingUserId = null, CancellationToken ct = default)
+        => _db.Users.AnyAsync(
+            u => u.NormalizedMobile == normalizedMobile &&
+                 (excludingUserId == null || u.Id != excludingUserId.Value),
+            ct);
+
     public async Task<(IReadOnlyList<User> Items, int TotalCount)> ListAsync(
         string? search, bool? isActive, int page, int pageSize, CancellationToken ct = default)
     {

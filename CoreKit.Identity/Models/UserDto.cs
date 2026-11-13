@@ -12,6 +12,8 @@ public sealed class UserDto
 
     public string Email { get; set; } = null!;
 
+    public string? Mobile { get; set; }
+
     public string? DisplayName { get; set; }
 
     public bool IsActive { get; set; }

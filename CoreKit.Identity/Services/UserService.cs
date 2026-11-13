@@ -94,6 +94,16 @@ public sealed class UserService : IUserService
         if (!EmailValidator.IsValid(email))
             return IdentityErrors.Validation("A valid email address is required.");
 
+        var mobile = request.Mobile?.Trim() ?? string.Empty;
+
+        if (mobile.Length == 0)
+            return IdentityErrors.Validation("A mobile number is required.");
+
+        var normalizedMobile = MobileValidator.Normalize(mobile);
+
+        if (normalizedMobile is null)
+            return IdentityErrors.Validation("A valid mobile number is required.");
+
         var passwordError = PasswordPolicy.Validate(request.Password, email);
 
         if (passwordError is not null)
@@ -120,11 +130,16 @@ public sealed class UserService : IUserService
         if (await _userRepository.EmailExistsAsync(normalizedEmail, ct: ct))
             return IdentityErrors.Conflict("A user with this email already exists.");
 
+        if (await _userRepository.MobileExistsAsync(normalizedMobile, ct: ct))
+            return IdentityErrors.Conflict("A user with this mobile number already exists.");
+
         var user = new User
         {
             Id = Guid.NewGuid(),
             Email = email,
             NormalizedEmail = normalizedEmail,
+            Mobile = mobile,
+            NormalizedMobile = normalizedMobile,
             PasswordHash = _hasher.Hash(request.Password),
             DisplayName = displayName,
             IsActive = request.IsActive,
@@ -182,6 +197,20 @@ public sealed class UserService : IUserService
             }
 
             user.Email = email;
+        }
+
+        if (request.Mobile is { } mobile && mobile != user.Mobile)
+        {
+            var normalizedMobile = MobileValidator.Normalize(mobile);
+
+            if (normalizedMobile is null)
+                return IdentityErrors.Validation("A valid mobile number is required.");
+
+            if (await _userRepository.MobileExistsAsync(normalizedMobile, id, ct))
+                return IdentityErrors.Conflict("A user with this mobile number already exists.");
+
+            user.Mobile = mobile.Trim();
+            user.NormalizedMobile = normalizedMobile;
         }
 
         if (request.DisplayName is not null)

@@ -21,6 +21,8 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(x => x.NormalizedEmail).IsRequired().HasMaxLength(320);
         builder.Property(x => x.PasswordHash).IsRequired().HasMaxLength(500);
         builder.Property(x => x.DisplayName).HasMaxLength(200);
+        builder.Property(x => x.Mobile).HasMaxLength(50);
+        builder.Property(x => x.NormalizedMobile).HasMaxLength(50);
 
         builder.Property(x => x.AccessFailedCount).IsRequired();
 
@@ -33,5 +35,13 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
         builder.HasIndex(x => x.NormalizedEmail)
             .IsUnique()
             .HasDatabaseName("UX_Identity_Users_NormalizedEmail");
+
+        // The database itself refuses a second account with the same mobile number.
+        // Nullable columns allow multiple NULLs in PostgreSQL, which is fine:
+        // existing users without a mobile all share NULL.
+        builder.HasIndex(x => x.NormalizedMobile)
+            .IsUnique()
+            .HasDatabaseName("UX_Identity_Users_NormalizedMobile")
+            .HasFilter("\"NormalizedMobile\" IS NOT NULL");
     }
 }

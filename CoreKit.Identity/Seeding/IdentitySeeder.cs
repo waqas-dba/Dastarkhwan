@@ -167,6 +167,7 @@ public sealed class IdentitySeeder
             return;
 
         var email = _options.AdminEmail?.Trim();
+        var mobile = _options.AdminMobile?.Trim();
         var password = _options.AdminPassword;
 
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrEmpty(password))
@@ -178,6 +179,14 @@ public sealed class IdentitySeeder
 
         if (!EmailValidator.IsValid(email))
             throw new InvalidOperationException("Identity:Seed:AdminEmail is not a valid email address.");
+
+        if (string.IsNullOrWhiteSpace(mobile))
+            throw new InvalidOperationException("Identity:Seed:AdminMobile is required to create the first administrator.");
+
+        var normalizedMobile = MobileValidator.Normalize(mobile);
+
+        if (normalizedMobile is null)
+            throw new InvalidOperationException("Identity:Seed:AdminMobile is not a valid mobile number.");
 
         var passwordError = PasswordPolicy.Validate(password, email);
 
@@ -195,6 +204,8 @@ public sealed class IdentitySeeder
                 Id = Guid.NewGuid(),
                 Email = email,
                 NormalizedEmail = normalizedEmail,
+                Mobile = mobile,
+                NormalizedMobile = normalizedMobile,
                 PasswordHash = _hasher.Hash(password),
                 DisplayName = _options.AdminDisplayName,
                 IsActive = true,

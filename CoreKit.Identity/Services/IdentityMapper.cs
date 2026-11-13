@@ -10,6 +10,7 @@ public static class IdentityMapper
     {
         Id = user.Id,
         Email = user.Email,
+        Mobile = user.Mobile,
         DisplayName = user.DisplayName,
         IsActive = user.IsActive,
         EmailConfirmed = user.EmailConfirmed,

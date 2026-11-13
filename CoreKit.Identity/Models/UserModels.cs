@@ -6,6 +6,8 @@ public sealed class CreateUserRequest
 
     public string Password { get; set; } = string.Empty;
 
+    public string Mobile { get; set; } = string.Empty;
+
     public string? DisplayName { get; set; }
 
     public bool IsActive { get; set; } = true;
@@ -17,6 +19,8 @@ public sealed class CreateUserRequest
 public sealed class UpdateUserRequest
 {
     public string? Email { get; set; }
+
+    public string? Mobile { get; set; }
 
     /// <summary>An empty string clears the display name.</summary>
     public string? DisplayName { get; set; }

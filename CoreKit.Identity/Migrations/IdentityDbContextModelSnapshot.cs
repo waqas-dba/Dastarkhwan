@@ -195,6 +195,14 @@ namespace CoreKit.Identity.Migrations
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
 
+                    b.Property<string>("Mobile")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("NormalizedMobile")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("boolean");
 
@@ -225,6 +233,10 @@ namespace CoreKit.Identity.Migrations
                     b.HasIndex("NormalizedEmail")
                         .IsUnique()
                         .HasDatabaseName("UX_Identity_Users_NormalizedEmail");
+
+                    b.HasIndex("NormalizedMobile")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Identity_Users_NormalizedMobile");
 
                     b.ToTable("Identity_Users", (string)null);
                 });

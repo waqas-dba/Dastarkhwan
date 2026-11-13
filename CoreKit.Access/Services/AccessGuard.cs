@@ -26,13 +26,22 @@ internal sealed class AccessGuard
         if (_scopeContext.Current is not { } scope || !scope.IsValid)
             return AccessErrors.ScopeRequired;
 
-        if (_actor.UserId is not { } userId)
+        if (!_actor.IsAuthenticated || _actor.UserId is not { } userId || userId == Guid.Empty)
             return AccessErrors.NotAuthenticated;
 
         // Changing roles or assignments is decided on the person's permissions right now. Reading is fine from the cache.
-        var access = RequiresFreshAuthority(permission) && _access is IFreshAccessSource fresh
-            ? await fresh.GetFreshAccessAsync(userId, scope, ct)
-            : await _access.GetAccessAsync(userId, scope, ct);
+        EffectiveAccess access;
+        if (RequiresFreshAuthority(permission))
+        {
+            if (_access is not IFreshAccessSource fresh)
+                return AccessErrors.Denied;
+
+            access = await fresh.GetFreshAccessAsync(userId, scope, ct);
+        }
+        else
+        {
+            access = await _access.GetAccessAsync(userId, scope, ct);
+        }
 
         if (!access.Has(permission))
             return AccessErrors.Denied;
@@ -49,12 +58,21 @@ internal sealed class AccessGuard
     {
         var scope = AccessScope.ForPlatform(AccessScope.PlatformId);
 
-        if (_actor.UserId is not { } userId)
+        if (!_actor.IsAuthenticated || _actor.UserId is not { } userId || userId == Guid.Empty)
             return AccessErrors.NotAuthenticated;
 
-        var access = RequiresFreshAuthority(permission) && _access is IFreshAccessSource fresh
-            ? await fresh.GetFreshAccessAsync(userId, scope, ct)
-            : await _access.GetAccessAsync(userId, scope, ct);
+        EffectiveAccess access;
+        if (RequiresFreshAuthority(permission))
+        {
+            if (_access is not IFreshAccessSource fresh)
+                return AccessErrors.Denied;
+
+            access = await fresh.GetFreshAccessAsync(userId, scope, ct);
+        }
+        else
+        {
+            access = await _access.GetAccessAsync(userId, scope, ct);
+        }
 
         if (!access.Has(permission))
             return AccessErrors.Denied;

@@ -45,7 +45,7 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
 
         var guardResult = await _guard.RequirePlatformScopePermissionAsync(AccessPermissionNames.PlatformMembersManage, ct);
         if (guardResult.IsFailure)
-            return PlatformMemberResult.Fail("access.denied", guardResult.Error!.Message);
+            return PlatformMemberResult.Fail(guardResult.Error!.Code, guardResult.Error!.Message);
 
         var existing = await _db.PlatformMembers
             .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId, ct);
@@ -108,7 +108,7 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
 
         var guardResult = await _guard.RequirePlatformScopePermissionAsync(AccessPermissionNames.PlatformMembersManage, ct);
         if (guardResult.IsFailure)
-            return PlatformMemberResult.Fail("access.denied", guardResult.Error!.Message);
+            return PlatformMemberResult.Fail(guardResult.Error!.Code, guardResult.Error!.Message);
 
         var existing = await _db.PlatformMembers
             .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId, ct);

@@ -15,7 +15,9 @@ public sealed class FakeCurrentUser : IAccessCurrentUser
 {
     public Guid? UserId { get; set; }
 
-    public bool IsAuthenticated => UserId is not null;
+    public bool? IsAuthenticatedOverride { get; set; }
+
+    public bool IsAuthenticated => IsAuthenticatedOverride ?? UserId is not null;
 }
 
 public sealed class FakeScopeContext : IAccessScopeContext

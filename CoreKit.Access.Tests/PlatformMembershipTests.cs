@@ -398,24 +398,44 @@ public sealed class PlatformMembershipTests : IDisposable
     }
 
     [Fact]
-    public async Task AddMember_DeniedAfterAuthorityRevoked()
+    public async Task AddMember_DeniedAfterAuthorityRevokedWithStaleCachedAccessPrimed()
     {
-        // Arrange: platform manager adds a member
+        // Arrange: platform manager with permission, prime cached access
         SignInAsPlatformManager();
-        var user1 = Guid.NewGuid();
-        var r1 = await Svc.AddMemberAsync(user1);
-        Assert.True(r1.IsSuccess);
+        var actorId = _env.User.UserId!.Value;
+        var primed = await _env.Access.GetAccessAsync(actorId, PlatformScope);
+        Assert.True(primed.Has(AccessPermissionNames.PlatformMembersManage));
+        Assert.True(_env.Cache.TryGet(PlatformScope, actorId, out _));
 
-        // Revoke the manager's platform membership — authority is gone
-        _env.Membership.Remove(PlatformScope, _env.User.UserId!.Value);
+        // Revoke authority
+        _env.Membership.Remove(PlatformScope, actorId);
 
-        // Act: manager tries to add another member using stale cached authority
-        var user2 = Guid.NewGuid();
-        var r2 = await Svc.AddMemberAsync(user2);
+        // Act: stale cache remains primed, but critical operation must use fresh authority
+        var result = await Svc.AddMemberAsync(Guid.NewGuid());
 
-        // Assert: denied by fresh authority check
-        Assert.False(r2.IsSuccess);
-        Assert.Equal("access.denied", r2.ErrorCode);
+        // Assert
+        Assert.False(result.IsSuccess);
+        Assert.Equal("access.denied", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task RevokeMember_DeniedAfterAuthorityRevokedWithStaleCachedAccessPrimed()
+    {
+        SignInAsPlatformManager();
+        var actorId = _env.User.UserId!.Value;
+        var target = Guid.NewGuid();
+        Assert.True((await Svc.AddMemberAsync(target)).IsSuccess);
+
+        var primed = await _env.Access.GetAccessAsync(actorId, PlatformScope);
+        Assert.True(primed.Has(AccessPermissionNames.PlatformMembersManage));
+        Assert.True(_env.Cache.TryGet(PlatformScope, actorId, out _));
+
+        _env.Membership.Remove(PlatformScope, actorId);
+
+        var result = await Svc.RevokeMemberAsync(target);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("access.denied", result.ErrorCode);
     }
 
     // ---- platform scope is fixed, never ambient tenant scope ----
@@ -472,6 +492,7 @@ public sealed class PlatformMembershipTests : IDisposable
     {
         // Arrange: no signed-in user
         _env.User.UserId = null;
+        _env.User.IsAuthenticatedOverride = null;
         var targetUser = Guid.NewGuid();
 
         // Act
@@ -481,4 +502,92 @@ public sealed class PlatformMembershipTests : IDisposable
         Assert.False(result.IsSuccess);
         Assert.Equal("access.not_authenticated", result.ErrorCode);
     }
+
+    [Fact]
+    public async Task PlatformRevokeMemberDeniedWhenUnauthenticated()
+    {
+        _env.User.UserId = null;
+        _env.User.IsAuthenticatedOverride = null;
+
+        var result = await Svc.RevokeMemberAsync(Guid.NewGuid());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("access.not_authenticated", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task PlatformAddMemberDeniedWhenUserIdPresentButNotAuthenticated()
+    {
+        _env.User.UserId = Guid.NewGuid();
+        _env.User.IsAuthenticatedOverride = false;
+
+        var result = await Svc.AddMemberAsync(Guid.NewGuid());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("access.not_authenticated", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task PlatformRevokeMemberDeniedWhenUserIdPresentButNotAuthenticated()
+    {
+        _env.User.UserId = Guid.NewGuid();
+        _env.User.IsAuthenticatedOverride = false;
+
+        var result = await Svc.RevokeMemberAsync(Guid.NewGuid());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("access.not_authenticated", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task PlatformAddMember_FailsClosedWhenFreshAuthoritySourceUnavailable()
+    {
+        _env.User.UserId = Guid.NewGuid();
+        _env.ScopeContext.Current = PlatformScope;
+        var cached = new EffectiveAccess(true, true, new HashSet<string>(StringComparer.Ordinal) { AccessPermissionNames.PlatformMembersManage }, Array.Empty<string>());
+        var access = new CachedOnlyAccessService(cached);
+        var guard = new AccessGuard(_env.ScopeContext, _env.User, access);
+        var svc = new PlatformMembershipService(_env.Db, _env.UnitOfWork, _env.Audit, _env.User, _env.Cache, _env.Time, guard);
+
+        var result = await svc.AddMemberAsync(Guid.NewGuid());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("access.denied", result.ErrorCode);
+    }
+
+    [Fact]
+    public async Task PlatformRevokeMember_FailsClosedWhenFreshAuthoritySourceUnavailable()
+    {
+        _env.User.UserId = Guid.NewGuid();
+        _env.ScopeContext.Current = PlatformScope;
+        var cached = new EffectiveAccess(true, true, new HashSet<string>(StringComparer.Ordinal) { AccessPermissionNames.PlatformMembersManage }, Array.Empty<string>());
+        var access = new CachedOnlyAccessService(cached);
+        var guard = new AccessGuard(_env.ScopeContext, _env.User, access);
+        var svc = new PlatformMembershipService(_env.Db, _env.UnitOfWork, _env.Audit, _env.User, _env.Cache, _env.Time, guard);
+
+        var result = await svc.RevokeMemberAsync(Guid.NewGuid());
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("access.denied", result.ErrorCode);
+    }
+
+    private sealed class CachedOnlyAccessService : IAccessService
+    {
+        private readonly EffectiveAccess _access;
+
+        public CachedOnlyAccessService(EffectiveAccess access) => _access = access;
+
+        public Task<EffectiveAccess> GetAccessAsync(Guid userId, AccessScope scope, CancellationToken ct = default)
+            => Task.FromResult(_access);
+
+        public Task<bool> HasPermissionAsync(Guid userId, AccessScope scope, string permission, CancellationToken ct = default)
+            => Task.FromResult(_access.Has(permission));
+
+        public Task<bool> HasPermissionAsync(string permission, CancellationToken ct = default)
+            => Task.FromResult(_access.Has(permission));
+
+        public Task<AccessResult<EffectiveAccess>> GetMyAccessAsync(CancellationToken ct = default)
+            => Task.FromResult(AccessResult.Success(_access));
+    }
+
 }

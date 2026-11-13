@@ -32,16 +32,16 @@ A status must describe the evidence available, not the intended architecture or 
 
 | Field | Value |
 |---|---|
-| Latest recorded remote baseline (HEAD commit) | `f09f236bcbc162387b572e0ed8cee4d29949a816` |
-| Parent commit | `3f58add6da963669cbc6d113f2bc030478a112c6` |
+| FIX1 baseline | `f09f236bcbc162387b572e0ed8cee4d29949a816` |
+| FIX1 implementation commit / FIX2 starting baseline / current remote HEAD | `7ed4c61fca8b06f35a0e2f1ce5f806ae22ad0043` |
 | Branch | `master` |
-| Latest commit message | `update the files` |
-| Commit date | 2026-11-13 19:36:18 +0500 |
-| Evidence basis (commit metadata) | GitHub remote commit/reference provided for this task (`f09f236`). Remote state beyond this commit was not independently queried in this environment. |
-| Local working-tree evidence | Not claimed from GitHub evidence. Local baseline, `git status --short`, and cleanliness must be verified by local inspection in the executing environment before relying on local state. |
-| Scope | Point-in-time record of the latest evidenced remote baseline for this documentation task; does not assert local inspection results |
+| Latest commit message | `docs(governance): accept D-017 automation and align agent guidance` |
+| Commit date | 2026-11-13 19:53:27 +0500 |
+| Evidence basis (commit metadata) | Local Git inspection at HEAD (`git rev-parse HEAD`, `git log -1`, `git status --short`) and remote `origin/master` query (`git ls-remote origin master`) on 2026-11-13. Both local HEAD and remote HEAD are `7ed4c61fca8b06f35a0e2f1ce5f806ae22ad0043`. |
+| Local working-tree evidence | Clean (`git status --short` returned empty) at local inspection on 2026-11-13. Not claimed from GitHub evidence; must be verified by local inspection in the executing environment before relying on local state. |
+| Scope | Point-in-time record of the current remote HEAD and FIX1 implementation commit verified at task time; does not assert source inspection results beyond this baseline. |
 
-The latest evidenced remote baseline for this documentation task is `f09f236bcbc162387b572e0ed8cee4d29949a816` (2026-11-13 19:36:18 +0500, `update the files`). This record distinguishes GitHub/remote commit evidence from local working-tree evidence and does not constitute independent review acceptance, Project Owner acceptance, or authorization for implementation/tests/builds/migrations outside approved task scope. Historical commit information is preserved.
+The FIX1 baseline `f09f236bcbc162387b572e0ed8cee4d29949a816` (2026-11-13 19:36:18 +0500, `update the files`) is preserved as the documentation-task baseline. The current remote HEAD `7ed4c61fca8b06f35a0e2f1ce5f806ae22ad0043` (2026-11-13 19:53:27 +0500, `docs(governance): accept D-017 automation and align agent guidance`) is the FIX1 implementation commit and the FIX2 starting baseline. This record distinguishes remote Git evidence from local working-tree evidence and does not constitute independent review acceptance, Project Owner acceptance, or authorization for implementation/tests/builds/migrations outside approved task scope. Historical commit information is preserved.
 
 Baselines distinguished in this file:
 
@@ -51,7 +51,8 @@ Baselines distinguished in this file:
 - Previous documentation snapshot: `548dca791009d094ef7e2e9bd917a3bc0b8b0f0c` (2026-11-12) — documentation-only snapshot recorded before later syncs.
 - Previous latest verified local baseline: `70d757fd099c58de5976383677255ce64aac15e3` (2026-11-13) — implementation/review-evidence baseline for `DK-ACCESS-PLATFORM-SCOPE-01` (**Under review / Request Changes**, not accepted).
 - Previous local/documentation baseline: `3f58add6da963669cbc6d113f2bc030478a112c6` (2026-11-13) — docs-sync commit recorded prior to this remote baseline.
-- Latest evidenced remote baseline: `f09f236bcbc162387b572e0ed8cee4d29949a816` (2026-11-13) — recorded for this task from GitHub/commit evidence; local working-tree state must be separately verified locally.
+- FIX1 baseline: `f09f236bcbc162387b572e0ed8cee4d29949a816` (2026-11-13 19:36:18 +0500) — documentation-task baseline recorded for `DK-DEV-AUTOMATION-01-FIX1`.
+- FIX1 implementation commit / FIX2 starting baseline: `7ed4c61fca8b06f35a0e2f1ce5f806ae22ad0043` (2026-11-13 19:53:27 +0500) — current remote `origin/master` HEAD; accepted D-017/D-007/D-008 automation reconciliation.
 
 The source-inspection baseline for the Tenant/Identity and Tenant/Access findings remains `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9`. Documentation-only commits at `45a5789`, `beb0a0b`, `d7585c3`, `335b9ed`, `0504f3a`, `6e79f13`, `c9d4b36`, `548dca`, `3f58add`, and related documentation corrections did not re-inspect source code; no claim is made that source behavior changed between these baselines except where explicitly noted. Commit `70d757f` is not documentation-only and remains **Under review / Request Changes** (not accepted). Distinguish remote/GitHub evidence from local inspection evidence.
 
@@ -166,12 +167,12 @@ Only one agent may modify the shared working tree at a time. All participating a
 
 `CLAUDE.md`, `ai-tasks.md`, `AGENTS.md`, `roadmap.md`, `current-state.md`, `decisions.md`, and `commands.txt` are updated in `DK-DEV-AUTOMATION-01-FIX1` against latest evidenced remote baseline `f09f236bcbc162387b572e0ed8cee4d29949a816` (2026-11-13). This synchronization records accepted D-017 automation policy reconciliation, corrected baseline/evidence wording, and verified EF CLI command guidance; it does not constitute independent review acceptance (except as separately reported), Project Owner acceptance, or authorization for implementation/tests/builds/migrations outside approved task scope. Prior synchronization remains historically evidenced (including `DK-DOCS-SYNC-03` and `DK-DEV-AUTOMATION-01` records).
 
-## Active review and planning items (evidence at latest verified local baseline `70d757fd`)
+## Active review and planning items (evidence at current verified baseline `7ed4c61`)
 
 | Item | Status | Evidence / notes |
 |---|---|---|
 | `DK-ACCESS-PLATFORM-SCOPE-01` | **Under review / Request Changes** | Commit `70d757fd099c58de5976383677255ce64aac15e3` (2026-11-13). Confirmed issues: error-code propagation defect in both `PlatformMembershipService.AddMemberAsync` and `RevokeMemberAsync` (guard unauthenticated result collapsed to `access.denied`); earlier finding that guard does not explicitly check `IsAuthenticated`; insufficient stale-cache test setup and missing Revoke regression cases; out-of-scope Tenant test `CoreKit.Tenant.Tests/TenantAccessAuthorizationTests.cs` addition assessed separately. Confirmed commit/push governance violation recorded (no retrospective approval). Not accepted. |
-| `DK-IDENTITY-BOUNDARY-01` | **Blocked** (investigation completed, read-only; no implementation) | Requested baseline `63a0eb183d4fcd53ec3d18c59861aceb3df4a6f5` differs from actual HEAD `70d757fd`; task stopped for baseline reconciliation before implementation planning/execution. Requires Project Owner approval of required architectural decisions and baseline reconciliation. Scope is planning/investigation only: remove authorization permissions from SharedKernel `ICurrentUser` while preserving Identity behavior and D-002/D-015/D-016 boundaries. Does not authorize implementation. |
+| `DK-IDENTITY-BOUNDARY-01` | **Blocked** (investigation completed, read-only; no implementation) | Requested baseline `63a0eb183d4fcd53ec3d18c59861aceb3df4a6f5` differs from actual HEAD `7ed4c61fca8b06f35a0e2f1ce5f806ae22ad0043`; task stopped for baseline reconciliation before implementation planning/execution. Requires Project Owner approval of required architectural decisions and baseline reconciliation. Scope is planning/investigation only: remove authorization permissions from SharedKernel `ICurrentUser` while preserving Identity behavior and D-002/D-015/D-016 boundaries. Does not authorize implementation. |
 | `DK-IDENTITY-BOUNDARY-01A–01E` | **Proposed task sequence (not approved)** | Proposed split: 01A design/contract approval, 01B Access-owned platform decision, 01C Tenant rewiring/fail-closed, 01D SharedKernel/Identity boundary cleanup with compatibility, 01E docs/status alignment if approved. Planning proposal only; not approved implementation work and not scheduled without explicit Project Owner decisions/approval. |
 
 ## Next proposed work

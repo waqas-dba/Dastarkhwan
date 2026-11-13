@@ -110,10 +110,13 @@ public sealed class UserRepository : IUserRepository
     public async Task<int> IncrementAccessFailedCountAsync(Guid userId, CancellationToken ct = default)
     {
         // Database-side atomic increment: no lost increments under concurrent load.
-        await _db.Database.ExecuteSqlRawAsync(
-            "UPDATE \"Identity_Users\" SET \"AccessFailedCount\" = \"AccessFailedCount\" + 1 WHERE \"Id\" = {0}",
-            new object[] { userId },
-            ct);
+        // Use type-safe ExecuteUpdateAsync instead of raw SQL so the Guid parameter is
+        // bound correctly by EF Core's provider, avoiding any provider-specific parameter
+        // formatting mismatches that could cause the UPDATE to match zero rows.
+        await _db.Users
+            .Where(u => u.Id == userId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.AccessFailedCount, u => u.AccessFailedCount + 1), ct);
 
         return await _db.Users
             .AsNoTracking()

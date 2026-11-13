@@ -704,7 +704,9 @@ public sealed class UserServiceTests : IDisposable
         Assert.NotNull(lockedUser);
         Assert.Equal(5, lockedUser.AccessFailedCount);
         Assert.True(lockedUser.LockoutEnd.HasValue);
-        Assert.True(lockedUser.LockoutEnd.Value > _env.Time.GetUtcNow());
+        // LockoutEnd is stored as DateTime (Kind=Unspecified from SQLite); compare as DateTime to avoid
+        // local-timezone reinterpretation when converting DateTime -> DateTimeOffset.
+        Assert.True(lockedUser.LockoutEnd.Value > _env.Time.GetUtcNow().UtcDateTime);
     }
 
     [Fact]

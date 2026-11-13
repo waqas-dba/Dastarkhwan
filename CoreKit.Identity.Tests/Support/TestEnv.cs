@@ -3,6 +3,7 @@ using CoreKit.Identity.Security;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using System.IO;
 using System.Security.Claims;
 using System.Threading;
 
@@ -16,12 +17,14 @@ namespace CoreKit.Identity.Tests.Support;
 /// </summary>
 internal sealed class TestEnv : IDisposable
 {
+    private readonly string _databasePath;
     private readonly SqliteConnection _connection;
     private readonly DbContextOptions<IdentityDbContext> _dbOptions;
 
     public TestEnv()
     {
-        _connection = new SqliteConnection("DataSource=:memory:;Foreign Keys=True");
+        _databasePath = Path.Combine(Path.GetTempPath(), $"corekit_identity_tests_{Guid.NewGuid():N}.db");
+        _connection = new SqliteConnection($"Data Source={_databasePath};Foreign Keys=True");
         _connection.Open();
 
         _dbOptions = new DbContextOptionsBuilder<IdentityDbContext>()
@@ -229,7 +232,9 @@ internal sealed class TestEnv : IDisposable
 
     public Guid UserUpdatePermissionId { get; }
 
-    public IdentityDbContext NewContext() => new(_dbOptions);
+    public IdentityDbContext NewContext() => new(new DbContextOptionsBuilder<IdentityDbContext>()
+        .UseSqlite(new SqliteConnection($"Data Source={_databasePath};Foreign Keys=True"))
+        .Options);
 
     public void SignInOwner()
     {
@@ -271,6 +276,7 @@ internal sealed class TestEnv : IDisposable
     {
         Db.Dispose();
         _connection.Dispose();
+        try { File.Delete(_databasePath); } catch { /* best-effort cleanup */ }
     }
 }
 

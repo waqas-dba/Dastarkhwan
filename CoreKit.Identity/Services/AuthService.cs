@@ -71,11 +71,15 @@ public sealed class AuthService : IAuthService
         }
 
         // If the account is locked out, refuse login without revealing lockout status.
+        // Still count the failed attempt so concurrent attempts cannot lose increments
+        // due to the lockout short-circuit (e.g. call 5 locks the account, calls 6-10
+        // read after the lock is set and would otherwise skip the increment).
         var now = Now();
         if (user.LockoutEnd is { } lockoutEnd)
         {
             if (lockoutEnd > now)
             {
+                await _userRepository.IncrementAccessFailedCountAsync(user.Id, ct);
                 _logger.LogInformation("Login blocked for user {UserId}: account locked until {LockoutEnd}.", user.Id, lockoutEnd);
                 return IdentityErrors.InvalidCredentials;
             }

@@ -39,24 +39,32 @@ Slices are prepared by OpenCode, implemented by OpenCode, independently reviewed
 
 | Slice | Task | Status | Boundary / completion evidence |
 |---|---|---|---|
-| S1 | Documentation only: synchronize `current-state.md` and `roadmap.md` with accepted decisions, current evidence and current agent allocation | Under review | Documentation changes applied and committed at `45a5789`. Initial review identified documentation corrections; correction task `DK-TENANT-ACCESS-DOCS-FIX1` addresses them. Independent review and Project Owner acceptance remain pending. |
+| S1 | Documentation only: synchronize `current-state.md` and `roadmap.md` with accepted decisions, current evidence and current agent allocation | Under review | Documentation changes applied and committed at `45a5789`. Initial review identified documentation corrections; correction tasks `DK-TENANT-ACCESS-DOCS-FIX1`–`FIX4` addressed findings. `DK-DOCS-SYNC-03` updates core docs at latest verified local baseline `70d757fd` (2026-11-13). Independent review and Project Owner acceptance remain pending. |
 | S2.1 | Create a dedicated `CoreKit.Access.Tests` project | Under review | `CoreKit.Access.Tests` exists with its Access-focused suites (created in `470d42c`). Independent review and user-run tests pending. File presence alone is not completion. |
 | S2.2 | Update architecture-test coverage and references for intended modules | In progress | Boundary rules cover SharedKernel, Identity, Access and Tenant, with a documented temporary exception. Boundary enforcement now evaluates actual MSBuild project references (imports included), validates solution inventory/classification and the IVT policy. Tests have not been run as part of this documentation task. |
 | S3 | Review the Access migration | Under review | Access migration files are committed under `CoreKit.Access/Migrations/` at `43c2179`. Review schema, constraints, relationships and compatibility. Database application requires separate explicit authorization. |
 | S4.1 | Inventory Tenant-to-Identity references and classify each | Reported complete (not independently verified) | Previously reported inventory requires refresh against the current implementation and an approved artifact. |
 | S4.2 | Tenant–Access foundation: establish public contract integration, tenant scope context, membership adapter, safe DI composition and fail-closed behavior | Pending | Access public contracts (`IAccessScopeContext`, `IAccessMembership`, `IAccessService`, `IPermissionChecker`) are available. Tenant adapter and DI composition not yet implemented. |
-| S4.3 | Platform authorization: define and implement explicit Access-owned platform/cross-tenant authorization | Pending | Platform authorization design not yet established. Must not be combined with tenant-scoped permission enforcement. |
+| S4.3 | Platform authorization: define and implement explicit Access-owned platform/cross-tenant authorization | Under review / partial (scoped fix pending correction) | `DK-ACCESS-PLATFORM-SCOPE-01` (`70d757fd`, 2026-11-13) implemented fixed platform-scope authorization for Access platform membership add/revoke operations only; **Request Changes** (not accepted). Confirmed findings: error-code propagation defect in both operations, earlier guard `IsAuthenticated` finding, insufficient stale-cache setup/missing Revoke regressions, out-of-scope Tenant test assessed separately. Governance: commit/push state change recorded without explicit recorded Project Owner approval before execution (no retrospective approval). Broader Tenant platform-authorization boundary redesign (D-015 semantic coupling via `TenantActor`/`ICurrentUser.Permissions`) remains separate and outstanding. |
 | S4.4 | Tenant permission enforcement: enforce named Access permissions across protected Tenant operations | Pending | Per-operation permission enforcement not yet implemented. Fail-closed behavior for missing/invalid authorization must be established. |
 | S5.1 | Inspect current Identity login and failed-attempt flow | Pending | Produce a focused design covering thresholds, duration, reset behavior, concurrency and rate limiting. |
 | S5.2 | Implement account lockout | Pending | Implement the accepted five-failed-attempt, fifteen-minute policy with focused tests. Tests are not run by AI unless separately authorized. |
 | S6.1 | Inventory role and permission ownership and dependencies | Reported complete (not independently verified) | Previously reported inventory and dependency map require refresh against current source and an approved artifact. |
 | S6.2 | Move role ownership to Access | Pending | Access owns role/permission persistence and behavior; Identity remains responsible for identity and authentication. Approve migration and data-compatibility strategy before implementation. |
 
+### Active blocked/planning items (not approved implementation)
+
+| Task | Status | Notes |
+|---|---|---|
+| `DK-IDENTITY-BOUNDARY-01` | Blocked | Requested baseline `63a0eb1` did not match actual HEAD `70d757fd`; investigation completed read-only and stopped for baseline reconciliation. No implementation. Requires Project Owner approval of required architectural decisions before implementation planning proceeds. |
+| `DK-IDENTITY-BOUNDARY-01A–01E` | Proposed (not approved) | Proposed sequence: 01A design/contract approval, 01B Access-owned platform decision, 01C Tenant rewiring/fail-closed, 01D SharedKernel/Identity boundary cleanup with compatibility, 01E docs/status alignment if approved. Not implementation authorization. |
+
 ### Migration note
 
 The commit `43c2179` includes migration artifacts for Access, Identity and Tenant. Their committed presence does not establish successful migration execution, database compatibility, or production readiness. Do not apply them to any database without separate explicit user authorization.
 
-Do not combine adjacent slices automatically. Stop after each slice and wait for user review and approval.
+- **S4.3 (in progress, not accepted):** `DK-ACCESS-PLATFORM-SCOPE-01` at `70d757fd` targets Access platform-membership scope authorization only and is Under review / Request Changes. It must not be treated as completion of Tenant platform-authorization redesign (S4.3 broader scope) or as authorization to remove SharedKernel permission claims / Identity RBAC.
+- **Blocked planning:** `DK-IDENTITY-BOUNDARY-01` requires baseline reconciliation (requested `63a0eb1` vs actual `70d757fd`) and Project Owner approval of required architectural decisions before implementation. Proposed `DK-IDENTITY-BOUNDARY-01A–01E` is not approved work.
 
 ## M2 — Module foundation
 

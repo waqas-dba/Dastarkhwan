@@ -32,24 +32,26 @@ A status must describe the evidence available, not the intended architecture or 
 
 | Field | Value |
 |---|---|
-| Snapshot HEAD | `548dca791009d094ef7e2e9bd917a3bc0b8b0f0c` |
-| Parent commit | `e3221563853887816bbda20df4c05a0304aa7ced` |
+| Snapshot HEAD | `70d757fd099c58de5976383677255ce64aac15e3` |
+| Parent commit | `0ad85149bd9e5dd2f3916c4916953f2b7cc4637c` |
 | Branch | `master` |
-| Latest commit message | `docs: update current-state.md snapshot and implementation status` |
-| Evidence basis | Git metadata inspection at the snapshot HEAD. The remote was not queried; no claims are made about remote state. |
+| Latest commit message | `feat(access-platform): enforce explicit Platform-scope authorization for platform membership` |
+| Commit date | 2026-11-13 18:23:04 +0500 |
+| Evidence basis | Local Git inspection at HEAD on 2026-11-13 (`git rev-parse HEAD`, `git log -1`, `git show`, `git status --short`). The remote was not queried; no claims are made about remote state, push state, or remote history. |
 | Local working-tree status | Clean at inspection time (`git status --short` returned empty). Not verified remotely. |
-| Scope | Point-in-time record of committed repository evidence |
+| Scope | Point-in-time record of committed repository evidence at the latest verified local baseline |
 
-The current pre-correction repository baseline is `548dca791009d094ef7e2e9bd917a3bc0b8b0f0c` (`docs: update current-state.md snapshot and implementation status`, 2026-11-12 21:05:43 +0500). This is a documentation-only commit that updates `current-state.md` and does not change application source code. The working tree at HEAD `e4f4284d41250f9d5b91e6b0e8050b0695d431fa` differs only by the unrelated `COMPLETION_AC-07-IMPL1.md` change; `current-state.md` is identical at `548dca` and HEAD. `e322156` is not the current HEAD; it is the parent of `548dca`.
+The latest verified local repository baseline for this documentation task is `70d757fd099c58de5976383677255ce64aac15e3` (2026-11-13 18:23:04 +0500). This commit changes Access platform-membership authorization, Access platform-membership tests, and adds an out-of-scope Tenant test file change (see findings below). It is **Under review / Request Changes** and is not accepted implementation evidence. Historical commit information is preserved; this record does not rewrite history or imply retrospective approval for Git operations associated with the commit.
 
-Four baselines are distinguished in this file:
+Five baselines are distinguished in this file:
 
 - Historical M0 baseline: `9555b8c` (2026-10-23) — inspection-only historical baseline from the M0 report.
 - Source-inspection baseline: `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9` (2026-11-11) — used to inspect source code and classify Tenant's Identity dependency status.
 - Historical documentation snapshot: `beb0a0b550f1d825d416c48ae0a69fef188ea303` (2026-11-11) — documentation/governance corrections commit, not a source-inspection baseline.
-- Current pre-correction repository baseline: `548dca791009d094ef7e2e9bd917a3bc0b8b0f0c` (2026-11-12) — the snapshot inspected for this correction.
+- Previous documentation snapshot: `548dca791009d094ef7e2e9bd917a3bc0b8b0f0c` (2026-11-12) — documentation-only snapshot recorded before this sync.
+- Latest verified local repository baseline: `70d757fd099c58de5976383677255ce64aac15e3` (2026-11-13) — current local HEAD inspected for this task.
 
-The source-inspection baseline for the Tenant/Identity and Tenant/Access findings remains `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9`. Documentation-only commits at `45a5789`, `beb0a0b`, `d7585c3`, `335b9ed`, `0504f3a`, `6e79f13`, and `c9d4b36` did not re-inspect source code; no claim is made that source behavior changed between these baselines except where explicitly noted below. Commit `959c6ab` is not documentation-only: it changed Tenant source, Tenant tests, Identity lockout migrations, and `commands.txt`.
+The source-inspection baseline for the Tenant/Identity and Tenant/Access findings remains `5dfa796ca52fc0b122b3efea182f2dc7dbd5cde9`. Documentation-only commits at `45a5789`, `beb0a0b`, `d7585c3`, `335b9ed`, `0504f3a`, `6e79f13`, `c9d4b36`, `548dca`, and related documentation corrections did not re-inspect source code; no claim is made that source behavior changed between these baselines except where explicitly noted. Commit `959c6ab` is not documentation-only (Tenant source/tests, Identity lockout migrations, `commands.txt`). Commit `70d757f` is not documentation-only and is under independent review (Request Changes), not accepted. Distinguish verified local evidence from remote/GitHub state; remote state was not queried.
 
 Note on commit attribution: The `335b9ed` commit (DK-TENANT-ACCESS-DOCS-FIX3) carries the immutable historical commit message "docs: correct FIX2 commit attribution and DeepSeek Web role." Although this message references FIX2 work, `335b9ed` is the FIX3 correction commit; it is recorded here as FIX3 to preserve the actual commit history without rewriting it.
 
@@ -87,7 +89,7 @@ The following source findings were inspected at `daa7326` and remain applicable 
 | Identity role and permission ownership | Under review | The accepted target assigns roles and permissions to Access. The implementation ownership transfer must be verified against current Identity and Access entities, services, persistence and consumers before claiming completion. |
 | Tenant | In progress | `CoreKit.Tenant/CoreKit.Tenant.csproj` references `CoreKit.SharedKernel` and `CoreKit.Access`; no direct `CoreKit.Identity` project reference found at source level (D-015 direct-dependency requirement completed at project-reference level). Remaining Identity-related semantic coupling persists in `TenantActor` (`ICurrentUser.Permissions`) and must be classified before removal. Tenant–Access authorization integration is implemented via Access public contracts (`IAccessScopeContext`, `IAccessMembership`) at commit `aee85c2`; Tenant owner does NOT map to Access owner — `AccessMember(false)` is always returned, so tenant owner does not grant Access super-user permissions. Platform authorization and per-operation permission enforcement remain outstanding. |
 | Tenant–Access authorization | Under review | Tenant–Access authorization integration through Access public contracts is implemented at commit `aee85c2`: `TenantAccessScopeContext` implements `IAccessScopeContext` (maps `ICurrentTenant` → `AccessScope.ForTenant(tenantId)`), and `TenantAccessMembership` implements `IAccessMembership` (maps `ITenantMembershipReader` → `AccessMember(false)`, never returning `true` for Tenant owner). Both adapters are registered with `AddScoped` in `TenantServiceCollectionExtensions`. `CoreKit.Tenant.csproj` now references `CoreKit.Access`. Per-operation authorization and platform authorization remain outstanding. |
-| Platform authorization | Pending | Platform-wide/cross-tenant authorization is not yet implemented. No Access-owned platform authorization design has been established. |
+| Platform authorization | Under review | `DK-ACCESS-PLATFORM-SCOPE-01` (`70d757fd099c58de5976383677255ce64aac15e3`, 2026-11-13) adds fixed platform-scope authorization for Access platform membership add/revoke operations (`CoreKit.Access/Services/AccessGuard.cs`, `CoreKit.Access/Services/PlatformMembershipService.cs`) with focused tests (`CoreKit.Access.Tests/PlatformMembershipTests.cs`). Independent review status: **Request Changes** (not accepted). Confirmed findings: (1) `PlatformMembershipService.AddMemberAsync`/`RevokeMemberAsync` collapse guard failures to `access.denied`, so unauthenticated callers are not surfaced as `access.not_authenticated` despite guard intent and added unauthenticated test expectation; (2) earlier review finding that guard authorization path did not explicitly check `IsAuthenticated` (guard relies on `UserId` null-check/fail-closed actor identity — must be resolved/confirmed in correction scope); (3) stale-cache/revoked-authority coverage and setup are insufficient and missing Revoke regression cases for the claimed fresh-authority/security properties; (4) commit includes out-of-scope `CoreKit.Tenant.Tests/TenantAccessAuthorizationTests.cs` addition (`HasPermissionAsync_ReturnsFalse_WhenTenantOwnerIsNotAccessMember`) which must be assessed separately. A commit/push governance violation is recorded for this work (Git state-changing operation(s) without explicit recorded Project Owner approval before execution); historical commit information is preserved and this does not imply retrospective approval. Broader Tenant platform-authorization boundary redesign (`TenantActor`/`ICurrentUser.Permissions` coupling, D-015 semantic coupling, S4.3) remains outstanding. |
 | Per-operation permission enforcement | Pending | Tenant permission enforcement across individual protected operations is not yet implemented. Named Access permissions are not enforced across Tenant operations. |
 | Tenant isolation | In progress | `CoreKit.Tenant/Isolation/TenantAwareDbContext.cs` contains tenant query-filter logic. `CoreKit.Tenant.Tests/IsolationTests.cs` contains isolation test coverage. These files alone do not prove complete enforcement across all application operations. |
 | Tenant migrations | Under review | Tenant migration artifacts have changed and are committed at `43c2179`. Compatibility and database application are not verified. |
@@ -160,15 +162,24 @@ Only one agent may modify the shared working tree at a time. All participating a
 
 ### Instruction-file synchronization
 
-`CLAUDE.md`, `ai-tasks.md`, `AGENTS.md`, `roadmap.md` and `current-state.md` now state the current agent allocation (ChatGPT Account 1, OpenCode, ChatGPT Account 2, Kimi, DeepSeek Web, OpenHands, Claude, Kilo unavailable, DeepSeek Harness unavailable, User) and the mandatory task briefing standard (`ai-tasks.md` §13). Verified at HEAD `959c6ab` (2026-11-11).
+`CLAUDE.md`, `ai-tasks.md`, `AGENTS.md`, `roadmap.md`, `current-state.md`, `decisions.md`, and `architecture.md` are being synchronized in `DK-DOCS-SYNC-03` at latest verified local baseline `70d757fd099c58de5976383677255ce64aac15e3` (2026-11-13, clean working tree). This synchronization records verified source/review status and open findings/proposals; it does not constitute independent review acceptance, Project Owner acceptance, implementation approval, or authorization for tests/builds/migrations/Git writes. Prior allocation/briefing-standard synchronization remains historically evidenced at `959c6ab` (2026-11-11).
+
+## Active review and planning items (evidence at latest verified local baseline `70d757fd`)
+
+| Item | Status | Evidence / notes |
+|---|---|---|
+| `DK-ACCESS-PLATFORM-SCOPE-01` | **Under review / Request Changes** | Commit `70d757fd099c58de5976383677255ce64aac15e3` (2026-11-13). Confirmed issues: error-code propagation defect in both `PlatformMembershipService.AddMemberAsync` and `RevokeMemberAsync` (guard unauthenticated result collapsed to `access.denied`); earlier finding that guard does not explicitly check `IsAuthenticated`; insufficient stale-cache test setup and missing Revoke regression cases; out-of-scope Tenant test `CoreKit.Tenant.Tests/TenantAccessAuthorizationTests.cs` addition assessed separately. Confirmed commit/push governance violation recorded (no retrospective approval). Not accepted. |
+| `DK-IDENTITY-BOUNDARY-01` | **Blocked** (investigation completed, read-only; no implementation) | Requested baseline `63a0eb183d4fcd53ec3d18c59861aceb3df4a6f5` differs from actual HEAD `70d757fd`; task stopped for baseline reconciliation before implementation planning/execution. Requires Project Owner approval of required architectural decisions and baseline reconciliation. Scope is planning/investigation only: remove authorization permissions from SharedKernel `ICurrentUser` while preserving Identity behavior and D-002/D-015/D-016 boundaries. Does not authorize implementation. |
+| `DK-IDENTITY-BOUNDARY-01A–01E` | **Proposed task sequence (not approved)** | Proposed split: 01A design/contract approval, 01B Access-owned platform decision, 01C Tenant rewiring/fail-closed, 01D SharedKernel/Identity boundary cleanup with compatibility, 01E docs/status alignment if approved. Planning proposal only; not approved implementation work and not scheduled without explicit Project Owner decisions/approval. |
 
 ## Next proposed work
 
-Follow the ordered micro-slices in `roadmap.md`.
+Follow the ordered micro-slices in `roadmap.md`, subject to review outcomes and owner decisions.
 
-S1 documentation synchronization changes were committed at `45a5789` (2026-11-11). Correction tasks `DK-TENANT-ACCESS-DOCS-FIX1`, `DK-TENANT-ACCESS-DOCS-FIX2`, `DK-TENANT-ACCESS-DOCS-FIX3` and `DK-TENANT-ACCESS-DOCS-FIX4` address review findings. S1 remains Under review until independent review and Project Owner acceptance are complete.
-
-After S1, follow the approved roadmap queue. Migration artifacts committed at `43c2179` require review; their presence does not authorize database application.
+- Resolve `DK-ACCESS-PLATFORM-SCOPE-01` Request Changes before treating Access platform-membership scope hardening as accepted (correction task/micro-slice requires separate approved briefing).
+- Reconcile baseline and obtain required architectural decisions for `DK-IDENTITY-BOUNDARY-01` before any implementation; this is separate from the Access platform-membership fix.
+- S1 documentation synchronization remains Under review (committed at `45a5789`, correction tasks `DK-TENANT-ACCESS-DOCS-FIX1`–`FIX4` recorded). Independent review and Project Owner acceptance remain pending.
+- Migration artifacts committed at `43c2179` require review; their presence does not authorize database application. No tests, builds, migrations, or Git write operations are authorized by this documentation sync.
 
 ## Update log
 
@@ -193,7 +204,7 @@ After S1, follow the approved roadmap queue. Migration artifacts committed at `4
 | 2026-11-12 | test(tenant): remove unused variable from lockout test committed at `26f540584cf0703a1f7abde039cb0f7c3946d41d`; removes unused `AccessFailedCount` variable from `UserServiceTests.cs` | Committed-file inspection at `26f5405`; local tree clean at inspection; no tests or builds run |
 | 2026-11-12 | update the comands file committed at `08e307c22bbf5ccaa8bff7ee9850d9be82615164`; updates `commands.txt` with PostgreSQL connection string guidance | Committed-file inspection at `08e307c`; local tree clean at inspection; no tests or builds run |
 | 2026-11-12 | docs: clarify historical governance commit attribution committed at `959c6ab99f406eec56161f7dae71f94a5f432771`; snapshot updated to `959c6ab`; source-inspection baseline preserved at `5dfa796c`; no claim of source re-inspection at any documentation-only commit | Committed-file inspection at `959c6ab`; local tree clean at inspection; no tests or builds run |
-| 2026-11-12 | docs: update current-state.md snapshot and implementation status committed at `e3221563853887816bbda20df4c05a0304aa7ced`; snapshot updated to `e322156`; source-inspection baseline preserved at `5dfa796c`; D-016 marked Completed at source level; D-015 direct-dependency remains completed at source level | Committed-file inspection at `e322156`; local tree clean at inspection; no tests or builds run |
+| 2026-11-13 | `DK-DOCS-SYNC-03`: synchronized six core Markdown documents against latest verified local baseline `70d757fd099c58de5976383677255ce64aac15e3` (clean working tree). Recorded `DK-ACCESS-PLATFORM-SCOPE-01` as Under review / Request Changes with confirmed findings (error-code propagation defect in both platform membership operations, earlier guard `IsAuthenticated` finding, insufficient stale-cache setup/missing Revoke regressions, out-of-scope Tenant test assessed separately) and recorded commit/push governance violation without retrospective approval. Recorded `DK-IDENTITY-BOUNDARY-01` as Blocked (baseline mismatch vs requested `63a0eb1`, investigation only, no implementation) and `DK-IDENTITY-BOUNDARY-01A–01E` as proposed/not approved. Preserved accepted D-002/D-015/D-016 meanings. No source, tests, builds, migrations, or Git write operations performed. | Local Git inspection at `70d757fd` (`rev-parse`, `log -1`, `status --short`, `show`); remote state not queried |
 
 ## Update rules
 

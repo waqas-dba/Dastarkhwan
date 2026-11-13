@@ -69,6 +69,8 @@ A capability may remain inside a well-defined module until splitting provides re
 - Platform scope is distinct from tenant scope and needs an explicit authorization design.
 - Tenant permission enforcement across individual operations remains implementation work, not an already completed capability.
 
+**Current evidence note (latest verified local baseline `70d757fd`, 2026-11-13):** `DK-ACCESS-PLATFORM-SCOPE-01` introduced fixed platform-scope authorization for Access platform-membership add/revoke operations only; it is **Under review / Request Changes** and not accepted. It does not complete Tenant platform-authorization redesign, does not remove `TenantActor`/`ICurrentUser.Permissions` semantic coupling (D-015 outstanding coupling), and does not authorize removal of SharedKernel permission claims or Identity RBAC. Broader platform authorization and per-operation Tenant enforcement remain pending design/implementation under approved decisions.
+
 Preserve the modular monolith architecture and existing approved module ownership boundaries.
 
 ## 7. SaaS and standalone composition

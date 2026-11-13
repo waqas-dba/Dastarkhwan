@@ -13,7 +13,7 @@
 | DeepSeek Web — Research and technical preparation | Research and technical preparation only. Not DeepSeek Harness. Do not assign implementation work by implication. | Implementation work or repository modification. |
 | Claude — Difficult implementation reserve | Difficult implementation and security/architecture review reserve; limited usage. | Repository modification outside an explicitly assigned scope. |
 | DeepSeek Harness — Unavailable | Do not assign until the Project Owner confirms availability. | Any repository work. |
-| User — Project Owner | Approves scope/architecture and standing automation (e.g. `decisions.md` D-017 if accepted), controls separately required approvals, performs manual testing, and makes final acceptance decisions. | Treating an unverified report as proof of completion. |
+| User — Project Owner | Approves scope/architecture and standing automation (including accepted `decisions.md` D-017), controls separately required approvals, performs manual testing, and makes final acceptance decisions. | Treating an unverified report as proof of completion. |
 
 The user is the final authority. AI agents coordinate and recommend; they do not independently approve architecture changes or releases. OpenCode and Kilo follow the same approved development workflow and safeguards; only one implementation owner may modify the shared working tree at a time.
 
@@ -87,7 +87,7 @@ Git inspection must remain read-only.
    - Run relevant builds/tests/formatting/static analysis; fix implementation-related failures and rerun required checks (broader suites justified; do not fix unrelated failures without approval).
    - If the approved task changes a database model and dev-DB work is included: identify actual DbContext/migration project/provider/history, generate and inspect migration/snapshot/SQL, build/test, apply only to a **positively identified development database**, verify migration history and expected schema, and report migration name(s), non-secret target metadata, and verification results.
    - Review complete diff for unrelated/pre-existing changes. Obtain independent review when required by task risk.
-   - **If standing automation is approved (D-017) and task is authorized:** stage only approved files, commit after required validation/review, and push to the already-authorized branch. **Otherwise/until accepted:** request explicit Project Owner approval before state-changing Git/DB actions as required.
+   - Stage only approved files, commit after required validation/review, and push to the already-authorized branch per D-017/D-008 standing authorization (within scope/safeguards).
    - Provide exact diffs and a complete report (commands, results, failures, skipped tests, risks, decisions/approvals). Documentation-only tasks do not run builds/tests/migrations/scheduled checks unless specifically requested.
 
 4. **ChatGPT Account 2 — Review**
@@ -108,7 +108,7 @@ Git inspection must remain read-only.
 
 7. **User — Verify and decide**
    - Run manual tests and any approved verification.
-   - Retains final authority over Git write operations and separately required approvals. **Proposed (D-017, not yet accepted):** for an approved implementation task, the assigned agent may stage approved files, commit after required validation/review, and push to the already-authorized branch without command-by-command approval, subject to all safeguards. Until D-017 is accepted, agents execute Git write operations only after explicit Project Owner approval (`D-007`/`D-008`).
+   - Retains final authority over Git write operations and separately required approvals. D-017/D-008 authorize scoped stage/commit/push for approved implementation tasks; protected Git/DB/destructive operations remain separately approval-gated.
    - Approve or reject the task's final acceptance.
 
 ### Coordination rules
@@ -117,7 +117,7 @@ Git inspection must remain read-only.
 - Only one AI agent may modify a shared working tree at a time; others use read-only access or supplied diff/report.
 - ChatGPT Account 2 is always read-only. ChatGPT Account 1 coordinates/recommends and does not modify the repository.
 - Every agent must verify its own baseline and stop on baseline mismatch, unexpected/unrelated changes, access errors, or security-critical findings.
-- **Standing automation is proposed (D-017, not yet accepted):** if accepted, an approved implementation task authorizes the assigned agent to perform routine scoped validation, dev-DB migration steps (when included), and scoped commit/push to the already-authorized branch without command-by-command approval, subject to safeguards below. Until accepted, obtain explicit Project Owner approval before state-changing commands/actions as required by current accepted decisions.
+- **Standing automation (D-017, D-007, D-008 accepted):** an approved implementation task authorizes the assigned agent to perform routine scoped validation, dev-DB migration steps (when included), and scoped commit/push to the already-authorized branch without command-by-command approval, subject to safeguards.
 - **Always require separate explicit Project Owner approval:** production DB changes; DB deletion/recreation/destructive reset; data deletion/irreversible transformations; unapproved rollback/downgrade; DB credential/infrastructure changes; uncertain-target/destructive operations; branch create/switch, pull, merge, rebase, force-push, reset, clean, amend, cherry-pick, revert/history rewriting; and actions outside approved scope.
 - Never include unrelated/pre-existing changes, expand scope, or claim unobserved results. Never expose secrets.
 - Do not duplicate work or use agents to bypass service limits or terms.
@@ -131,7 +131,7 @@ For every task:
 1. Verify the repository baseline and working tree.
 2. Inspect only relevant files.
 3. Provide a short plan with goal, expected files, and acceptance criteria.
-4. **Authorization before state-changing actions:** for approved implementation tasks, follow the task's authorized scope and the current permission model. **Proposed (D-017, not yet accepted):** routine in-scope validation, dev-DB migration steps (when included), and scoped commit/push to the already-authorized branch may proceed without command-by-command approval if D-017 is accepted, subject to safeguards and mandatory stop conditions. **Until D-017 is accepted**, wait for explicit Project Owner approval before editing or executing state-changing commands as required by accepted decisions (`D-007`, `D-008`). Actions requiring separate explicit approval (destructive/uncertain-target/production DB changes, branch/history-rewriting operations, scope expansion) always require explicit approval.
+4. **Authorization before state-changing actions:** for approved implementation tasks, routine in-scope validation, dev-DB migration steps (when included), and scoped commit/push to the already-authorized branch are covered by standing authorization (D-017/D-007/D-008), subject to safeguards and mandatory stop conditions. Actions requiring separate explicit approval (protected/destructive/uncertain-target/production DB changes, branch/history-rewriting operations, scope expansion) always require explicit Project Owner approval before execution.
 5. Implement only the approved scope.
 6. Report changed files, exact commands/results/failures/skips (including migration/DB verification metadata when applicable, non-secret), risks, and one suggested next task.
 7. Stop and wait for review/Project Owner decision.
@@ -142,7 +142,7 @@ Split tasks that touch multiple module boundaries, persistence models, or unrela
 
 Git inspection (`git status`, `git log`, `git diff`, branch listing) is permitted without approval.
 
-**Proposed standing automation (D-017, requires Project Owner acceptance):** within an approved implementation task, the assigned implementation agent (OpenCode or Kilo) may, without command-by-command approval and only within approved scope/baseline/authorized branch:
+**Standing automation (D-017, D-007, D-008):** within an approved implementation task, the assigned implementation agent (OpenCode or Kilo) may, without command-by-command approval and only within approved scope/baseline/authorized branch:
 - Run relevant builds, tests, formatting, and static analysis; fix implementation-related failures and rerun required checks (report exact commands/results/failures/skips).
 - For approved model changes: identify actual DbContext/migration project/provider/history, generate/inspect migrations and SQL scripts, build/test, apply migrations to a **positively identified development database** when included, and verify migration history/expected schema (report migration names and non-secret target metadata/verification).
 - Stage only approved task files, commit after required validation/review, and push to the already-authorized branch.
@@ -151,7 +151,7 @@ Git inspection (`git status`, `git log`, `git diff`, branch listing) is permitte
 
 **Separate explicit Project Owner approval always required:** production DB changes; DB deletion/recreation/destructive reset; data deletion/irreversible transformations; unapproved rollback/downgrade; DB credential/infrastructure changes; uncertain-target or destructive operations; branch create/switch, pull, merge, rebase, force-push, reset, clean, amend, cherry-pick, revert/history rewriting; Git config/hook changes; actions outside approved scope.
 
-**Until D-017 is accepted:** state-changing Git/DB/build/test actions requiring command-by-command approval under current accepted decisions (D-007, D-008) remain subject to explicit Project Owner approval before execution (explain purpose, exact command, benefits, risks/consequences, and affected branches/commits/remotes/DB targets; approval request is not authorization). AI may add/update test files and migration files as part of approved implementation work per the applicable authorization.
+AI may add/update test and migration files as part of approved implementation work per applicable authorization.
 
 ## 8. Implementation task template
 
@@ -195,7 +195,7 @@ Before using this template, complete the mandatory briefing standard in §13, in
 - Disallowed Git/DB operations (see safeguards).
 
 ## Constraints
-- Follow CLAUDE.md, ai-tasks.md, and accepted decisions; D-017 automation applies only if accepted and task-approved.
+- Follow CLAUDE.md, ai-tasks.md, and accepted decisions (including D-017/D-007/D-008 automation boundaries).
 - Inspect existing implementation before changing it. Keep smallest compatible change.
 - Stop on baseline mismatch, unexpected/unrelated changes, or uncertain/destructive DB target.
 - Never expose secrets; report exact commands/results/failures/skips and non-secret migration/DB metadata.
@@ -268,7 +268,7 @@ An implementation report is not independent verification. A reviewer report is n
 
 ## 11. Git commit message guidance
 
-The user retains final authority over Git write operations. **If D-017 standing automation is accepted**, an approved implementation task authorizes the assigned agent to stage only approved files, commit after required validation/review, and push to the already-authorized branch (subject to safeguards). **Until D-017 is accepted**, obtain explicit Project Owner approval before staging/committing/pushing or other state-changing Git operations (explain purpose, exact command, benefits, risks/consequences, affected branches/commits/remotes; approval request is not authorization).
+The user retains final authority over Git write operations and acceptance. D-017/D-008 standing authorization permits the assigned agent, within an approved implementation task, to stage only approved files, commit after required validation/review, and push to the already-authorized branch (subject to safeguards). All other state-changing/protected Git operations require separate explicit Project Owner approval before execution (explain purpose, exact command, benefits, risks/consequences, affected branches/commits/remotes; approval request is not authorization).
 
 Use:
 
@@ -291,9 +291,9 @@ Do not commit/push while critical review findings remain unresolved (when review
 ## 12. Final authority
 
 ChatGPT Account 1 coordinates and recommends.
-OpenCode or Kilo (assigned) prepares and implements approved tasks per the approved workflow.
+OpenCode or Kilo (assigned) prepares and implements approved tasks per the approved workflow (D-017/D-007/D-008).
 ChatGPT Account 2 independently reviews.
-The user owns scope, architecture approval, standing/explicit automation approvals (including D-017 if accepted), manual testing, and final acceptance. The user retains final authority over Git write operations and protected DB/destructive actions.
+The user owns scope, architecture approval, standing/explicit approvals, manual testing, and final acceptance. The user retains final authority over repository history, protected DB/destructive actions, and acceptance outcomes.
 
 ## 13. Mandatory task briefing standard
 
@@ -421,24 +421,24 @@ These six sections are mandatory project-wide rules for all participating develo
 ### 15.1 Development and Testing
 
 - The implementation agent (OpenCode or Kilo, as assigned) may inspect the repository and approved files.
-- **Approved implementation tasks:** run relevant builds, automated tests, formatting, and static analysis; add/update focused tests; fix implementation-related failures and rerun required checks. Report exact commands, results, failures, and skipped tests. Broader suites may be run when justified; do not fix unrelated failures without approval.
-- **EF Core in approved scope:** for model changes, identify actual DbContext/migration project/provider/history, generate/inspect migration/snapshot/SQL, and—when included—apply to a positively identified development database and verify migration history/expected schema. Report migration names and non-secret target metadata/verification.
+- **Approved implementation tasks (D-017/D-007):** run relevant builds, automated tests, formatting, and static analysis; add/update focused tests; fix implementation-related failures and rerun required checks. Report exact commands, results, failures, and skipped tests. Broader suites may be run when justified; do not fix unrelated failures without approval.
+- **EF Core in approved scope (D-017):** for model changes, identify actual DbContext/migration project/provider/history, generate/inspect migration/snapshot/SQL, and—when included—apply to a positively identified development database and verify migration history/expected schema. Report migration names and non-secret target metadata/verification.
 - **Documentation-only tasks:** must not run builds, tests, migrations, or scheduled checks unless specifically requested.
-- **Proposed (D-017):** standing automation for routine in-scope validation/dev-DB steps requires Project Owner acceptance; until accepted, follow current command-by-command approval rules.
+- Standing automation boundaries, safeguards, and protected exceptions are defined in D-017/D-007/D-008.
 
 ### 15.2 Git Operations
 
 Read-only inspection (`git status`, `git log`, `git diff`, branch listing) is permitted.
 
-**Proposed standing automation (D-017, if accepted):** within an approved implementation task, stage only approved files, commit after required validation/review, and push to the already-authorized branch (no unrelated/pre-existing changes).
+**Standing automation (D-017/D-008):** within an approved implementation task, stage only approved files, commit after required validation/review, and push to the already-authorized branch (no unrelated/pre-existing changes).
 
 **Always require separate explicit Project Owner approval:** branch create/switch, pull, merge, rebase, force-push, reset, clean, amend, cherry-pick, revert, history rewriting, and Git config/hook changes.
 
-**Until D-017 is accepted (and for actions outside standing automation):** before any state-changing Git operation, explain purpose, exact command, benefits, risks/consequences, and affected branches/commits/remotes; obtain explicit Project Owner approval and wait for it (asking is not authorization).
+**For separately protected actions:** explain purpose, exact command, benefits, risks/consequences, and affected branches/commits/remotes; obtain explicit Project Owner approval and wait for it (asking is not authorization).
 
 ### 15.3 Database and Destructive Operations
 
-- **Approved implementation tasks (proposed D-017, if accepted):** routine migration generation/SQL review and application to a positively identified development database (when included) with verification are authorized within scope/safeguards.
+- **Approved implementation tasks (D-017, in scope):** routine migration generation/SQL review and application to a positively identified development database (when included) with verification are authorized within scope/safeguards.
 - **Always require separate explicit Project Owner approval:** production DB changes; DB deletion/recreation/destructive reset; data deletion or irreversible transformations; unapproved rollback/downgrade; DB credential/infrastructure changes; any uncertain-target or destructive operation.
 - Before such separately approved actions: explain purpose, expected changes, affected databases/tables/records, backup/rollback, alternatives with pros/cons, recommend safest approach, and wait for explicit approval.
 - Never assume a DB is development from name/environment variable alone. Never assume approval from earlier discussion/task. Never expose secrets.

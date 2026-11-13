@@ -50,64 +50,27 @@ Never overwrite or discard existing work.
 - One implementation owner per task. Only one AI agent may modify a shared working tree at a time.
 - OpenCode is the default primary implementation agent; Kilo is the alternative primary implementation agent when assigned. Both follow the same approved workflow and safeguards.
 - ChatGPT Account 2 reviews independently and remains read-only. ChatGPT Account 1 coordinates and recommends acceptance; it does not modify repository files.
-- **Approved implementation tasks (proposed standing automation, `decisions.md` D-017 — requires Project Owner acceptance):** the assigned agent may, within approved scope/baseline/authorized branch, inspect, implement, add/update focused tests, run relevant builds/tests/formatting/static analysis, fix implementation-related failures, generate/inspect EF Core migrations and SQL scripts when the model changes, apply migrations to a positively identified development database and verify when included in the task, and stage only approved files, commit after required validation/review, and push to the already-authorized branch. Report exact commands/results/failures/skips and migration/DB verification metadata (non-secret).
+- **Approved implementation tasks (standing automation, `decisions.md` D-017/D-007/D-008):** the assigned agent may, within approved scope/baseline/authorized branch, inspect, implement, add/update focused tests, run relevant builds/tests/formatting/static analysis, fix implementation-related failures, generate/inspect EF Core migrations and SQL scripts when the model changes, apply migrations to a positively identified development database and verify when included in the task, and stage only approved files, commit after required validation/review, and push to the already-authorized branch. Report exact commands/results/failures/skips and migration/DB verification metadata (non-secret).
 - **Always stop/protect:** unrelated or pre-existing changes must not be included; never expand scope; never claim unobserved results; never expose secrets.
 - **Separate explicit Project Owner approval always required:** production DB changes; DB deletion/recreation/destructive reset; data deletion/irreversible transformations; unapproved rollback/downgrade; DB credential/infrastructure changes; uncertain-target or destructive operations; branch create/switch, pull, merge, rebase, force-push, reset, clean, amend, cherry-pick, revert/history rewriting; actions outside approved scope.
-- **Until D-017 is accepted:** routine command-by-command approvals remain governed by existing accepted decisions (`D-007`, `D-008`) and current authoritative instructions.
 - **Documentation-only tasks:** no builds/tests/migrations/scheduled checks unless specifically requested.
 - Security-critical and architectural changes require explicit user approval and independent review.
 - Every task must use the nine-part briefing and four owner actions in `ai-tasks.md` §13. Documentation and code comments must follow `ai-tasks.md` §14. Keep secrets out of files, logs, and reports. Refer to `commands.txt` for actual EF Core/migration command examples (placeholders only).
 
 ## 5. Architecture boundaries
 
-Preserve the approved modular monolith architecture:
+Preserve the approved modular monolith architecture and module ownership/contract rules in `architecture.md` and `decisions.md` (Identity/Access separation, Tenant isolation, no cross-module private DbContext/table access, server-side authorization, no circular dependencies).
 
-- Identity owns users, authentication, credentials, sessions, and tokens.
-- Access owns roles, permissions, assignments, and authorization.
-- Tenant must not depend directly on Identity.
-- Standalone modules must not require Tenant infrastructure.
-- Modules must not access another module's private DbContext, tables, or internals.
-- Enforce server-side authorization and tenant isolation.
-- Avoid circular dependencies and unnecessary refactoring.
+## 6. OpenCode and Kilo (implementation agents)
 
-Consult `architecture.md` and `decisions.md` before proposing boundary changes.
+When assigned as implementation owner, verify baseline/working-tree state, follow approved scope, perform authorized implementation/validation/EF Core dev-DB steps as applicable, and deliver exact diffs with a complete factual report per `ai-tasks.md` and `CLAUDE.md`. Stop on mismatch, unexpected/unrelated changes, or protected operations requiring separate approval.
 
-## 6. DeepSeek Harness
+## 7. ChatGPT Account 2
 
-Unavailable until the Project Owner says otherwise.
+Performs independent read-only review against the same baseline and acceptance criteria, reporting actionable findings with severity and file/line references. Does not edit or implement fixes.
 
-## 7. OpenCode and Kilo (implementation agents)
+## 8. Completion
 
-Implementation responsibilities (when assigned as owner):
-
-- Verify the approved baseline and working-tree state; stop on mismatch or unexpected/unrelated changes.
-- Follow the task brief and approved scope; implement only assigned work.
-- Add/update focused tests and run relevant validation (builds/tests/formatting/static analysis) as included/authorized; report exact commands, results, failures, and skipped tests.
-- For approved model changes, handle EF Core migration generation/SQL review and, when included, apply/verify against a positively identified development database; report migration names and non-secret target metadata/verification.
-- Stage only approved files, commit after required validation/review, and push to the already-authorized branch only when covered by approved standing automation (D-017, if accepted) or explicit approval; never include unrelated/pre-existing changes.
-- Provide exact diffs and a complete, factual completion report. Do not claim unobserved results.
-
-## 8. ChatGPT Account 2
-
-Independent reviewer responsibilities:
-
-- Inspect the actual focused implementation.
-- Use the same baseline and acceptance criteria.
-- Review security, architecture, correctness, compatibility, and test coverage.
-- Report actionable findings with severity and file/line references.
-- Do not edit or implement fixes.
-
-## 9. Completion
-
-Use only the approved project statuses:
-
-- Completed (verified)
-- Reported complete (not independently verified)
-- In progress
-- Pending
-- Under review
-- Blocked
-
-Agent reports do not constitute final acceptance. The user performs manual verification and makes the final decision.
+Use only approved project statuses (Completed verified, Reported complete not independently verified, In progress, Pending, Under review, Blocked). Agent reports do not constitute final acceptance; the Project Owner makes the final decision.
 
 For full procedures, consult `ai-tasks.md` and `CLAUDE.md`.

@@ -1,10 +1,10 @@
 # CoreKit — Development, EF Core, Database, and Git Commands
 
-Reference for the approved/standardized development workflow (see `ai-tasks.md`, `CLAUDE.md`, `AGENTS.md`, and `decisions.md` D-017 Proposed). Use placeholders for all secrets. Never print, log, commit, or report passwords, connection strings, tokens, or other credentials.
+Reference for the approved/standardized development workflow (see `ai-tasks.md`, `CLAUDE.md`, `AGENTS.md`, and accepted `decisions.md` D-017/D-007/D-008). Use placeholders for all secrets. Never print, log, commit, or report passwords, connection strings, tokens, or other credentials.
 
 ## 0. Scope, safety, and automation boundaries
 
-- **Routine (within an approved implementation task, if standing automation is approved):** inspect, implement approved scope, add/update focused tests, run relevant builds/tests/formatting/static analysis, generate/inspect EF Core migrations and SQL scripts when the task changes a model, apply migrations to a **positively identified development database** and verify when included in the task, stage only approved files, commit after required validation/review, and push to the already-authorized branch.
+- **Routine (within an approved implementation task, per D-017/D-007/D-008):** inspect, implement approved scope, add/update focused tests, run relevant builds/tests/formatting/static analysis, generate/inspect EF Core migrations and SQL scripts when the task changes a model, apply migrations to a **positively identified development database** and verify when included in the task, stage only approved files, commit after required validation/review, and push to the already-authorized branch.
 - **Separate explicit Project Owner approval required:** production database changes; database deletion/recreation/destructive reset; data deletion or irreversible transformations; unapproved migration rollback/downgrade; changes to database credentials or infrastructure; any operation with uncertain target or destructive impact; branch create/switch, pull, merge, rebase, force-push, reset, clean, amend, or history rewriting.
 - **Positive identification:** never assume a database is development based only on its name or an environment variable. Confirm host, database name, purpose, and backup/rollback context before applying migrations.
 - **Unrelated changes:** stop and report if `git status --short` shows unrelated/pre-existing changes; never include them in the task commit.
@@ -57,10 +57,12 @@ Run formatting/static analysis only if configured in the repo/task scope and rep
 
 **Before generating:** identify actual DbContext, migration project, provider, existing migrations, and migration history; confirm the change is in approved scope.
 
-### 4.1 dotnet-ef CLI (PowerShell, from repo root; adjust project/startup if needed)
+### 4.1 dotnet-ef CLI (PowerShell, from repo root)
+
+Each module has an `IDesignTimeDbContextFactory<*>` in `CoreKit.<Module>/Persistence/*DbContextFactory.cs` that reads `ConnectionStrings__<Module>` and configures Npgsql; using the module project as both `--project` and `--startup-project` is therefore supported for design-time operations. `CoreKit.SampleHost` can be used as an alternative startup project when appropriate (it references all modules), but verify startup/configuration behavior before switching.
 
 ```powershell
-# Install/update tool if needed (requires approval/environment readiness)
+# Install/update tool if needed (environment readiness; follow approval/policy)
 # dotnet tool install --global dotnet-ef
 # dotnet tool update --global dotnet-ef
 
@@ -132,7 +134,7 @@ dotnet ef migrations script --idempotent --project CoreKit.Identity/CoreKit.Iden
 
 Also inspect configured development databases' migration history tables and compare with committed migration files. Report affected module, database metadata (non-secret), migration names, pending migrations, history inconsistencies, and any reliably detectable schema drift. Schema-drift detection may be incomplete from history comparison alone.
 
-## 7. Git (routine, within approved implementation task, if standing automation is approved)
+## 7. Git (routine, within approved implementation task, per D-017/D-008)
 
 ```powershell
 git status --short

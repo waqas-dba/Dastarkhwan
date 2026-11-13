@@ -151,7 +151,7 @@ public sealed class UserService : IUserService
             user.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = role.Id });
 
         if (!await _userRepository.CreateAsync(user, ct))
-            return IdentityErrors.Conflict("A user with this email already exists.");
+            return IdentityErrors.Conflict("A user with this email or mobile number already exists.");
 
         return await LoadDtoAsync(user.Id, ct);
     }
@@ -253,7 +253,7 @@ public sealed class UserService : IUserService
         user.UpdatedAt = now;
 
         if (!await _userRepository.UpdateAsync(user, ct))
-            return IdentityErrors.Conflict("A user with this email already exists.");
+            return IdentityErrors.Conflict("A user with this email or mobile number already exists.");
 
         if (endSessions)
             await _refreshTokenRepository.RevokeAllForUserAsync(id, now, ct);

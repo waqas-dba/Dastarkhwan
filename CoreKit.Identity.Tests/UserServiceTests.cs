@@ -211,6 +211,44 @@ public sealed class UserServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task UserRepository_DuplicateEmail_ReturnsFalseWithoutThrowing()
+    {
+        // Same scenario as the mobile fallback test, but with a duplicate email:
+        // bypasses UserService's pre-check and exercises the repository's
+        // DbUpdateException recovery path directly.
+        using var db = _env.NewContext();
+        var repo = new UserRepository(db);
+
+        var userA = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = "repo-email-a@example.com",
+            NormalizedEmail = IdentityNormalizer.NormalizeEmail("repo-email-a@example.com"),
+            Mobile = "+15551000080",
+            NormalizedMobile = "+15551000080",
+            PasswordHash = _env.Hasher.Hash("Pass123!"),
+            IsActive = true,
+            CreatedAt = _env.Time.GetUtcNow().UtcDateTime
+        };
+
+        Assert.True(await repo.CreateAsync(userA, CancellationToken.None));
+
+        var userB = new User
+        {
+            Id = Guid.NewGuid(),
+            Email = "repo-email-a@example.com",
+            NormalizedEmail = IdentityNormalizer.NormalizeEmail("repo-email-a@example.com"),
+            Mobile = "+15551000081",
+            NormalizedMobile = "+15551000081",
+            PasswordHash = _env.Hasher.Hash("Pass123!"),
+            IsActive = true,
+            CreatedAt = _env.Time.GetUtcNow().UtcDateTime
+        };
+
+        Assert.False(await repo.CreateAsync(userB, CancellationToken.None));
+    }
+
+    [Fact]
     public async Task CreateUser_WithAlphabeticMobile_Fails()
     {
         _env.SignInOwner();
@@ -387,6 +425,18 @@ public sealed class UserServiceTests : IDisposable
         ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
         {
             Mobile = "+15551000001"
+        }), IdentityErrorKind.Conflict, "conflict");
+    }
+
+    [Fact]
+    public async Task UpdateUser_WithDuplicateEmail_Fails()
+    {
+        _env.SignInOwner();
+
+        // Owner already has email owner@example.com
+        ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
+        {
+            Email = "owner@example.com"
         }), IdentityErrorKind.Conflict, "conflict");
     }
 

@@ -56,9 +56,13 @@ public sealed class TenantRepository : ITenantRepository
 
         var totalCount = await query.CountAsync(ct);
 
+        var skip = (int)Math.Min(
+            ((long)page - 1) * pageSize,
+            int.MaxValue);
+
         var items = await query
             .OrderBy(t => t.Slug)
-            .Skip((page - 1) * pageSize)
+            .Skip(skip)
             .Take(pageSize)
             .ToListAsync(ct);
 

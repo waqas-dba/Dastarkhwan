@@ -109,7 +109,7 @@ public sealed class TenantMembershipReaderTests : IDisposable
 
     public void Dispose() => _env.Dispose();
 
-    private TenantMembershipReader Reader => new(_env.Members);
+    private TenantMembershipReader Reader => _env.MembershipReader;
 
     [Fact]
     public async Task Find_ReturnsOwnerFlag()

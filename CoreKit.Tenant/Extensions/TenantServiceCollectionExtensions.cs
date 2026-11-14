@@ -30,7 +30,13 @@ public static class TenantServiceCollectionExtensions
                 o => !string.IsNullOrWhiteSpace(o.Resolution.HeaderName) && !string.IsNullOrWhiteSpace(o.Resolution.ClaimType),
                 "Tenant:Resolution:HeaderName and Tenant:Resolution:ClaimType must be set.");
 
-        services.AddDbContext<TenantDbContext>(options =>
+        services.AddOptions<DatabaseOptions>()
+            .Bind(configuration.GetSection(DatabaseOptions.SectionName))
+            .Validate(o => o.MaxPoolSize is null or > 0, "Database:MaxPoolSize must be positive when set.")
+            .Validate(o => o.CommandTimeoutSeconds is null or > 0, "Database:CommandTimeoutSeconds must be positive when set.")
+            .Validate(o => o.MaxRetryAttempts >= 1, "Database:MaxRetryAttempts must be at least 1.");
+
+        services.AddDbContext<TenantDbContext>((sp, options) =>
         {
             if (configureDatabase is not null)
             {
@@ -43,7 +49,8 @@ public static class TenantServiceCollectionExtensions
                     $"Connection string '{ConnectionStringName}' is missing. " +
                     "Set ConnectionStrings:Tenant (user-secrets or the ConnectionStrings__Tenant environment variable).");
 
-            TenantDbContextConfigurator.Configure(options, connectionString);
+            var database = sp.GetRequiredService<IOptions<DatabaseOptions>>().Value;
+            TenantDbContextConfigurator.Configure(options, connectionString, database);
         });
 
         services.TryAddSingleton(TimeProvider.System);
@@ -78,7 +85,8 @@ public static class TenantServiceCollectionExtensions
         services.AddScoped<ITenantSettingsService, TenantSettingsService>();
         services.AddScoped<ITenantMembershipService, TenantMembershipService>();
         services.AddScoped<ITenantAuditLog, TenantAuditLog>();
-        services.AddScoped<ITenantMembershipReader, TenantMembershipReader>();   // new: for other modules, through the shared kernel
+        services.AddScoped<ITenantMembershipReader, TenantMembershipReader>();
+        services.AddScoped<ITenantMembershipCache>(sp => (ITenantMembershipCache)sp.GetRequiredService<ITenantMembershipReader>());
 
         // Resolution strategies. Other modules add theirs the same way.
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITenantResolutionStrategy, ClaimTenantResolutionStrategy>());

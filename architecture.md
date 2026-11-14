@@ -101,6 +101,7 @@ Pakistan is the initial market. Future UK support should use market settings/ada
 - Each module owns its schema and persistence mapping.
 - Use database constraints and short transactions for important invariants.
 - Do not hold a transaction open during slow external network calls.
+- Each unit of work (`AccessUnitOfWork`, `TenantUnitOfWork`) performs exactly one `SaveChangesAsync` call. EF Core wraps that single call in its own implicit transaction, so no explicit transaction is needed for the common single-save path. If a future change adds a second `SaveChanges` or a raw query between saves, an explicit `BeginTransactionAsync` must wrap them; otherwise the two saves are not atomic.
 - Use explicit orchestration and idempotency for cross-module workflows and callbacks.
 - Add outbox/retry infrastructure only when justified.
 - Plan migrations and backward compatibility before destructive schema changes. Review migration contents before applying them.

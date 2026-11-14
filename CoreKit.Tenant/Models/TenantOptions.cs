@@ -19,6 +19,9 @@ public sealed class TenantOptions
     /// <summary>How long a tenant's id, slug and status are remembered. 0 turns the cache off.</summary>
     public int InfoCacheSeconds { get; set; } = 30;
 
+    /// <summary>How long a user's tenant membership is remembered. 0 turns the cache off.</summary>
+    public int MembershipCacheSeconds { get; set; } = 30;
+
     public TenantResolutionOptions Resolution { get; set; } = new();
 
     public IReadOnlyCollection<string> GetReservedSlugs()

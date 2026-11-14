@@ -1,4 +1,6 @@
-﻿namespace CoreKit.Access.Extensions;
+﻿using CoreKit.Access.Persistence;
+
+namespace CoreKit.Access.Extensions;
 
 public static class AccessServiceCollectionExtensions
 {
@@ -24,7 +26,13 @@ public static class AccessServiceCollectionExtensions
             .Validate(o => o.CacheSeconds >= 0, "Access:CacheSeconds cannot be negative.")
             .Validate(o => !string.IsNullOrWhiteSpace(o.UserIdClaimType), "Access:UserIdClaimType must be set.");
 
-        services.AddDbContext<AccessDbContext>(options =>
+        services.AddOptions<AccessDatabaseOptions>()
+            .Bind(configuration.GetSection("Database"))
+            .Validate(o => o.MaxPoolSize is null or > 0, "Database:MaxPoolSize must be positive when set.")
+            .Validate(o => o.CommandTimeoutSeconds is null or > 0, "Database:CommandTimeoutSeconds must be positive when set.")
+            .Validate(o => o.MaxRetryAttempts >= 1, "Database:MaxRetryAttempts must be at least 1.");
+
+        services.AddDbContext<AccessDbContext>((sp, options) =>
         {
             if (configureDatabase is not null)
             {
@@ -37,7 +45,8 @@ public static class AccessServiceCollectionExtensions
                     $"Connection string '{ConnectionStringName}' is missing. " +
                     "Set ConnectionStrings:Access (user-secrets or the ConnectionStrings__Access environment variable).");
 
-            AccessDbContextConfigurator.Configure(options, connectionString);
+            var database = sp.GetRequiredService<IOptions<AccessDatabaseOptions>>().Value;
+            AccessDbContextConfigurator.Configure(options, connectionString, database);
         });
 
         services.TryAddSingleton(TimeProvider.System);

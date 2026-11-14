@@ -1,4 +1,5 @@
 ﻿using CoreKit.Tenant.Resolution;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace CoreKit.Tenant.Tests;
 
@@ -127,7 +128,7 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
                 nextCalled = true;
                 return Task.CompletedTask;
             },
-            new TenantMembershipReader(_env.Members));
+            new TenantMembershipReader(_env.Members, new MemoryCache(new MemoryCacheOptions()), Options.Create(_env.Config)));
 
         var options = Options.Create(_env.Config);
         var strategies = new ITenantResolutionStrategy[]
@@ -192,7 +193,7 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
         var bySlugTenant = other.AddTenant("Shop", "shop");
         var middleware = new TenantResolutionMiddleware(
             _ => Task.CompletedTask,
-            new TenantMembershipReader(other.Members));
+            new TenantMembershipReader(other.Members, new MemoryCache(new MemoryCacheOptions()), Options.Create(other.Config)));
         var options = Options.Create(other.Config);
 
         await middleware.InvokeAsync(

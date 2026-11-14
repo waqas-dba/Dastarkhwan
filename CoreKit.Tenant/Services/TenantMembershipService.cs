@@ -13,6 +13,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
     private readonly ITenantPlatformAccess _platform;
     private readonly ITenantActor _actor;
     private readonly TimeProvider _time;
+    private readonly ITenantMembershipCache _membershipCache;
 
     public TenantMembershipService(
         ITenantRepository tenants,
@@ -23,7 +24,8 @@ public sealed class TenantMembershipService : ITenantMembershipService
         TenantAccessGuard guard,
         ITenantPlatformAccess platform,
         ITenantActor actor,
-        TimeProvider time)
+        TimeProvider time,
+        ITenantMembershipCache membershipCache)
     {
         _tenants = tenants;
         _members = members;
@@ -34,6 +36,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
         _platform = platform;
         _actor = actor;
         _time = time;
+        _membershipCache = membershipCache;
     }
 
     public async Task<TenantResult<IReadOnlyList<TenantMemberDto>>> ListMembersAsync(Guid tenantId, CancellationToken ct = default)
@@ -137,6 +140,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
             return saveError;
 
+        _membershipCache.Invalidate(tenantId, member.UserId);
         await _events.PublishAsync(new TenantMemberAddedEvent(tenantId, member.UserId, member.IsOwner, now), ct);
 
         return TenantResult.Success(TenantMapper.ToDto(member));
@@ -196,6 +200,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
             return saveError;
 
+        _membershipCache.Invalidate(tenantId, userId);
         await _events.PublishAsync(new TenantMemberRemovedEvent(tenantId, userId, Now()), ct);
 
         return TenantResult.Success();
@@ -249,6 +254,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
             return saveError;
 
+        _membershipCache.Invalidate(tenantId, userId);
         return TenantResult.Success(TenantMapper.ToDto(member));
     }
 

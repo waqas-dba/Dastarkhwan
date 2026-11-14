@@ -1,6 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using CoreKit.SharedKernel;
+using Npgsql;
 
 namespace CoreKit.Identity.Persistence;
 
@@ -16,8 +15,29 @@ public static class IdentityDbContextConfigurator
     /// </summary>
     public const string MigrationsHistoryTable = "__IdentityMigrationsHistory";
 
-    public static DbContextOptionsBuilder Configure(DbContextOptionsBuilder options, string connectionString)
-        => options.UseNpgsql(
-            connectionString,
-            npgsql => npgsql.MigrationsHistoryTable(MigrationsHistoryTable));
+    public static DbContextOptionsBuilder Configure(
+        DbContextOptionsBuilder options,
+        string connectionString,
+        DatabaseOptions? database = null)
+    {
+        var builder = new NpgsqlConnectionStringBuilder(connectionString);
+
+        if (database?.MaxPoolSize is > 0)
+            builder.MaxPoolSize = database.MaxPoolSize.Value;
+
+        if (database?.CommandTimeoutSeconds is > 0)
+            builder.CommandTimeout = database.CommandTimeoutSeconds.Value;
+
+        options.UseNpgsql(
+            builder.ConnectionString,
+            npgsql =>
+            {
+                npgsql.MigrationsHistoryTable(MigrationsHistoryTable);
+
+                if (database?.EnableRetryOnFailure == true)
+                    npgsql.EnableRetryOnFailure(database.MaxRetryAttempts);
+            });
+
+        return options;
+    }
 }

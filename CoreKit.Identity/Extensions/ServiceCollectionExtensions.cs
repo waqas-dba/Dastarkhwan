@@ -1,4 +1,5 @@
 ﻿using CoreKit.Identity.Repositories;
+using CoreKit.SharedKernel;
 
 namespace CoreKit.Identity.Extensions;
 
@@ -15,7 +16,13 @@ public static class ServiceCollectionExtensions
         IConfiguration configuration,
         Action<DbContextOptionsBuilder>? configureDatabase = null)
     {
-        services.AddDbContext<IdentityDbContext>(options =>
+        services.AddOptions<DatabaseOptions>()
+            .Bind(configuration.GetSection(DatabaseOptions.SectionName))
+            .Validate(o => o.MaxPoolSize is null or > 0, "Database:MaxPoolSize must be positive when set.")
+            .Validate(o => o.CommandTimeoutSeconds is null or > 0, "Database:CommandTimeoutSeconds must be positive when set.")
+            .Validate(o => o.MaxRetryAttempts >= 1, "Database:MaxRetryAttempts must be at least 1.");
+
+        services.AddDbContext<IdentityDbContext>((sp, options) =>
         {
             if (configureDatabase is not null)
             {
@@ -28,7 +35,8 @@ public static class ServiceCollectionExtensions
                     $"Connection string '{ConnectionStringName}' is missing. " +
                     "Set ConnectionStrings:Identity (user-secrets or the ConnectionStrings__Identity environment variable).");
 
-            IdentityDbContextConfigurator.Configure(options, connectionString);
+            var database = sp.GetRequiredService<IOptions<DatabaseOptions>>().Value;
+            IdentityDbContextConfigurator.Configure(options, connectionString, database);
         });
 
         // TryAdd: a host or a test may register its own clock or hasher first.

@@ -20,13 +20,17 @@ public sealed class TenantAuditRepository : ITenantAuditRepository
     public async Task<(IReadOnlyList<TenantAuditEntry> Items, int TotalCount)> ListAsync(
         Guid tenantId, int page, int pageSize, CancellationToken ct = default)
     {
+        var skip = (int)Math.Min(
+            ((long)page - 1) * pageSize,
+            int.MaxValue);
+
         var query = _db.AuditEntries.AsNoTracking().Where(a => a.TenantId == tenantId);
 
         var totalCount = await query.CountAsync(ct);
 
         var items = await query
             .OrderByDescending(a => a.OccurredAt).ThenBy(a => a.Id)
-            .Skip((page - 1) * pageSize)
+            .Skip(skip)
             .Take(pageSize)
             .ToListAsync(ct);
 

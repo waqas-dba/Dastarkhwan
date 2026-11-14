@@ -38,14 +38,25 @@ public interface IUserRepository
 
     Task SetPasswordHashAsync(Guid userId, string passwordHash, DateTime now, CancellationToken ct = default);
 
-    /// <summary>Atomically increments the failed-login counter. Returns the new value.</summary>
-    Task<int> IncrementAccessFailedCountAsync(Guid userId, CancellationToken ct = default);
+    /// <summary>
+    /// Atomically records a failed login attempt as one database-side state transition.
+    /// Increments the failure counter, establishes the lockout when the threshold is reached,
+    /// preserves an existing active lockout (its end time is never extended or replaced), and
+    /// starts a fresh failure budget when the previous lockout has expired. The decision is
+    /// made by the database against the current row, so a stale snapshot cannot clear a
+    /// newer lockout. Returns false when the user row no longer exists.
+    /// </summary>
+    Task<bool> RegisterFailedLoginAttemptAsync(
+        Guid userId, DateTime now, DateTime lockoutEnd, int threshold, CancellationToken ct = default);
 
-    /// <summary>Atomically sets the lockout end time.</summary>
-    Task SetLockoutEndAsync(Guid userId, DateTime? lockoutEnd, CancellationToken ct = default);
-
-    /// <summary>Atomically resets the failed-login counter and clears the lockout.</summary>
-    Task ResetAccessFailureAsync(Guid userId, CancellationToken ct = default);
+    /// <summary>
+    /// Authoritative conditional success transition, executed as a single database statement:
+    /// resets the failure counter and clears the lockout only when the account is active and
+    /// not currently locked, evaluated against the current row. Returns false when the
+    /// transition must not be applied (user missing, inactive, or locked by a concurrent
+    /// request); the caller must not issue a session.
+    /// </summary>
+    Task<bool> TryCompleteSuccessfulLoginAsync(Guid userId, DateTime now, CancellationToken ct = default);
 
     /// <summary>Makes the user's role links match exactly the given role ids.</summary>
     Task ReplaceRolesAsync(User user, IReadOnlyCollection<Guid> roleIds, CancellationToken ct = default);

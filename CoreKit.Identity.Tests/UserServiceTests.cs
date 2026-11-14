@@ -705,8 +705,10 @@ public sealed class UserServiceTests : IDisposable
         Assert.Equal(5, lockedUser.AccessFailedCount);
         Assert.True(lockedUser.LockoutEnd.HasValue);
         // LockoutEnd is stored as DateTime (Kind=Unspecified from SQLite); compare as DateTime to avoid
-        // local-timezone reinterpretation when converting DateTime -> DateTimeOffset.
-        Assert.True(lockedUser.LockoutEnd.Value > _env.Time.GetUtcNow().UtcDateTime);
+        // local-timezone reinterpretation when converting DateTime -> DateTimeOffset. With the fixed
+        // clock the fifth failure locks the account for exactly fifteen minutes.
+        var expectedLockoutEnd = _env.Time.GetUtcNow().UtcDateTime.AddMinutes(15);
+        Assert.Equal(expectedLockoutEnd.Ticks, lockedUser.LockoutEnd.Value.Ticks);
     }
 
     [Fact]
@@ -969,15 +971,17 @@ public sealed class UserServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task IncrementAccessFailedCountAsync_WithCancelledToken_ThrowsAndDoesNotTreatTokenAsSqlParameter()
+    public async Task RegisterFailedLoginAttemptAsync_WithCancelledToken_ThrowsAndDoesNotApplyTransition()
     {
         using var db = _env.NewContext();
         var repo = new UserRepository(db);
         using var cts = new CancellationTokenSource();
         cts.Cancel();
+        var now = _env.Time.GetUtcNow().UtcDateTime;
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => repo.IncrementAccessFailedCountAsync(_env.StaffUserId, cts.Token));
+            () => repo.RegisterFailedLoginAttemptAsync(
+                _env.StaffUserId, now, now.AddMinutes(15), 5, cts.Token));
 
         using var verify = _env.NewContext();
         var user = await verify.Users.FirstOrDefaultAsync(u => u.Id == _env.StaffUserId);
@@ -985,10 +989,173 @@ public sealed class UserServiceTests : IDisposable
         Assert.Equal(0, user.AccessFailedCount);
     }
 
+    [Fact]
+    public async Task TryCompleteSuccessfulLoginAsync_WithCancelledToken_ThrowsAndDoesNotApplyTransition()
+    {
+        using var db = _env.NewContext();
+        var repo = new UserRepository(db);
+        var now = _env.Time.GetUtcNow().UtcDateTime;
+
+        // Bring the account to a known failure state first: three failed attempts, no lockout.
+        for (var i = 0; i < 3; i++)
+            Assert.True(await repo.RegisterFailedLoginAttemptAsync(
+                _env.StaffUserId, now, now.AddMinutes(15), 5));
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => repo.TryCompleteSuccessfulLoginAsync(_env.StaffUserId, now, cts.Token));
+
+        // Cancellation must not leave a partially applied transition: the counter stays at 3.
+        using var verify = _env.NewContext();
+        var user = await verify.Users.FirstOrDefaultAsync(u => u.Id == _env.StaffUserId);
+        Assert.NotNull(user);
+        Assert.Equal(3, user.AccessFailedCount);
+        Assert.Null(user.LockoutEnd);
+    }
+
+    [Fact]
+    public async Task FailedLoginTransition_StaleExpiredLockoutRequest_CannotClearNewerLockout()
+    {
+        // A failed-login request captured its clock while the previous lockout was already
+        // expired. Before its transition runs, concurrent failures re-establish a lockout at a
+        // later clock. The stale request's transition must preserve the newer lockout (it can
+        // only ever see an active lockout, because a stale "now" is never ahead of the row).
+        using var db = _env.NewContext();
+        var repo = new UserRepository(db);
+        var userId = _env.StaffUserId;
+
+        var staleNow = _env.Time.GetUtcNow().UtcDateTime;
+        var newerNow = staleNow.AddMinutes(1);
+
+        // Seed: a lockout that is already expired as of the stale request's clock.
+        await db.Users
+            .Where(u => u.Id == userId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.AccessFailedCount, 5)
+                .SetProperty(u => u.LockoutEnd, (DateTime?)staleNow.AddMinutes(-1)));
+
+        // Concurrent failed attempts run at the newer clock and establish a fresh lockout.
+        for (var i = 0; i < 5; i++)
+            Assert.True(await repo.RegisterFailedLoginAttemptAsync(
+                userId, newerNow, newerNow.AddMinutes(15), 5));
+
+        // The stale request's transition now executes with its old clock.
+        Assert.True(await repo.RegisterFailedLoginAttemptAsync(
+            userId, staleNow, staleNow.AddMinutes(15), 5));
+
+        using var verify = _env.NewContext();
+        var user = await verify.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        Assert.NotNull(user);
+        // The newer lockout survives; the stale attempt is counted on top, not treated as a
+        // fresh budget (a stale request can never reset a newer lockout back to one).
+        Assert.Equal(newerNow.AddMinutes(15).Ticks, user.LockoutEnd!.Value.Ticks);
+        Assert.Equal(6, user.AccessFailedCount);
+    }
+
+    [Fact]
+    public async Task SuccessfulLoginTransition_StaleRequest_CannotClearNewerActiveLockout()
+    {
+        // A successful-login request captured its clock before a concurrent failed request
+        // established a lockout. Its authoritative transition executes afterwards with the
+        // stale clock and must be refused, leaving the newer lockout intact.
+        using var db = _env.NewContext();
+        var repo = new UserRepository(db);
+        var userId = _env.StaffUserId;
+
+        var staleNow = _env.Time.GetUtcNow().UtcDateTime;
+        var newerNow = staleNow.AddMinutes(1);
+
+        for (var i = 0; i < 5; i++)
+            Assert.True(await repo.RegisterFailedLoginAttemptAsync(
+                userId, newerNow, newerNow.AddMinutes(15), 5));
+
+        Assert.False(await repo.TryCompleteSuccessfulLoginAsync(userId, staleNow));
+
+        using var verify = _env.NewContext();
+        var user = await verify.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
+        Assert.NotNull(user);
+        Assert.Equal(newerNow.AddMinutes(15).Ticks, user.LockoutEnd!.Value.Ticks);
+        Assert.Equal(5, user.AccessFailedCount);
+    }
+
+    [Fact]
+    public async Task SuccessfulLoginTransition_InactiveAccount_IsRefused()
+    {
+        using var db = _env.NewContext();
+        var repo = new UserRepository(db);
+
+        // The seeded inactive user is active=false with no failure state.
+        Assert.False(await repo.TryCompleteSuccessfulLoginAsync(
+            _env.InactiveUserId, _env.Time.GetUtcNow().UtcDateTime));
+
+        using var verify = _env.NewContext();
+        var user = await verify.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == _env.InactiveUserId);
+        Assert.NotNull(user);
+        Assert.Equal(0, user.AccessFailedCount);
+        Assert.Null(user.LockoutEnd);
+    }
+
+    [Fact]
+    public async Task Login_CorrectPassword_WhenConcurrentFailureLocksFirst_DoesNotIssueSession()
+    {
+        // Deterministic interleaving of the dangerous race: the successful request has read its
+        // snapshot and verified the password, then parks at the gate; concurrent failed
+        // requests establish a lockout; the gate releases and the authoritative transition
+        // must refuse, so the correct-password request is rejected and no session is issued.
+        var atTransition = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseTransition = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var gatedRepo = new GatedUserRepository(
+            new UserRepository(_env.NewContext()),
+            async () =>
+            {
+                atTransition.SetResult();
+                await releaseTransition.Task;
+            });
+        var authService = CreateAuthService(gatedRepo);
+
+        var loginTask = authService.LoginAsync(new LoginRequest
+        {
+            Email = "staff@example.com",
+            Password = "StaffPass123!"
+        }, CancellationToken.None);
+
+        // The correct-password request is parked immediately before its transition.
+        await atTransition.Task;
+
+        // Concurrent failed requests lock the account first.
+        for (var i = 0; i < 5; i++)
+        {
+            ResultAssert.Fails(await CreateAuthService().LoginAsync(new LoginRequest
+            {
+                Email = "staff@example.com",
+                Password = "wrong-password"
+            }, CancellationToken.None), IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
+        }
+
+        releaseTransition.SetResult();
+
+        // The correct-password request loses the authoritative transition and is rejected.
+        ResultAssert.Fails(await loginTask, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
+
+        // The rejected attempt is still counted like any attempt during an active lockout.
+        using var verify = _env.NewContext();
+        var user = await verify.Users.AsNoTracking()
+            .FirstOrDefaultAsync(u => u.NormalizedEmail == IdentityNormalizer.NormalizeEmail("staff@example.com"));
+        Assert.NotNull(user);
+        Assert.Equal(6, user.AccessFailedCount);
+        Assert.NotNull(user.LockoutEnd);
+    }
+
     private IAuthService CreateAuthService()
+        => CreateAuthService(userRepository: null);
+
+    private IAuthService CreateAuthService(IUserRepository? userRepository)
     {
         var db = _env.NewContext();
-        var userRepository = new UserRepository(db);
+        userRepository ??= new UserRepository(db);
         var refreshTokenRepository = new RefreshTokenRepository(db);
         var accessResolver = new AccessResolver(new PermissionRepository(db));
         var currentUser = new FakeCurrentUserService();

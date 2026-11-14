@@ -107,39 +107,50 @@ public sealed class UserRepository : IUserRepository
                 .SetProperty(u => u.UpdatedAt, (DateTime?)now), ct);
     }
 
-    public async Task<int> IncrementAccessFailedCountAsync(Guid userId, CancellationToken ct = default)
+    public async Task<bool> RegisterFailedLoginAttemptAsync(
+        Guid userId, DateTime now, DateTime lockoutEnd, int threshold, CancellationToken ct = default)
     {
-        // Database-side atomic increment: no lost increments under concurrent load.
-        // Use type-safe ExecuteUpdateAsync instead of raw SQL so the Guid parameter is
-        // bound correctly by EF Core's provider, avoiding any provider-specific parameter
-        // formatting mismatches that could cause the UPDATE to match zero rows.
-        await _db.Users
+        // One atomic UPDATE ... CASE transition. The database itself computes the new counter
+        // value and decides whether a lockout is established, preserved, or cleared, against
+        // the current row under a row lock, so concurrent requests cannot lose increments and
+        // a stale clock or snapshot cannot clear a newer active lockout: every branch
+        // condition is evaluated inside this single statement against the current row.
+        var affected = await _db.Users
             .Where(u => u.Id == userId)
             .ExecuteUpdateAsync(s => s
-                .SetProperty(u => u.AccessFailedCount, u => u.AccessFailedCount + 1), ct);
+                .SetProperty(u => u.AccessFailedCount, u =>
+                    u.LockoutEnd != null && u.LockoutEnd <= now
+                        ? 1 // previous lockout has expired: fresh failure budget
+                        : u.AccessFailedCount + 1)
+                .SetProperty(u => u.LockoutEnd, u =>
+                    u.LockoutEnd != null && u.LockoutEnd > now
+                        ? u.LockoutEnd // active lockout: never extended or replaced by this attempt
+                        : (u.LockoutEnd != null && u.LockoutEnd <= now ? 1 : u.AccessFailedCount + 1) >= threshold
+                            ? (DateTime?)lockoutEnd
+                            : (DateTime?)null),
+                ct);
 
-        return await _db.Users
-            .AsNoTracking()
-            .Where(u => u.Id == userId)
-            .Select(u => u.AccessFailedCount)
-            .FirstOrDefaultAsync(ct);
+        return affected > 0;
     }
 
-    public async Task SetLockoutEndAsync(Guid userId, DateTime? lockoutEnd, CancellationToken ct = default)
+    public async Task<bool> TryCompleteSuccessfulLoginAsync(Guid userId, DateTime now, CancellationToken ct = default)
     {
-        await _db.Users
-            .Where(u => u.Id == userId)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(u => u.LockoutEnd, lockoutEnd), ct);
-    }
-
-    public async Task ResetAccessFailureAsync(Guid userId, CancellationToken ct = default)
-    {
-        await _db.Users
-            .Where(u => u.Id == userId)
+        // Authoritative success transition: the same single statement that resets the failure
+        // state also refuses to touch an inactive or currently locked account, evaluated
+        // against the current row. A concurrent failed attempt that establishes a lockout
+        // before this runs makes the statement match zero rows, and the caller must not
+        // issue a session. "Not locked" is !(LockoutEnd IS NOT NULL AND LockoutEnd > now),
+        // which is null-safe for a cleared lockout.
+        var affected = await _db.Users
+            .Where(u => u.Id == userId
+                && u.IsActive
+                && !(u.LockoutEnd != null && u.LockoutEnd > now))
             .ExecuteUpdateAsync(s => s
                 .SetProperty(u => u.AccessFailedCount, 0)
-                .SetProperty(u => u.LockoutEnd, (DateTime?)null), ct);
+                .SetProperty(u => u.LockoutEnd, (DateTime?)null),
+                ct);
+
+        return affected > 0;
     }
 
     public async Task ReplaceRolesAsync(User user, IReadOnlyCollection<Guid> roleIds, CancellationToken ct = default)

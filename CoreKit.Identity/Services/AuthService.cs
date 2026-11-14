@@ -70,54 +70,38 @@ public sealed class AuthService : IAuthService
             return IdentityErrors.InvalidCredentials;
         }
 
-        // If the account is locked out, refuse login without revealing lockout status.
-        // Still count the failed attempt so concurrent attempts cannot lose increments
-        // due to the lockout short-circuit (e.g. call 5 locks the account, calls 6-10
-        // read after the lock is set and would otherwise skip the increment).
+        // The lockout state and the failure counter are transitioned by atomic, database-side
+        // statements (see IUserRepository). A snapshot taken here is never used to decide a
+        // transition: a stale snapshot cannot clear a newer lockout, and a correct password
+        // cannot issue a session if a concurrent request locked the account first, because the
+        // authoritative conditional update below is evaluated against the current row.
         var now = Now();
-        if (user.LockoutEnd is { } lockoutEnd)
-        {
-            if (lockoutEnd > now)
-            {
-                await _userRepository.IncrementAccessFailedCountAsync(user.Id, ct);
-                _logger.LogInformation("Login blocked for user {UserId}: account locked until {LockoutEnd}.", user.Id, lockoutEnd);
-                return IdentityErrors.InvalidCredentials;
-            }
-
-            // The lockout window is over. Reset the failure budget atomically.
-            await _userRepository.ResetAccessFailureAsync(user.Id, ct);
-        }
-
         var check = _hasher.Verify(user.PasswordHash, password);
 
-        if (check == PasswordCheckResult.Failed || !user.IsActive)
+        if (check != PasswordCheckResult.Failed && user.IsActive &&
+            await _userRepository.TryCompleteSuccessfulLoginAsync(user.Id, now, ct))
         {
-            // Atomically increment the failed-attempt counter. No lost increments under concurrency.
-            var newCount = await _userRepository.IncrementAccessFailedCountAsync(user.Id, ct);
-
-            if (newCount >= 5)
+            // Only reached with the right password, so this message cannot be used to discover accounts.
+            if (_emailOptions.RequireConfirmedEmail && !user.EmailConfirmed)
             {
-                await _userRepository.SetLockoutEndAsync(user.Id, now.AddMinutes(15), ct);
+                _logger.LogInformation("Login blocked for user {UserId}: email not confirmed.", user.Id);
+                return IdentityEmailErrors.EmailNotConfirmed;
             }
 
-            _logger.LogInformation("Login failed for user {UserId}. Failed attempts: {Count}.", user.Id, newCount);
-            return IdentityErrors.InvalidCredentials;
+            if (check == PasswordCheckResult.SuccessRehashNeeded)
+                await _userRepository.SetPasswordHashAsync(user.Id, _hasher.Hash(password), Now(), ct);
+
+            return Common.IdentityResult.Success(await _sessions.IssueAsync(user, ct));
         }
 
-        // Successful login: reset failed attempt counter and lockout atomically.
-        await _userRepository.ResetAccessFailureAsync(user.Id, ct);
+        // Wrong password, inactive account, or the authoritative success transition was refused
+        // because a concurrent request locked the account (or deactivated it) in the meantime.
+        // In every case the attempt is recorded by the same atomic failed-login transition.
+        await _userRepository.RegisterFailedLoginAttemptAsync(
+            user.Id, now, lockoutEnd: now.AddMinutes(15), threshold: 5, ct);
 
-        // Only reached with the right password, so this message cannot be used to discover accounts.
-        if (_emailOptions.RequireConfirmedEmail && !user.EmailConfirmed)
-        {
-            _logger.LogInformation("Login blocked for user {UserId}: email not confirmed.", user.Id);
-            return IdentityEmailErrors.EmailNotConfirmed;
-        }
-
-        if (check == PasswordCheckResult.SuccessRehashNeeded)
-            await _userRepository.SetPasswordHashAsync(user.Id, _hasher.Hash(password), Now(), ct);
-
-        return Common.IdentityResult.Success(await _sessions.IssueAsync(user, ct));
+        _logger.LogInformation("Login failed for user {UserId}.", user.Id);
+        return IdentityErrors.InvalidCredentials;
     }
 
     public async Task<IdentityResult<LoginResponse>> RefreshAsync(RefreshTokenRequest request, CancellationToken ct = default)

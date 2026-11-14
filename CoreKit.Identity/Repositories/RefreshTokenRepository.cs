@@ -17,10 +17,54 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
             .Include(t => t.User).ThenInclude(u => u.UserRoles).ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
 
-    public async Task AddAsync(RefreshToken token, CancellationToken ct = default)
+    public async Task<GuardedIssuanceResult> TryIssueGuardedAsync(
+        Guid userId,
+        int expectedSecurityVersion,
+        bool requireUnlocked,
+        DateTime now,
+        RefreshToken token,
+        CancellationToken ct = default)
     {
-        _db.RefreshTokens.Add(token);
-        await _db.SaveChangesAsync(ct);
+        // One transaction on the shared scoped IdentityDbContext covers the user-row guard and
+        // the token insert. The guard is an UPDATE that assigns the security version to itself:
+        // it changes no data but takes a write row lock on the user, held until commit, so the
+        // re-check and the insert are atomic with respect to concurrent credential changes,
+        // deactivation and (for login) lockout. Works identically on PostgreSQL (row lock) and
+        // SQLite (statement-level write serialization).
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+
+        try
+        {
+            var guarded = await _db.Users
+                .Where(u => u.Id == userId
+                    && u.IsActive
+                    && u.SecurityVersion == expectedSecurityVersion
+                    && (!requireUnlocked || u.LockoutEnd == null || u.LockoutEnd <= now))
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(u => u.SecurityVersion, u => u.SecurityVersion),
+                    ct);
+
+            if (guarded == 0)
+            {
+                await transaction.RollbackAsync(ct);
+                return GuardedIssuanceResult.UserUnavailable;
+            }
+
+            _db.RefreshTokens.Add(token);
+            await _db.SaveChangesAsync(ct);
+
+            await transaction.CommitAsync(ct);
+            return GuardedIssuanceResult.Issued;
+        }
+        catch (DbUpdateException)
+        {
+            // The insert violated a database constraint (for example the unique token hash).
+            // Roll back and leave the context clean: the rejected token must not linger in the
+            // change tracker and be retried by a later SaveChanges.
+            await transaction.RollbackAsync(CancellationToken.None);
+            _db.Entry(token).State = EntityState.Detached;
+            return GuardedIssuanceResult.InsertFailed;
+        }
     }
 
     public async Task<bool> TryRevokeAsync(Guid tokenId, DateTime now, CancellationToken ct = default)

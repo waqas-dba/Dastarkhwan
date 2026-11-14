@@ -18,6 +18,10 @@ public sealed class CreateUserRequest
 /// <summary>Every property is optional. A property that is not sent stays unchanged.</summary>
 public sealed class UpdateUserRequest
 {
+    /// <summary>
+    /// Immutable after account creation. Any non-null value — including a casing-only or
+    /// byte-identical address — is rejected; email changes are established only at creation.
+    /// </summary>
     public string? Email { get; set; }
 
     public string? Mobile { get; set; }
@@ -27,7 +31,11 @@ public sealed class UpdateUserRequest
 
     public bool? IsActive { get; set; }
 
-    /// <summary>An administrator can set a new password. All of the user's sessions are ended.</summary>
+    /// <summary>
+    /// An administrator can reset the password. The update is version-guarded: if the account's
+    /// credential state changed concurrently the request fails without applying anything. All of
+    /// the user's sessions are ended and SecurityVersion is incremented in the same transaction.
+    /// </summary>
     public string? Password { get; set; }
 }
 

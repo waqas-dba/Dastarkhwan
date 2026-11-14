@@ -37,8 +37,14 @@ public sealed class User
     /// <summary>Lockout end time. When set and in the future, login is refused.</summary>
     public DateTime? LockoutEnd { get; set; }
 
-    /// <summary>Security version. Increments on password change, email verification revocation, account deactivation.
-    /// Every authenticated request validates this against the JWT claim. Mismatch = revoked.</summary>
+    /// <summary>
+    /// Concurrency guard for credential state. Incremented atomically on a successful password
+    /// change, an administrator password reset and an account deactivation; read together with
+    /// the password hash at login and with the user row at refresh and session issuance, so a
+    /// stale credential cannot create a session. Not incremented for password rehashing or email
+    /// confirmation. Access-token (JWT) validation of this version is a separate, not yet
+    /// implemented task: existing access tokens stay valid until expiry.
+    /// </summary>
     public int SecurityVersion { get; set; }
 
     public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();

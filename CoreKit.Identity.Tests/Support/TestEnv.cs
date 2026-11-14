@@ -170,7 +170,7 @@ internal sealed class TestEnv : IDisposable
         CurrentUser = new FakeCurrentUserService();
 
         UserService = new UserService(
-            UserRepository, RoleRepository, RefreshTokenRepository,
+            UserRepository, RoleRepository,
             AccessResolver, AdministratorGuard, Hasher, CurrentUser, Time);
 
         RoleService = new RoleService(RoleRepository, PermissionRepository, CurrentUser);
@@ -299,25 +299,32 @@ internal sealed class FakeTokenService : ITokenService
         => "hash-" + rawToken;
 }
 
-/// <summary>Minimal fake ISessionIssuer for tests.</summary>
+/// <summary>Minimal fake ISessionIssuer for tests: always succeeds, like the unguarded baseline.</summary>
 internal sealed class FakeSessionIssuer : ISessionIssuer
 {
-    public Task<LoginResponse> IssueAsync(User user, CancellationToken ct = default)
-        => Task.FromResult(new LoginResponse
+    public Task<IdentityResult<LoginResponse>> IssueForLoginAsync(
+        User user, int expectedSecurityVersion, CancellationToken ct = default)
+        => Task.FromResult(IdentityResult.Success(Build(user)));
+
+    public Task<IdentityResult<LoginResponse>> IssueForRefreshAsync(
+        User user, int expectedSecurityVersion, CancellationToken ct = default)
+        => Task.FromResult(IdentityResult.Success(Build(user)));
+
+    private static LoginResponse Build(User user) => new()
+    {
+        AccessToken = "fake-access-token",
+        AccessTokenExpiresAt = DateTime.UtcNow.AddMinutes(5),
+        RefreshToken = "fake-refresh-token",
+        RefreshTokenExpiresAt = DateTime.UtcNow.AddDays(7),
+        User = new UserDto
         {
-            AccessToken = "fake-access-token",
-            AccessTokenExpiresAt = DateTime.UtcNow.AddMinutes(5),
-            RefreshToken = "fake-refresh-token",
-            RefreshTokenExpiresAt = DateTime.UtcNow.AddDays(7),
-            User = new UserDto
-            {
-                Id = user.Id,
-                Email = user.Email,
-                DisplayName = user.DisplayName,
-                IsActive = user.IsActive,
-                EmailConfirmed = user.EmailConfirmed,
-                CreatedAt = user.CreatedAt,
-                UpdatedAt = user.UpdatedAt
-            }
-        });
+            Id = user.Id,
+            Email = user.Email,
+            DisplayName = user.DisplayName,
+            IsActive = user.IsActive,
+            EmailConfirmed = user.EmailConfirmed,
+            CreatedAt = user.CreatedAt,
+            UpdatedAt = user.UpdatedAt
+        }
+    };
 }

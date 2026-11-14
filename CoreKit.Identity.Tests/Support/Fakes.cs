@@ -22,3 +22,24 @@ public sealed class FakeCurrentUserService : ICurrentUserService
 
     public bool IsAuthenticated => UserId is not null;
 }
+
+/// <summary>
+/// Controllable hasher for tests that must steer verification or rehash behaviour: every Verify
+/// call returns the configured result, and every Hash call returns a deterministic marker.
+/// </summary>
+public sealed class StubHasher : IPasswordHasher
+{
+    private readonly PasswordCheckResult _verifyResult;
+
+    public StubHasher(PasswordCheckResult verifyResult) => _verifyResult = verifyResult;
+
+    public int HashCallCount { get; private set; }
+
+    public string Hash(string password)
+    {
+        HashCallCount++;
+        return "hash:" + password;
+    }
+
+    public PasswordCheckResult Verify(string passwordHash, string password) => _verifyResult;
+}

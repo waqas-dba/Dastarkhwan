@@ -102,7 +102,11 @@ public sealed class EmailVerificationService : IEmailVerificationService
             token.NormalizedEmail != token.User.NormalizedEmail) // the address changed after the token was issued
             return InvalidToken;
 
-        if (!await _tokenRepository.ConfirmEmailAsync(token.Id, token.UserId, now, ct))
+        // The snapshot check below filters obvious mismatches before the transaction; the
+        // authoritative bind to the token's normalized email happens inside ConfirmEmailAsync,
+        // evaluated against the current row, so a change that lands between this read and the
+        // confirmation rolls the token claim back and returns an invalid-token result.
+        if (!await _tokenRepository.ConfirmEmailAsync(token.Id, token.UserId, token.NormalizedEmail, now, ct))
             return InvalidToken;
 
         _logger.LogInformation("Email confirmed for user {UserId}.", token.UserId);

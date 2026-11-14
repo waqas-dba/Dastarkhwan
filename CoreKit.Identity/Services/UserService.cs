@@ -13,7 +13,6 @@ public sealed class UserService : IUserService
 {
     private readonly IUserRepository _userRepository;
     private readonly IRoleRepository _roleRepository;
-    private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IAccessResolver _accessResolver;
     private readonly IAdministratorGuard _administratorGuard;
     private readonly IPasswordHasher _hasher;
@@ -23,7 +22,6 @@ public sealed class UserService : IUserService
     public UserService(
         IUserRepository userRepository,
         IRoleRepository roleRepository,
-        IRefreshTokenRepository refreshTokenRepository,
         IAccessResolver accessResolver,
         IAdministratorGuard administratorGuard,
         IPasswordHasher hasher,
@@ -32,7 +30,6 @@ public sealed class UserService : IUserService
     {
         _userRepository = userRepository;
         _roleRepository = roleRepository;
-        _refreshTokenRepository = refreshTokenRepository;
         _accessResolver = accessResolver;
         _administratorGuard = administratorGuard;
         _hasher = hasher;
@@ -166,38 +163,22 @@ public sealed class UserService : IUserService
         if (user is null)
             return IdentityErrors.NotFound("User");
 
-        // Only an administrator can change another administrator's password or email
-        var isChangingCredentials = request.Password is not null || request.Email is not null;
-        if (isChangingCredentials && id != _currentUser.UserId)
+        // Only an administrator can change another administrator's credentials
+        if ((request.Password is not null || request.Email is not null) && id != _currentUser.UserId)
         {
             var isTargetAdmin = user.UserRoles.Any(ur => AdministratorRole.Is(ur.Role));
             if (isTargetAdmin && !_currentUser.Roles.Contains(IdentityRoleNames.Administrator))
                 return IdentityErrors.AccessDenied("You cannot change another administrator's credentials.");
         }
 
-        var now = Now();
-        var endSessions = false;
-
+        // The email address is established at account creation and is immutable afterwards.
+        // Any non-null value in the request is rejected outright — including a casing-only or
+        // byte-identical "change" — before any other field is written, so an update carrying an
+        // email change never partially saves.
         if (request.Email is not null)
-        {
-            var email = request.Email.Trim();
+            return IdentityErrors.Validation("The email address cannot be changed after account creation.");
 
-            if (!EmailValidator.IsValid(email))
-                return IdentityErrors.Validation("A valid email address is required.");
-
-            var normalized = IdentityNormalizer.NormalizeEmail(email);
-
-            if (normalized != user.NormalizedEmail)
-            {
-                if (await _userRepository.EmailExistsAsync(normalized, id, ct))
-                    return IdentityErrors.Conflict("A user with this email already exists.");
-
-                user.NormalizedEmail = normalized;
-                user.EmailConfirmed = false; // a new address has not been confirmed yet
-            }
-
-            user.Email = email;
-        }
+        var now = Now();
 
         if (request.Mobile is { } mobile && mobile != user.Mobile)
         {
@@ -233,12 +214,23 @@ public sealed class UserService : IUserService
                 if (await _administratorGuard.IsLastActiveAdministratorAsync(id, ct))
                     return IdentityErrors.Conflict("The last active administrator cannot be deactivated.");
 
-                endSessions = true;
-            }
+                // Deactivation is a security transition: it is applied under an expected-version
+                // guard, increments SecurityVersion and revokes every session in one transaction.
+                // If a concurrent security-sensitive update wins the race, nothing is applied.
+                var deactivated = await _userRepository.TryDeactivateAsync(id, user.SecurityVersion, now, ct);
 
-            user.IsActive = isActive;
+                if (deactivated != CredentialUpdateResult.Updated)
+                    return IdentityErrors.Conflict("The account was changed by another request. Please try again.");
+            }
+            else
+            {
+                user.IsActive = true;
+            }
         }
 
+        // Password resets are security transitions too: a version-guarded conditional update plus
+        // version increment plus session revocation, in one transaction. A tracked-entity save is
+        // never used for them, so a stale snapshot cannot overwrite a newer password or state.
         if (request.Password is not null)
         {
             var passwordError = PasswordPolicy.Validate(request.Password, user.Email);
@@ -246,17 +238,24 @@ public sealed class UserService : IUserService
             if (passwordError is not null)
                 return IdentityErrors.Validation(passwordError);
 
-            user.PasswordHash = _hasher.Hash(request.Password);
-            endSessions = true;
+            var reset = await _userRepository.TryChangePasswordAsync(
+                id,
+                user.PasswordHash,
+                user.SecurityVersion,
+                _hasher.Hash(request.Password),
+                now,
+                bumpSecurityVersion: true,
+                revokeSessions: true,
+                ct);
+
+            if (reset != CredentialUpdateResult.Updated)
+                return IdentityErrors.Conflict("The account was changed by another request. Please try again.");
         }
 
         user.UpdatedAt = now;
 
         if (!await _userRepository.UpdateAsync(user, ct))
             return IdentityErrors.Conflict("A user with this email or mobile number already exists.");
-
-        if (endSessions)
-            await _refreshTokenRepository.RevokeAllForUserAsync(id, now, ct);
 
         return await LoadDtoAsync(id, ct);
     }

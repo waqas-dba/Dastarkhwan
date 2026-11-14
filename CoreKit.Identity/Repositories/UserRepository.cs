@@ -97,16 +97,6 @@ public sealed class UserRepository : IUserRepository
     public Task<bool> UpdateAsync(User user, CancellationToken ct = default)
         => TrySaveAsync(user, ct);
 
-    public async Task SetPasswordHashAsync(
-        Guid userId, string passwordHash, DateTime now, CancellationToken ct = default)
-    {
-        await _db.Users
-            .Where(u => u.Id == userId)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(u => u.PasswordHash, passwordHash)
-                .SetProperty(u => u.UpdatedAt, (DateTime?)now), ct);
-    }
-
     public async Task<bool> RegisterFailedLoginAttemptAsync(
         Guid userId, DateTime now, DateTime lockoutEnd, int threshold, CancellationToken ct = default)
     {
@@ -133,21 +123,152 @@ public sealed class UserRepository : IUserRepository
         return affected > 0;
     }
 
-    public async Task<bool> TryCompleteSuccessfulLoginAsync(Guid userId, DateTime now, CancellationToken ct = default)
+    public async Task<LoginCompletion> TryCompleteSuccessfulLoginAsync(
+        Guid userId, int expectedSecurityVersion, DateTime now, CancellationToken ct = default)
     {
         // Authoritative success transition: the same single statement that resets the failure
-        // state also refuses to touch an inactive or currently locked account, evaluated
-        // against the current row. A concurrent failed attempt that establishes a lockout
-        // before this runs makes the statement match zero rows, and the caller must not
-        // issue a session. "Not locked" is !(LockoutEnd IS NOT NULL AND LockoutEnd > now),
-        // which is null-safe for a cleared lockout.
+        // state also refuses to touch an inactive, currently locked, or credential-version
+        // stale account, evaluated against the current row. A concurrent failed attempt that
+        // establishes a lockout, or a password change that bumps the security version, before
+        // this runs makes the statement match zero rows, and the caller must not issue a
+        // session. "Not locked" is !(LockoutEnd IS NOT NULL AND LockoutEnd > now), which is
+        // null-safe for a cleared lockout.
         var affected = await _db.Users
             .Where(u => u.Id == userId
                 && u.IsActive
+                && u.SecurityVersion == expectedSecurityVersion
                 && !(u.LockoutEnd != null && u.LockoutEnd > now))
             .ExecuteUpdateAsync(s => s
                 .SetProperty(u => u.AccessFailedCount, 0)
                 .SetProperty(u => u.LockoutEnd, (DateTime?)null),
+                ct);
+
+        if (affected > 0)
+            return LoginCompletion.Completed;
+
+        // The transition was refused. Classify the reason from the current row; this read only
+        // labels the refusal, the decision not to complete the login was already made above.
+        var current = await _db.Users
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => new { u.IsActive, u.SecurityVersion, u.LockoutEnd })
+            .FirstOrDefaultAsync(ct);
+
+        if (current is null)
+            return LoginCompletion.UserMissing;
+        if (!current.IsActive)
+            return LoginCompletion.Inactive;
+        if (current.LockoutEnd is { } lockoutEnd && lockoutEnd > now)
+            return LoginCompletion.Locked;
+        return LoginCompletion.VersionConflict;
+    }
+
+    public async Task<CredentialUpdateResult> TryChangePasswordAsync(
+        Guid userId,
+        string expectedCurrentHash,
+        int expectedSecurityVersion,
+        string newHash,
+        DateTime now,
+        bool bumpSecurityVersion,
+        bool revokeSessions,
+        CancellationToken ct = default)
+    {
+        // One transaction: the conditional password update, the optional security-version bump
+        // and the optional refresh-token revocation all commit together or not at all. The
+        // expected-hash and expected-version predicates run inside the UPDATE against the
+        // current row, so two concurrent credential updates cannot silently overwrite each
+        // other: only the request whose expectations still hold wins.
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+
+        var affected = await _db.Users
+            .Where(u => u.Id == userId
+                && u.PasswordHash == expectedCurrentHash
+                && u.SecurityVersion == expectedSecurityVersion)
+            .ExecuteUpdateAsync(s =>
+            {
+                s.SetProperty(u => u.PasswordHash, newHash)
+                 .SetProperty(u => u.UpdatedAt, (DateTime?)now);
+
+                if (bumpSecurityVersion)
+                    s.SetProperty(u => u.SecurityVersion, u => u.SecurityVersion + 1);
+            }, ct);
+
+        if (affected == 0)
+        {
+            await transaction.RollbackAsync(ct);
+
+            var current = await _db.Users
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => new { u.PasswordHash, u.SecurityVersion })
+                .FirstOrDefaultAsync(ct);
+
+            if (current is null)
+                return CredentialUpdateResult.UserMissing;
+            return current.PasswordHash == expectedCurrentHash
+                ? CredentialUpdateResult.VersionConflict
+                : CredentialUpdateResult.HashConflict;
+        }
+
+        if (revokeSessions)
+            await RefreshTokenRevocation.RevokeAllForUserAsync(_db, userId, now, ct);
+
+        await transaction.CommitAsync(ct);
+
+        return CredentialUpdateResult.Updated;
+    }
+
+    public async Task<CredentialUpdateResult> TryDeactivateAsync(
+        Guid userId, int expectedSecurityVersion, DateTime now, CancellationToken ct = default)
+    {
+        // Same shape as TryChangePasswordAsync: the deactivation, the security-version bump and
+        // the refresh-token revocation are one transaction. The expected-version predicate makes
+        // the update conditional, so a concurrent security-sensitive update wins or loses
+        // deterministically instead of being silently overwritten.
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+
+        var affected = await _db.Users
+            .Where(u => u.Id == userId
+                && u.IsActive
+                && u.SecurityVersion == expectedSecurityVersion)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.IsActive, false)
+                .SetProperty(u => u.SecurityVersion, u => u.SecurityVersion + 1)
+                .SetProperty(u => u.UpdatedAt, (DateTime?)now),
+                ct);
+
+        if (affected == 0)
+        {
+            await transaction.RollbackAsync(ct);
+
+            var exists = await _db.Users
+                .AsNoTracking()
+                .AnyAsync(u => u.Id == userId, ct);
+
+            return exists ? CredentialUpdateResult.VersionConflict : CredentialUpdateResult.UserMissing;
+        }
+
+        await RefreshTokenRevocation.RevokeAllForUserAsync(_db, userId, now, ct);
+
+        await transaction.CommitAsync(ct);
+
+        return CredentialUpdateResult.Updated;
+    }
+
+    public async Task<bool> TryRehashPasswordAsync(
+        Guid userId, string expectedCurrentHash, int expectedSecurityVersion, string newHash, DateTime now,
+        CancellationToken ct = default)
+    {
+        // Conditional rehash: requires the expected existing hash and version, and never bumps
+        // the version or revokes sessions. If the password changed concurrently the predicate
+        // matches zero rows, so a stale rehash can never overwrite a newer password.
+        var affected = await _db.Users
+            .Where(u => u.Id == userId
+                && u.PasswordHash == expectedCurrentHash
+                && u.SecurityVersion == expectedSecurityVersion)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.PasswordHash, newHash)
+                .SetProperty(u => u.UpdatedAt, (DateTime?)now),
                 ct);
 
         return affected > 0;

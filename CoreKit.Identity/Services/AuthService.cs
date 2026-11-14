@@ -70,33 +70,67 @@ public sealed class AuthService : IAuthService
             return IdentityErrors.InvalidCredentials;
         }
 
-        // The lockout state and the failure counter are transitioned by atomic, database-side
-        // statements (see IUserRepository). A snapshot taken here is never used to decide a
-        // transition: a stale snapshot cannot clear a newer lockout, and a correct password
-        // cannot issue a session if a concurrent request locked the account first, because the
-        // authoritative conditional update below is evaluated against the current row.
+        // The lockout state, the failure counter and the credential version are transitioned by
+        // atomic, database-side statements (see IUserRepository). A snapshot taken here is never
+        // used to decide a transition: the SecurityVersion observed together with the password
+        // hash is carried into the authoritative transition, so a password change or reset that
+        // lands after the read makes the login fail with a version conflict instead of issuing a
+        // session from stale credentials.
         var now = Now();
         var check = _hasher.Verify(user.PasswordHash, password);
 
-        if (check != PasswordCheckResult.Failed && user.IsActive &&
-            await _userRepository.TryCompleteSuccessfulLoginAsync(user.Id, now, ct))
+        if (check != PasswordCheckResult.Failed && user.IsActive)
         {
-            // Only reached with the right password, so this message cannot be used to discover accounts.
-            if (_emailOptions.RequireConfirmedEmail && !user.EmailConfirmed)
+            var completion = await _userRepository.TryCompleteSuccessfulLoginAsync(
+                user.Id, user.SecurityVersion, now, ct);
+
+            if (completion == LoginCompletion.Completed)
             {
-                _logger.LogInformation("Login blocked for user {UserId}: email not confirmed.", user.Id);
-                return IdentityEmailErrors.EmailNotConfirmed;
+                // Only reached with the right password, so this message cannot be used to discover accounts.
+                if (_emailOptions.RequireConfirmedEmail && !user.EmailConfirmed)
+                {
+                    _logger.LogInformation("Login blocked for user {UserId}: email not confirmed.", user.Id);
+                    return IdentityEmailErrors.EmailNotConfirmed;
+                }
+
+                // Conditional rehash: requires the expected hash and version, so it can never
+                // overwrite a password that changed concurrently, and it never bumps the version.
+                if (check == PasswordCheckResult.SuccessRehashNeeded)
+                    await _userRepository.TryRehashPasswordAsync(
+                        user.Id, user.PasswordHash, user.SecurityVersion, _hasher.Hash(password), now, ct);
+
+                // Second authoritative guard: the guarded insertion re-checks the user row under
+                // a lock held through the token insert. A credential change or lockout that lands
+                // after the login transition stops here — no session and no token row are produced.
+                var issuance = await _sessions.IssueForLoginAsync(user, user.SecurityVersion, ct);
+
+                if (issuance.IsFailure)
+                {
+                    _logger.LogInformation(
+                        "Session issuance refused for user {UserId}: the account changed during login.", user.Id);
+                    return IdentityErrors.InvalidCredentials;
+                }
+
+                return issuance;
             }
 
-            if (check == PasswordCheckResult.SuccessRehashNeeded)
-                await _userRepository.SetPasswordHashAsync(user.Id, _hasher.Hash(password), Now(), ct);
+            if (completion is LoginCompletion.VersionConflict or LoginCompletion.UserMissing)
+            {
+                // Stale credential: the password or account state moved on after the read. This is
+                // not a wrong password, so it must not be counted as a failed attempt.
+                _logger.LogInformation("Login rejected for user {UserId}: credentials changed during login.", user.Id);
+                return IdentityErrors.InvalidCredentials;
+            }
 
-            return Common.IdentityResult.Success(await _sessions.IssueAsync(user, ct));
+            // Inactive or locked: keep the approved lockout policy — the attempt counts.
+            await _userRepository.RegisterFailedLoginAttemptAsync(
+                user.Id, now, lockoutEnd: now.AddMinutes(15), threshold: 5, ct);
+            _logger.LogInformation("Login failed for user {UserId}.", user.Id);
+            return IdentityErrors.InvalidCredentials;
         }
 
-        // Wrong password, inactive account, or the authoritative success transition was refused
-        // because a concurrent request locked the account (or deactivated it) in the meantime.
-        // In every case the attempt is recorded by the same atomic failed-login transition.
+        // Wrong password, or an inactive account: recorded by the atomic failed-login transition
+        // (FIX-03 behaviour: increments the counter, locks at five, never extends an active lockout).
         await _userRepository.RegisterFailedLoginAttemptAsync(
             user.Id, now, lockoutEnd: now.AddMinutes(15), threshold: 5, ct);
 
@@ -151,7 +185,21 @@ public sealed class AuthService : IAuthService
         if (!await _refreshTokenRepository.TryRevokeAsync(token.Id, now, ct))
             return IdentityErrors.InvalidRefreshToken;
 
-        return Common.IdentityResult.Success(await _sessions.IssueAsync(token.User, ct));
+        // The refresh snapshot (user row read with the token) is stale-prone exactly like a
+        // login snapshot, so issuance is guarded the same way: the version observed with the
+        // token must still be current when the guarded insert executes, otherwise no new
+        // session is created. A login lockout does not block refresh — the guard only checks
+        // account state and credential version. The consumed token stays consumed either way.
+        var issuance = await _sessions.IssueForRefreshAsync(token.User, token.User.SecurityVersion, ct);
+
+        if (issuance.IsFailure)
+        {
+            _logger.LogInformation(
+                "Refresh rejected for user {UserId}: credentials changed or the account is inactive.", token.UserId);
+            return IdentityErrors.InvalidRefreshToken;
+        }
+
+        return issuance;
     }
 
     public async Task<Common.IdentityResult> LogoutAsync(RefreshTokenRequest request, CancellationToken ct = default)
@@ -208,10 +256,26 @@ public sealed class AuthService : IAuthService
 
         var now = Now();
 
-        await _userRepository.SetPasswordHashAsync(userId, _hasher.Hash(request.NewPassword), now, ct);
+        // One atomic, version-guarded credential transition: the password update, the security
+        // version increment and the revocation of every session commit together. If the account
+        // changed after the read (a concurrent change, reset or deactivation), the conditional
+        // update matches zero rows and this call fails without applying anything.
+        var changed = await _userRepository.TryChangePasswordAsync(
+            userId,
+            user.PasswordHash,
+            user.SecurityVersion,
+            _hasher.Hash(request.NewPassword),
+            now,
+            bumpSecurityVersion: true,
+            revokeSessions: true,
+            ct);
 
-        // Every device must sign in again with the new password.
-        await _refreshTokenRepository.RevokeAllForUserAsync(userId, now, ct);
+        if (changed != CredentialUpdateResult.Updated)
+        {
+            _logger.LogInformation(
+                "Password change for user {UserId} rejected: the account changed concurrently.", userId);
+            return IdentityErrors.Conflict("The account was changed by another request. Please try again.");
+        }
 
         return Common.IdentityResult.Success();
     }

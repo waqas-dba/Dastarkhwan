@@ -36,8 +36,6 @@ public interface IUserRepository
     /// <summary>Saves changes made to a tracked user. Returns false on a duplicate email.</summary>
     Task<bool> UpdateAsync(User user, CancellationToken ct = default);
 
-    Task SetPasswordHashAsync(Guid userId, string passwordHash, DateTime now, CancellationToken ct = default);
-
     /// <summary>
     /// Atomically records a failed login attempt as one database-side state transition.
     /// Increments the failure counter, establishes the lockout when the threshold is reached,
@@ -51,15 +49,96 @@ public interface IUserRepository
 
     /// <summary>
     /// Authoritative conditional success transition, executed as a single database statement:
-    /// resets the failure counter and clears the lockout only when the account is active and
-    /// not currently locked, evaluated against the current row. Returns false when the
-    /// transition must not be applied (user missing, inactive, or locked by a concurrent
-    /// request); the caller must not issue a session.
+    /// resets the failure counter and clears the lockout only when the account is active,
+    /// not currently locked, and its <see cref="User.SecurityVersion"/> still equals the
+    /// version observed together with the verified password hash. Returns false when the
+    /// transition must not be applied (user missing, inactive, locked by a concurrent
+    /// request, or the credentials changed concurrently); the caller must not issue a session.
     /// </summary>
-    Task<bool> TryCompleteSuccessfulLoginAsync(Guid userId, DateTime now, CancellationToken ct = default);
+    Task<LoginCompletion> TryCompleteSuccessfulLoginAsync(
+        Guid userId, int expectedSecurityVersion, DateTime now, CancellationToken ct = default);
+
+    /// <summary>
+    /// Atomically changes a password under an expected-version and expected-hash guard, in one
+    /// database transaction. Optionally increments <see cref="User.SecurityVersion"/> and revokes
+    /// every refresh token of the user (used for self-service changes and administrator resets).
+    /// Rehash uses the same method with both flags off: it can never overwrite a newer password,
+    /// and it never bumps the version or ends sessions. Returns how the transition ended; on
+    /// failure nothing is applied.
+    /// </summary>
+    Task<CredentialUpdateResult> TryChangePasswordAsync(
+        Guid userId,
+        string expectedCurrentHash,
+        int expectedSecurityVersion,
+        string newHash,
+        DateTime now,
+        bool bumpSecurityVersion,
+        bool revokeSessions,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Atomically deactivates an account under an expected-version guard, increments
+    /// <see cref="User.SecurityVersion"/> and revokes every refresh token in one transaction.
+    /// Returns how the transition ended; on failure nothing is applied.
+    /// </summary>
+    Task<CredentialUpdateResult> TryDeactivateAsync(
+        Guid userId, int expectedSecurityVersion, DateTime now, CancellationToken ct = default);
+
+    /// <summary>
+    /// Conditional password rehash: writes the new hash only when the expected current hash and
+    /// expected <see cref="User.SecurityVersion"/> still hold, evaluated in a single statement.
+    /// A stale rehash can never overwrite a newer password. It never bumps the security version
+    /// and never revokes sessions. Returns false when nothing was written.
+    /// </summary>
+    Task<bool> TryRehashPasswordAsync(
+        Guid userId,
+        string expectedCurrentHash,
+        int expectedSecurityVersion,
+        string newHash,
+        DateTime now,
+        CancellationToken ct = default);
 
     /// <summary>Makes the user's role links match exactly the given role ids.</summary>
     Task ReplaceRolesAsync(User user, IReadOnlyCollection<Guid> roleIds, CancellationToken ct = default);
 
     Task DeleteAsync(User user, CancellationToken ct = default);
+}
+
+/// <summary>Outcome of the authoritative successful-login transition.</summary>
+public enum LoginCompletion
+{
+    /// <summary>The transition was applied; the login may continue to session issuance.</summary>
+    Completed,
+
+    /// <summary>No such user any more.</summary>
+    UserMissing,
+
+    /// <summary>The account was deactivated after the credentials were read.</summary>
+    Inactive,
+
+    /// <summary>A concurrent failed request locked the account before the transition.</summary>
+    Locked,
+
+    /// <summary>
+    /// The password, or the account state behind it, changed after the credentials were read
+    /// (for example a concurrent password change or administrator reset). A stale credential
+    /// is not a wrong password: the failed-password counter must not be incremented.
+    /// </summary>
+    VersionConflict
+}
+
+/// <summary>Outcome of a version-guarded credential update.</summary>
+public enum CredentialUpdateResult
+{
+    /// <summary>The transition was applied.</summary>
+    Updated,
+
+    /// <summary>The current password hash differs from the expected one.</summary>
+    HashConflict,
+
+    /// <summary>The security version moved on after the caller read it.</summary>
+    VersionConflict,
+
+    /// <summary>No such user any more.</summary>
+    UserMissing
 }

@@ -339,18 +339,77 @@ public sealed class UserServiceTests : IDisposable
     // ---- Update ----
 
     [Fact]
-    public async Task UpdateUser_Email_SucceedsAndUnconfirms()
+    public async Task UpdateUser_Email_IsRejected()
     {
         _env.SignInOwner();
 
+        // The email address is established at account creation and is immutable afterwards.
         var result = await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
         {
             Email = "newstaff@example.com"
         });
 
-        var dto = ResultAssert.Ok(result);
-        Assert.Equal("newstaff@example.com", dto.Email);
-        Assert.False(dto.EmailConfirmed);
+        ResultAssert.Fails(result, IdentityErrorKind.Validation, "validation.failed");
+
+        // Nothing changed in the database: not the address, not the normalized copy, not the
+        // confirmed flag.
+        using var db = _env.NewContext();
+        var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == _env.StaffUserId);
+        Assert.NotNull(user);
+        Assert.Equal("staff@example.com", user.Email);
+        Assert.Equal(IdentityNormalizer.NormalizeEmail("staff@example.com"), user.NormalizedEmail);
+        Assert.True(user.EmailConfirmed);
+    }
+
+    [Fact]
+    public async Task UpdateUser_CasingOnlyEmailChange_IsRejected()
+    {
+        _env.SignInOwner();
+
+        // A casing-only "change" normalizes to the same address but is still an email change
+        // request, so it is rejected like any other.
+        ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
+        {
+            Email = "STAFF@example.com"
+        }), IdentityErrorKind.Validation, "validation.failed");
+
+        using var db = _env.NewContext();
+        var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == _env.StaffUserId);
+        Assert.NotNull(user);
+        Assert.Equal("staff@example.com", user.Email);
+    }
+
+    [Fact]
+    public async Task UpdateUser_IdenticalEmail_IsRejected()
+    {
+        _env.SignInOwner();
+
+        // Even a byte-identical value is an email change request and is rejected outright.
+        ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
+        {
+            Email = "staff@example.com"
+        }), IdentityErrorKind.Validation, "validation.failed");
+    }
+
+    [Fact]
+    public async Task UpdateUser_EmailWithOtherFields_IsRejectedEntirely()
+    {
+        _env.SignInOwner();
+
+        // The whole update is refused when it carries an email change: no field is partially saved.
+        var result = await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
+        {
+            Email = "newstaff@example.com",
+            DisplayName = "New Display Name"
+        });
+
+        ResultAssert.Fails(result, IdentityErrorKind.Validation, "validation.failed");
+
+        using var db = _env.NewContext();
+        var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == _env.StaffUserId);
+        Assert.NotNull(user);
+        Assert.Equal("staff@example.com", user.Email);
+        Assert.NotEqual("New Display Name", user.DisplayName);
     }
 
     [Fact]
@@ -433,11 +492,18 @@ public sealed class UserServiceTests : IDisposable
     {
         _env.SignInOwner();
 
-        // Owner already has email owner@example.com
+        // The duplicate-email conflict path for updates no longer exists: every non-null email
+        // is rejected as an immutable-field violation, whatever its value (the owner's address
+        // here would previously have produced a duplicate conflict).
         ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
         {
             Email = "owner@example.com"
-        }), IdentityErrorKind.Conflict, "conflict");
+        }), IdentityErrorKind.Validation, "validation.failed");
+
+        using var db = _env.NewContext();
+        var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == _env.StaffUserId);
+        Assert.NotNull(user);
+        Assert.Equal("staff@example.com", user.Email);
     }
 
     [Fact]
@@ -1005,7 +1071,7 @@ public sealed class UserServiceTests : IDisposable
         cts.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => repo.TryCompleteSuccessfulLoginAsync(_env.StaffUserId, now, cts.Token));
+            () => repo.TryCompleteSuccessfulLoginAsync(_env.StaffUserId, 0, now, cts.Token));
 
         // Cancellation must not leave a partially applied transition: the counter stays at 3.
         using var verify = _env.NewContext();
@@ -1071,7 +1137,8 @@ public sealed class UserServiceTests : IDisposable
             Assert.True(await repo.RegisterFailedLoginAttemptAsync(
                 userId, newerNow, newerNow.AddMinutes(15), 5));
 
-        Assert.False(await repo.TryCompleteSuccessfulLoginAsync(userId, staleNow));
+        // The stale transition is refused: the newer lockout is still active at the stale clock.
+        Assert.Equal(LoginCompletion.Locked, await repo.TryCompleteSuccessfulLoginAsync(userId, 0, staleNow));
 
         using var verify = _env.NewContext();
         var user = await verify.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
@@ -1087,8 +1154,8 @@ public sealed class UserServiceTests : IDisposable
         var repo = new UserRepository(db);
 
         // The seeded inactive user is active=false with no failure state.
-        Assert.False(await repo.TryCompleteSuccessfulLoginAsync(
-            _env.InactiveUserId, _env.Time.GetUtcNow().UtcDateTime));
+        Assert.Equal(LoginCompletion.Inactive, await repo.TryCompleteSuccessfulLoginAsync(
+            _env.InactiveUserId, 0, _env.Time.GetUtcNow().UtcDateTime));
 
         using var verify = _env.NewContext();
         var user = await verify.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == _env.InactiveUserId);

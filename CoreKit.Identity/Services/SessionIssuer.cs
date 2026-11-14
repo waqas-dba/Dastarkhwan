@@ -1,4 +1,5 @@
 ﻿using System.Security.Claims;
+using CoreKit.Identity.Common;
 using CoreKit.Identity.Entities;
 using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Models;
@@ -28,7 +29,20 @@ public sealed class SessionIssuer : ISessionIssuer
         _time = time;
     }
 
-    public async Task<LoginResponse> IssueAsync(User user, CancellationToken ct = default)
+    public Task<IdentityResult<LoginResponse>> IssueForLoginAsync(
+        User user, int expectedSecurityVersion, CancellationToken ct = default)
+        => IssueCoreAsync(user, expectedSecurityVersion, requireUnlocked: true, IdentityErrors.InvalidCredentials, ct);
+
+    public Task<IdentityResult<LoginResponse>> IssueForRefreshAsync(
+        User user, int expectedSecurityVersion, CancellationToken ct = default)
+        => IssueCoreAsync(user, expectedSecurityVersion, requireUnlocked: false, IdentityErrors.InvalidRefreshToken, ct);
+
+    private async Task<IdentityResult<LoginResponse>> IssueCoreAsync(
+        User user,
+        int expectedSecurityVersion,
+        bool requireUnlocked,
+        Common.IdentityError failure,
+        CancellationToken ct)
     {
         var access = await _accessResolver.ResolveAsync(user, ct);
 
@@ -38,23 +52,36 @@ public sealed class SessionIssuer : ISessionIssuer
 
         var accessToken = _tokens.CreateAccessToken(user, access.Roles, access.Permissions, extraClaims);
         var refreshToken = _tokens.CreateRefreshToken();
+        var now = _time.GetUtcNow().UtcDateTime;
 
-        await _refreshTokenRepository.AddAsync(new RefreshToken
-        {
-            Id = Guid.NewGuid(),
-            UserId = user.Id,
-            TokenHash = refreshToken.TokenHash,
-            CreatedAt = _time.GetUtcNow().UtcDateTime,
-            ExpiresAt = refreshToken.ExpiresAt
-        }, ct);
+        // The only refresh-token insertion route: the guarded transactional insert re-checks the
+        // user row under a lock held until commit, so no session can be created from stale
+        // credential state. On refusal no token row exists and no response is produced.
+        var issuance = await _refreshTokenRepository.TryIssueGuardedAsync(
+            user.Id,
+            expectedSecurityVersion,
+            requireUnlocked,
+            now,
+            new RefreshToken
+            {
+                Id = Guid.NewGuid(),
+                UserId = user.Id,
+                TokenHash = refreshToken.TokenHash,
+                CreatedAt = now,
+                ExpiresAt = refreshToken.ExpiresAt
+            },
+            ct);
 
-        return new LoginResponse
+        if (issuance != GuardedIssuanceResult.Issued)
+            return failure;
+
+        return Common.IdentityResult.Success(new LoginResponse
         {
             AccessToken = accessToken.Token,
             AccessTokenExpiresAt = accessToken.ExpiresAt,
             RefreshToken = refreshToken.RawToken,
             RefreshTokenExpiresAt = refreshToken.ExpiresAt,
             User = IdentityMapper.ToDto(user, access.Permissions)
-        };
+        });
     }
 }

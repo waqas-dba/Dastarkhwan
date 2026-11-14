@@ -35,7 +35,8 @@ public sealed class EmailVerificationTokenRepository : IEmailVerificationTokenRe
         await transaction.CommitAsync(ct);
     }
 
-    public async Task<bool> ConfirmEmailAsync(Guid tokenId, Guid userId, DateTime now, CancellationToken ct = default)
+    public async Task<bool> ConfirmEmailAsync(
+        Guid tokenId, Guid userId, string tokenNormalizedEmail, DateTime now, CancellationToken ct = default)
     {
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
 
@@ -45,13 +46,27 @@ public sealed class EmailVerificationTokenRepository : IEmailVerificationTokenRe
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.UsedAt, (DateTime?)now), ct);
 
         if (claimed == 0)
+        {
+            await transaction.RollbackAsync(ct);
             return false;
+        }
 
-        await _db.Users
-            .Where(u => u.Id == userId)
+        // Bind the confirmation to the address the token was issued for, evaluated against the
+        // current row inside the transaction. If the user's normalized email no longer matches
+        // (a stale token for a different address), roll back the token claim as well, so the
+        // link is not consumed by a failed confirmation. EmailConfirmed is only ever set from
+        // false to true: no SecurityVersion change, no session revocation.
+        var confirmed = await _db.Users
+            .Where(u => u.Id == userId && u.NormalizedEmail == tokenNormalizedEmail)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(u => u.EmailConfirmed, true)
                 .SetProperty(u => u.UpdatedAt, (DateTime?)now), ct);
+
+        if (confirmed == 0)
+        {
+            await transaction.RollbackAsync(ct);
+            return false;
+        }
 
         await transaction.CommitAsync(ct);
 

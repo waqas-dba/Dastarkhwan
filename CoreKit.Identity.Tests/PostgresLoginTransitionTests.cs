@@ -192,8 +192,11 @@ public sealed class PostgresLoginTransitionTests
                     Assert.True(await repo.RegisterFailedLoginAttemptAsync(
                         userId, newerNow, newerNow.AddMinutes(15), 5));
 
-                // A successful-login transition holding a stale clock must be refused.
-                Assert.False(await repo.TryCompleteSuccessfulLoginAsync(userId, staleNow));
+                // A successful-login transition holding a stale clock must be refused: the newer
+                // lockout is still active at the stale clock, so the authoritative transition
+                // classifies the refusal as Locked and the newer lockout survives untouched.
+                Assert.Equal(LoginCompletion.Locked,
+                    await repo.TryCompleteSuccessfulLoginAsync(userId, 0, staleNow));
             }
 
             await using var verify = CreateContext(scratch.ConnectionString);

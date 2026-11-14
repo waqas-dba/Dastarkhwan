@@ -14,17 +14,20 @@ internal sealed class GatedUserRepository : IUserRepository
     private readonly Func<Task>? _beforeSuccessTransition;
     private readonly Func<Task>? _beforePasswordRehash;
     private readonly Func<Task>? _beforeCredentialUpdate;
+    private readonly Func<Task>? _beforeDeactivate;
 
     public GatedUserRepository(
         IUserRepository inner,
         Func<Task>? beforeSuccessTransition = null,
         Func<Task>? beforePasswordRehash = null,
-        Func<Task>? beforeCredentialUpdate = null)
+        Func<Task>? beforeCredentialUpdate = null,
+        Func<Task>? beforeDeactivate = null)
     {
         _inner = inner;
         _beforeSuccessTransition = beforeSuccessTransition;
         _beforePasswordRehash = beforePasswordRehash;
         _beforeCredentialUpdate = beforeCredentialUpdate;
+        _beforeDeactivate = beforeDeactivate;
     }
 
     public async Task<LoginCompletion> TryCompleteSuccessfulLoginAsync(
@@ -66,9 +69,13 @@ internal sealed class GatedUserRepository : IUserRepository
             bumpSecurityVersion, revokeSessions, ct);
     }
 
-    public Task<CredentialUpdateResult> TryDeactivateAsync(
+    public async Task<CredentialUpdateResult> TryDeactivateAsync(
         Guid userId, int expectedSecurityVersion, DateTime now, CancellationToken ct = default)
-        => _inner.TryDeactivateAsync(userId, expectedSecurityVersion, now, ct);
+    {
+        if (_beforeDeactivate is not null)
+            await _beforeDeactivate();
+        return await _inner.TryDeactivateAsync(userId, expectedSecurityVersion, now, ct);
+    }
 
     public Task<User?> FindByIdAsync(Guid id, CancellationToken ct = default)
         => _inner.FindByIdAsync(id, ct);

@@ -399,7 +399,7 @@ public sealed class CredentialVersionTests : IDisposable
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var gatedRepo = new GatedUserRepository(
             new UserRepository(_env.NewContext()),
-            beforeCredentialUpdate: async () =>
+            beforeDeactivate: async () =>
             {
                 gate.SetResult();
                 await release.Task;
@@ -801,6 +801,13 @@ public sealed class CredentialVersionTests : IDisposable
         // must be rolled back so the link is not consumed by the failed confirmation.
         using var seed = _env.NewContext();
         var rawToken = "raw-verify-token";
+
+        // The seeded staff account is already confirmed; start from unconfirmed so the test
+        // actually proves that a mismatching token does not confirm it.
+        await seed.Users
+            .Where(u => u.Id == _env.StaffUserId)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.EmailConfirmed, false));
+
         seed.EmailVerificationTokens.Add(new EmailVerificationToken
         {
             Id = Guid.NewGuid(),
@@ -829,6 +836,12 @@ public sealed class CredentialVersionTests : IDisposable
     {
         using var seed = _env.NewContext();
         var rawToken = "raw-verify-token";
+
+        // Start unconfirmed so the confirmation itself is what flips the flag.
+        await seed.Users
+            .Where(u => u.Id == _env.StaffUserId)
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.EmailConfirmed, false));
+
         seed.EmailVerificationTokens.Add(new EmailVerificationToken
         {
             Id = Guid.NewGuid(),

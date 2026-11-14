@@ -16,16 +16,12 @@ namespace CoreKit.Tenant.Resolution;
 public sealed class TenantResolutionMiddleware
 {
     private readonly RequestDelegate _next;
-    private readonly ITenantMembershipReader _membershipReader;
 
-    public TenantResolutionMiddleware(RequestDelegate next, ITenantMembershipReader membershipReader)
-    {
-        _next = next;
-        _membershipReader = membershipReader;
-    }
+    public TenantResolutionMiddleware(RequestDelegate next) => _next = next;
 
     public async Task InvokeAsync(
         HttpContext context,
+        ITenantMembershipReader membershipReader,
         IEnumerable<ITenantResolutionStrategy> strategies,
         ITenantInfoProvider provider,
         ITenantContextSetter setter)
@@ -93,7 +89,7 @@ public sealed class TenantResolutionMiddleware
                 await WriteErrorAsync(context, TenantErrors.Forbidden("Invalid user identity."));
                 return;
             }
-            var member = await _membershipReader.FindAsync(tenant.Id, userId.Value, ct);
+            var member = await membershipReader.FindAsync(tenant.Id, userId.Value, ct);
             if (member is null)
             {
                 await WriteErrorAsync(context, TenantErrors.Forbidden("You are not a member of this tenant."));

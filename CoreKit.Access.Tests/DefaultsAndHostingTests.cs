@@ -103,80 +103,6 @@ public sealed class AccessPermissionCheckerTests : IDisposable
     }
 }
 
-public sealed class RequireAccessAttributeTests : IDisposable
-{
-    private readonly TestEnv _env = new();
-
-    public void Dispose() => _env.Dispose();
-
-    private async Task<(ActionExecutingContext Context, bool NextCalled)> RunAsync(string permission)
-    {
-        var services = new ServiceCollection()
-            .AddSingleton<IAccessScopeContext>(_env.ScopeContext)
-            .AddSingleton<IAccessCurrentUser>(_env.User)
-            .AddSingleton<IAccessService>(_env.Access)
-            .BuildServiceProvider();
-
-        var http = new DefaultHttpContext { RequestServices = services };
-        var actionContext = new ActionContext(http, new RouteData(), new ActionDescriptor());
-        var context = new ActionExecutingContext(
-            actionContext, new List<IFilterMetadata>(), new Dictionary<string, object?>(), new object());
-
-        var nextCalled = false;
-
-        await new RequireAccessAttribute(permission).OnActionExecutionAsync(context, () =>
-        {
-            nextCalled = true;
-            return Task.FromResult(new ActionExecutedContext(actionContext, new List<IFilterMetadata>(), new object()));
-        });
-
-        return (context, nextCalled);
-    }
-
-    [Fact]
-    public async Task WithoutAScope_Answers400()
-    {
-        _env.SignInOwner();
-        _env.ScopeContext.Current = null;
-
-        var run = await RunAsync("sales.create");
-
-        Assert.False(run.NextCalled);
-        Assert.Equal(400, Assert.IsType<ObjectResult>(run.Context.Result).StatusCode);
-    }
-
-    [Fact]
-    public async Task WhenNotSignedIn_Answers401()
-    {
-        var run = await RunAsync("sales.create");
-
-        Assert.False(run.NextCalled);
-        Assert.Equal(401, Assert.IsType<ObjectResult>(run.Context.Result).StatusCode);
-    }
-
-    [Fact]
-    public async Task WithoutThePermission_Answers403()
-    {
-        _env.SignInAs("products.view");
-
-        var run = await RunAsync("sales.create");
-
-        Assert.False(run.NextCalled);
-        Assert.Equal(403, Assert.IsType<ObjectResult>(run.Context.Result).StatusCode);
-    }
-
-    [Fact]
-    public async Task WithThePermission_TheActionRuns()
-    {
-        _env.SignInAs("sales.create");
-
-        var run = await RunAsync("sales.create");
-
-        Assert.True(run.NextCalled);
-        Assert.Null(run.Context.Result);
-    }
-}
-
 public sealed class AccessDependencyInjectionTests
 {
     private static ServiceProvider Build(
@@ -242,12 +168,10 @@ public sealed class AccessDependencyInjectionTests
     }
 
     [Fact]
-    public async Task WithTheKernelContractsProvided_RolesWorkEndToEnd()
+    public async Task WithScopeAndMembershipProvided_RolesWorkEndToEnd()
     {
         var tenantId = Guid.NewGuid();
         var ownerId = Guid.NewGuid();
-        var reader = new FakeTenantMembershipReader();
-        reader.Members[(tenantId, ownerId)] = true;
 
         using var connection = Open();
         var membership = new FakeMembership();

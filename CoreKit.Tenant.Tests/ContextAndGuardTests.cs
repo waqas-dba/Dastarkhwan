@@ -93,30 +93,30 @@ public sealed class TenantPlatformAccessTests
     private readonly FakeTenantActor _actor = new();
 
     [Fact]
-    public void NotGrantedByDefault()
-        => Assert.False(new TenantPlatformAccess(_actor).IsGranted);
+    public async Task NotGrantedByDefault()
+        => Assert.False(await new TenantPlatformAccess(_actor).IsGrantedAsync());
 
     [Fact]
-    public void PlatformAdminsAreGranted()
+    public async Task PlatformAdminsAreGranted()
     {
         _actor.IsPlatformAdmin = true;
 
-        Assert.True(new TenantPlatformAccess(_actor).IsGranted);
+        Assert.True(await new TenantPlatformAccess(_actor).IsGrantedAsync());
     }
 
     [Fact]
-    public void Grant_IsTemporary()
+    public async Task Grant_IsTemporary()
     {
         var access = new TenantPlatformAccess(_actor);
 
         using (access.Grant())
-            Assert.True(access.IsGranted);
+            Assert.True(await access.IsGrantedAsync());
 
-        Assert.False(access.IsGranted);
+        Assert.False(await access.IsGrantedAsync());
     }
 
     [Fact]
-    public void Grant_NestsAndSurvivesDoubleDispose()
+    public async Task Grant_NestsAndSurvivesDoubleDispose()
     {
         var access = new TenantPlatformAccess(_actor);
         var outer = access.Grant();
@@ -124,10 +124,10 @@ public sealed class TenantPlatformAccessTests
 
         inner.Dispose();
         inner.Dispose();
-        Assert.True(access.IsGranted);
+        Assert.True(await access.IsGrantedAsync());
 
         outer.Dispose();
-        Assert.False(access.IsGranted);
+        Assert.False(await access.IsGrantedAsync());
     }
 }
 
@@ -145,75 +145,75 @@ public sealed class TenantAccessGuardTests
     }
 
     [Fact]
-    public void Platform_UnresolvedAdmin_MayDoPlatformWorkAndTouchAnyTenant()
+    public async Task Platform_UnresolvedAdmin_MayDoPlatformWorkAndTouchAnyTenant()
     {
         _actor.IsPlatformAdmin = true;
 
-        Assert.Null(_guard.EnsurePlatformScope());
-        Assert.Null(_guard.EnsureCanAccess(Guid.NewGuid()));
+        Assert.Null(await _guard.EnsurePlatformScopeAsync());
+        Assert.Null(await _guard.EnsureCanAccessAsync(Guid.NewGuid()));
     }
 
     [Fact]
-    public void Unresolved_WithoutPlatformAccess_IsRefusedEverywhere()
+    public async Task Unresolved_WithoutPlatformAccess_IsRefusedEverywhere()
     {
-        Assert.Equal(TenantErrors.PlatformOnly, _guard.EnsurePlatformScope());
-        Assert.Equal(TenantErrors.PlatformOnly, _guard.EnsureCanAccess(Guid.NewGuid()));
+        Assert.Equal(TenantErrors.PlatformOnly, await _guard.EnsurePlatformScopeAsync());
+        Assert.Equal(TenantErrors.PlatformOnly, await _guard.EnsureCanAccessAsync(Guid.NewGuid()));
     }
 
     [Fact]
-    public void Bound_MayTouchOnlyItsOwnTenant()
+    public async Task Bound_MayTouchOnlyItsOwnTenant()
     {
         var own = Guid.NewGuid();
         _current.Set(own);
 
-        Assert.Null(_guard.EnsureCanAccess(own));
-        Assert.Equal(TenantErrors.CrossTenantAccess, _guard.EnsureCanAccess(Guid.NewGuid()));
+        Assert.Null(await _guard.EnsureCanAccessAsync(own));
+        Assert.Equal(TenantErrors.CrossTenantAccess, await _guard.EnsureCanAccessAsync(Guid.NewGuid()));
     }
 
     [Fact]
-    public void PlatformAdmin_BoundToTenant_CanStillDoPlatformWork()
+    public async Task PlatformAdmin_BoundToTenant_CanStillDoPlatformWork()
     {
         _actor.IsPlatformAdmin = true;
         _current.Set(Guid.NewGuid());
 
-        Assert.Null(_guard.EnsurePlatformScope());
-        Assert.Equal(TenantErrors.CrossTenantAccess, _guard.EnsureCanAccess(Guid.NewGuid()));
+        Assert.Null(await _guard.EnsurePlatformScopeAsync());
+        Assert.Equal(TenantErrors.CrossTenantAccess, await _guard.EnsureCanAccessAsync(Guid.NewGuid()));
     }
 
     [Fact]
-    public void GrantedTrustedCode_ActsAsPlatform()
+    public async Task GrantedTrustedCode_ActsAsPlatform()
     {
         using (_platform.Grant())
         {
-            Assert.Null(_guard.EnsurePlatformScope());
-            Assert.Null(_guard.EnsureCanAccess(Guid.NewGuid()));
+            Assert.Null(await _guard.EnsurePlatformScopeAsync());
+            Assert.Null(await _guard.EnsureCanAccessAsync(Guid.NewGuid()));
         }
     }
 
     [Fact]
-    public void SelfOrPlatform_AllowsTheUserThemselves()
+    public async Task SelfOrPlatform_AllowsTheUserThemselves()
     {
         var userId = Guid.NewGuid();
         _actor.UserId = userId;
 
-        Assert.Null(_guard.EnsureSelfOrPlatform(userId));
-        Assert.Equal(TenantErrors.CrossTenantAccess, _guard.EnsureSelfOrPlatform(Guid.NewGuid()));
+        Assert.Null(await _guard.EnsureSelfOrPlatformAsync(userId));
+        Assert.Equal(TenantErrors.CrossTenantAccess, await _guard.EnsureSelfOrPlatformAsync(Guid.NewGuid()));
     }
 
     [Fact]
-    public void SelfOrPlatform_AllowsPlatformAdmins()
+    public async Task SelfOrPlatform_AllowsPlatformAdmins()
     {
         _actor.IsPlatformAdmin = true;
 
-        Assert.Null(_guard.EnsureSelfOrPlatform(Guid.NewGuid()));
+        Assert.Null(await _guard.EnsureSelfOrPlatformAsync(Guid.NewGuid()));
     }
 
     [Fact]
-    public void SelfOrPlatform_RefusesAnonymousCallers()
-        => Assert.NotNull(_guard.EnsureSelfOrPlatform(Guid.NewGuid()));
+    public async Task SelfOrPlatform_RefusesAnonymousCallers()
+        => Assert.NotNull(await _guard.EnsureSelfOrPlatformAsync(Guid.NewGuid()));
 
     [Fact]
-    public void Exposes_TheCurrentTenant()
+    public async Task Exposes_TheCurrentTenant()
     {
         Assert.False(_guard.IsTenantBound);
         Assert.Null(_guard.CurrentTenantId);
@@ -226,56 +226,56 @@ public sealed class TenantAccessGuardTests
     }
 
     [Fact]
-    public void PlatformAdmin_WithTenantResolved_CanDoPlatformWork()
+    public async Task PlatformAdmin_WithTenantResolved_CanDoPlatformWork()
     {
         _actor.IsPlatformAdmin = true;
         _current.Set(Guid.NewGuid());
 
-        Assert.Null(_guard.EnsurePlatformScope());
+        Assert.Null(await _guard.EnsurePlatformScopeAsync());
     }
 
     [Fact]
-    public void PlatformAdmin_WithSuspendedTenant_CanDoPlatformWork()
+    public async Task PlatformAdmin_WithSuspendedTenant_CanDoPlatformWork()
     {
         _actor.IsPlatformAdmin = true;
         var tenantId = Guid.NewGuid();
         _current.Set(tenantId);
 
-        Assert.Null(_guard.EnsurePlatformScope());
+        Assert.Null(await _guard.EnsurePlatformScopeAsync());
     }
 
     [Fact]
-    public void PlatformAdmin_WithTenantResolved_CanAccessOwnTenant()
+    public async Task PlatformAdmin_WithTenantResolved_CanAccessOwnTenant()
     {
         _actor.IsPlatformAdmin = true;
         var tenantId = Guid.NewGuid();
         _current.Set(tenantId);
 
-        Assert.Null(_guard.EnsureCanAccess(tenantId));
+        Assert.Null(await _guard.EnsureCanAccessAsync(tenantId));
     }
 
     [Fact]
-    public void PlatformAdmin_WithTenantResolved_CannotAccessOtherTenant()
+    public async Task PlatformAdmin_WithTenantResolved_CannotAccessOtherTenant()
     {
         _actor.IsPlatformAdmin = true;
         var ownTenant = Guid.NewGuid();
         var otherTenant = Guid.NewGuid();
         _current.Set(ownTenant);
 
-        Assert.Equal(TenantErrors.CrossTenantAccess, _guard.EnsureCanAccess(otherTenant));
+        Assert.Equal(TenantErrors.CrossTenantAccess, await _guard.EnsureCanAccessAsync(otherTenant));
     }
 
     [Fact]
-    public void NonAdmin_WithoutTenant_CannotDoPlatformWork()
+    public async Task NonAdmin_WithoutTenant_CannotDoPlatformWork()
     {
-        Assert.Equal(TenantErrors.PlatformOnly, _guard.EnsurePlatformScope());
+        Assert.Equal(TenantErrors.PlatformOnly, await _guard.EnsurePlatformScopeAsync());
     }
 
     [Fact]
-    public void PlatformAdmin_WithoutTenant_CanDoPlatformWork()
+    public async Task PlatformAdmin_WithoutTenant_CanDoPlatformWork()
     {
         _actor.IsPlatformAdmin = true;
 
-        Assert.Null(_guard.EnsurePlatformScope());
+        Assert.Null(await _guard.EnsurePlatformScopeAsync());
     }
 }

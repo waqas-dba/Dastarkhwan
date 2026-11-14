@@ -20,7 +20,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CoreKit.SharedKernel\CoreKit.SharedKernel.csproj" />
     <ProjectReference Include="..\CoreKit.Access\CoreKit.Access.csproj" />
   </ItemGroup>
 

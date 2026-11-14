@@ -1,4 +1,4 @@
-﻿using CoreKit.SharedKernel.Abstractions;
+﻿using CoreKit.Access.Abstractions;
 using System.Security.Claims;
 using System.Collections.Generic;
 using System.Threading;

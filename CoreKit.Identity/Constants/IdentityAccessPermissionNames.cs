@@ -1,3 +1,5 @@
+using CoreKit.Access.Catalog;
+
 namespace CoreKit.Identity.Constants;
 
 /// <summary>
@@ -13,11 +15,11 @@ public static class IdentityAccessPermissionNames
     public const string UsersUpdate = "identity.users.update";
     public const string UsersDelete = "identity.users.delete";
 
-    public static IReadOnlyList<(string Name, string Description)> All { get; } = new List<(string, string)>
+    public static IReadOnlyList<AccessPermissionDefinition> All { get; } = new List<AccessPermissionDefinition>
     {
-        (UsersRead, "View users"),
-        (UsersCreate, "Create users"),
-        (UsersUpdate, "Edit users"),
-        (UsersDelete, "Delete users")
+        new(UsersRead, "View users"),
+        new(UsersCreate, "Create users"),
+        new(UsersUpdate, "Edit users"),
+        new(UsersDelete, "Delete users")
     };
 }

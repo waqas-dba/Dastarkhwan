@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Routing;
+﻿using CoreKit.Access.Common;
+using Microsoft.AspNetCore.Routing;
 
 namespace CoreKit.Identity.Endpoints;
 
@@ -10,7 +11,7 @@ public static class IdentityEndpointExtensions
     /// </summary>
     public static IEndpointRouteBuilder MapIdentity(this IEndpointRouteBuilder app, string prefix = "/Identity")
     {
-        prefix = NormalizePrefix(prefix);
+        prefix = EndpointRoutes.NormalizePrefix(prefix);
 
         var Identity = app.MapGroup(prefix).WithTags("Identity");
 
@@ -20,13 +21,6 @@ public static class IdentityEndpointExtensions
         return app;
     }
 
-    /// <summary>"Identity", "/Identity/" and "/Identity" all become "/Identity". An empty prefix stays empty.</summary>
-    private static string NormalizePrefix(string? prefix)
-    {
-        var trimmed = (prefix ?? string.Empty).Trim().TrimEnd('/');
-
-        return trimmed.Length == 0 || trimmed.StartsWith('/') ? trimmed : "/" + trimmed;
-    }
     private static void MapAuth(RouteGroupBuilder auth)
     {
         auth.MapGet("/me", async (IAuthService s, CancellationToken ct) =>

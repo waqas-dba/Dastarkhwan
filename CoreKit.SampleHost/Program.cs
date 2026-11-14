@@ -9,7 +9,7 @@ using CoreKit.Identity.Extensions;
 using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Persistence;
 using CoreKit.Identity.Seeding;
-using CoreKit.SharedKernel;
+using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Endpoints;
 using CoreKit.Tenant.Extensions;
 using CoreKit.Tenant.Integration;

@@ -1,5 +1,5 @@
+using CoreKit.Access.Abstractions;
 using CoreKit.Identity.Repositories;
-using CoreKit.SharedKernel.Abstractions;
 
 namespace CoreKit.Identity.Tests;
 

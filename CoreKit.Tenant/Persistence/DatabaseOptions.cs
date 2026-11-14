@@ -1,7 +1,7 @@
-namespace CoreKit.SharedKernel;
+namespace CoreKit.Tenant.Persistence;
 
 /// <summary>
-/// Connection and command settings shared by every module's DbContext.
+/// Connection and command settings for the Tenant DbContext.
 /// Bound from the "Database" configuration section. All values are optional;
 /// unset values leave Npgsql/EF Core defaults in place.
 /// </summary>

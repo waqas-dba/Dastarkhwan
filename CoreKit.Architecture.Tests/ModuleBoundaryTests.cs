@@ -8,9 +8,9 @@ using Xunit;
 namespace CoreKit.Architecture.Tests;
 
 /// <summary>
-/// Keeps the modules independent. A module may reference the shared kernel, but another module
-/// only where this list says so. Every row you delete from the exceptions makes the design stricter,
-/// and a new, unlisted reference fails the build. The compiled-assembly allowlist is shared with
+/// Keeps the modules independent. A module may reference another module only where the allowlist
+/// says so. Every row you delete from the exceptions makes the design stricter, and a new,
+/// unlisted reference fails the build. The compiled-assembly allowlist is shared with
 /// ProjectReferenceBoundaryTests via ModuleBoundaryMatrix.
 /// </summary>
 public sealed class ModuleBoundaryTests
@@ -51,31 +51,6 @@ public sealed class ModuleBoundaryTests
         Assert.True(
             illegal.Count == 0,
             $"{module} must not reference: {string.Join(", ", illegal)}. " +
-            "Use a contract from CoreKit.SharedKernel instead of another module.");
-    }
-
-    [Fact]
-    public void The_shared_kernel_has_no_third_party_dependencies()
-    {
-        var thirdParty = Load("CoreKit.SharedKernel").GetReferencedAssemblies()
-            .Select(a => a.Name!)
-            .Where(n => n.StartsWith("Microsoft.EntityFrameworkCore", StringComparison.Ordinal) ||
-                        n.StartsWith("Microsoft.AspNetCore", StringComparison.Ordinal) ||
-                        n.StartsWith("Npgsql", StringComparison.Ordinal))
-            .ToList();
-
-        Assert.True(
-            thirdParty.Count == 0,
-            $"The shared kernel must stay free of frameworks. Found: {string.Join(", ", thirdParty)}.");
-    }
-
-    [Fact]
-    public void The_shared_kernel_contains_only_contracts_and_events()
-    {
-        var types = Load("CoreKit.SharedKernel").GetExportedTypes();
-
-        // No entities and no DbContexts: those belong to a module.
-        Assert.DoesNotContain(types, t => t.Name.EndsWith("DbContext", StringComparison.Ordinal));
-        Assert.DoesNotContain(types, t => t.Name.EndsWith("Entity", StringComparison.Ordinal));
+            "Keep a module's contracts inside the module that owns them.");
     }
 }

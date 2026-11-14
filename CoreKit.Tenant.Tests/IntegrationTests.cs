@@ -105,16 +105,16 @@ public sealed class TenantClaimsContributorTests : IDisposable
 public sealed class TenantActorTests
 {
     [Fact]
-    public void WithoutACurrentUser_ThereIsNoUserAndNoPlatformAccess()
+    public async Task WithoutACurrentUser_ThereIsNoUserAndNoPlatformAccess()
     {
         var actor = new TenantActor();
 
         Assert.Null(actor.UserId);
-        Assert.False(actor.IsPlatformAdmin);
+        Assert.False(await actor.IsPlatformAdminAsync());
     }
 
     [Fact]
-    public void TakesTheUserFromTheSharedKernel()
+    public void TakesTheUserFromTheCurrentUser()
     {
         var id = Guid.NewGuid();
 
@@ -122,16 +122,21 @@ public sealed class TenantActorTests
     }
 
     [Fact]
-    public void OnlyThePlatformPermissionMakesAPlatformAdmin()
+    public async Task OnlyThePlatformPermissionMakesAPlatformAdmin()
     {
-        var withPermission = new FakeCurrentUserService { Permissions = new[] { TenantPermissionNames.Platform } };
-        var withOthers = new FakeCurrentUserService
-        {
-            Permissions = new[] { TenantPermissionNames.Update, TenantPermissionNames.Read }
-        };
+        var withPermission = new FakePermissionChecker(TenantPermissionNames.Platform);
+        var withOthers = new FakePermissionChecker(TenantPermissionNames.Update, TenantPermissionNames.Read);
 
-        Assert.True(new TenantActor(withPermission).IsPlatformAdmin);
-        Assert.False(new TenantActor(withOthers).IsPlatformAdmin);
+        Assert.True(await new TenantActor(permissions: withPermission).IsPlatformAdminAsync());
+        Assert.False(await new TenantActor(permissions: withOthers).IsPlatformAdminAsync());
+    }
+
+    [Fact]
+    public async Task WithoutAPermissionChecker_NobodyIsAPlatformAdmin()
+    {
+        var actor = new TenantActor(new FakeCurrentUserService { UserId = Guid.NewGuid() });
+
+        Assert.False(await actor.IsPlatformAdminAsync());
     }
 }
 
@@ -252,6 +257,28 @@ public sealed class TenantDependencyInjectionTests
     }
 
     [Fact]
+    public async Task ThePlatformFlagIsAnsweredByAccess_ThroughTheContainer()
+    {
+        using var connection = new SqliteConnection("DataSource=:memory:;Foreign Keys=True");
+        connection.Open();
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddTenant(new ConfigurationBuilder().Build(), db => db.UseSqlite(connection));
+        services.AddScoped<CoreKit.Access.Abstractions.IPermissionChecker>(
+            _ => new FakePermissionChecker(TenantPermissionNames.Platform));
+        using var provider = services.BuildServiceProvider(validateScopes: true);
+        using var scope = provider.CreateScope();
+        var sp = scope.ServiceProvider;
+
+        var actor = sp.GetRequiredService<ITenantActor>();
+
+        Assert.True(await actor.IsPlatformAdminAsync());
+        Assert.True(await sp.GetRequiredService<ITenantPlatformAccess>().IsGrantedAsync());
+        Assert.Null(await sp.GetRequiredService<TenantAccessGuard>().EnsurePlatformScopeAsync());
+    }
+
+    [Fact]
     public void CurrentTenant_IsOneObjectPerScope_AndNotSharedBetweenScopes()
     {
         using var connection = new SqliteConnection("DataSource=:memory:");
@@ -280,7 +307,7 @@ public sealed class TenantDependencyInjectionTests
         using var scope = provider.CreateScope();
 
         var strategies = scope.ServiceProvider.GetServices<ITenantResolutionStrategy>().ToList();
-        var contributors = scope.ServiceProvider.GetServices<CoreKit.SharedKernel.Abstractions.IAccessTokenClaimsContributor>().ToList();
+        var contributors = scope.ServiceProvider.GetServices<CoreKit.Access.Abstractions.IAccessTokenClaimsContributor>().ToList();
 
         Assert.Equal(2, strategies.Count);
         Assert.Contains(contributors, c => c is TenantClaimsContributor);

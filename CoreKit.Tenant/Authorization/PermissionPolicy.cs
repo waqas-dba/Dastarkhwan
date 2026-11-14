@@ -1,7 +1,7 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
 
-namespace CoreKit.SharedKernel;
+namespace CoreKit.Tenant.Authorization;
 
 /// <summary>
 /// The policy-name contract shared by every module that protects an endpoint with a permission.

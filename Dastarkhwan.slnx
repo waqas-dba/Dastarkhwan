@@ -17,7 +17,6 @@
     <Project Path="CoreKit.Identity/CoreKit.Identity.csproj" />
     <Project Path="CoreKit.Identity.Tests/CoreKit.Identity.Tests.csproj" />
     <Project Path="CoreKit.SampleHost/CoreKit.SampleHost.csproj" />
-    <Project Path="CoreKit.SharedKernel/CoreKit.SharedKernel.csproj" Id="bdbaeb26-28be-405d-90d4-723fa4a5c5bb" />
     <Project Path="CoreKit.Tenant.Tests/CoreKit.Tenant.Tests.csproj" />
     <Project Path="CoreKit.Tenant/CoreKit.Tenant.csproj" Id="e0d47be8-fd8d-4032-98ab-e5e8ba6480a3" />
   </Folder>

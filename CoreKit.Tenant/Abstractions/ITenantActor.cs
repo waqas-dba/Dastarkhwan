@@ -5,8 +5,11 @@ public interface ITenantActor
 {
     Guid? UserId { get; }
 
-    /// <summary>True when the caller may act across all tenants.</summary>
-    bool IsPlatformAdmin { get; }
+    /// <summary>
+    /// True when the caller may act across all tenants. Answered by Access (the authority for
+    /// permissions), never from token claims, because tokens do not carry permission claims.
+    /// </summary>
+    Task<bool> IsPlatformAdminAsync(CancellationToken ct = default);
 }
 
 /// <summary>
@@ -16,7 +19,7 @@ public interface ITenantActor
 /// </summary>
 public interface ITenantPlatformAccess
 {
-    bool IsGranted { get; }
+    Task<bool> IsGrantedAsync(CancellationToken ct = default);
 
     IDisposable Grant();
 }

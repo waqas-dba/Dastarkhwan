@@ -38,7 +38,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
 
     public async Task<TenantResult<IReadOnlyList<TenantSettingDto>>> ListAsync(Guid tenantId, CancellationToken ct = default)
     {
-        if (_guard.EnsureCanAccess(tenantId) is { } denied)
+        if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
 
         if (await _tenants.FindByIdAsync(tenantId, ct) is null)
@@ -52,7 +52,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
 
     public async Task<TenantResult<TenantSettingDto>> GetAsync(Guid tenantId, string key, CancellationToken ct = default)
     {
-        if (_guard.EnsureCanAccess(tenantId) is { } denied)
+        if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
 
         var keyError = ValidateKey(key, out var normalizedKey);
@@ -84,7 +84,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
     public async Task<TenantResult<IReadOnlyList<TenantSettingDto>>> SetManyAsync(
         Guid tenantId, SetTenantSettingsRequest request, CancellationToken ct = default)
     {
-        if (_guard.EnsureCanAccess(tenantId) is { } denied)
+        if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
 
         if (request.Values is null || request.Values.Count == 0)
@@ -157,7 +157,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
 
     public async Task<TenantResult> RemoveAsync(Guid tenantId, string key, CancellationToken ct = default)
     {
-        if (_guard.EnsureCanAccess(tenantId) is { } denied)
+        if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
 
         var keyError = ValidateKey(key, out var normalizedKey);

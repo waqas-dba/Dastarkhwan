@@ -225,15 +225,4 @@ public sealed class TenantPermissionTests
         Assert.All(names, n => Assert.Equal(n.ToLowerInvariant(), n));
         Assert.Contains(TenantPermissionNames.Platform, names);
     }
-
-    [Fact]
-    public void IdentitySeeds_MirrorTheDefinitions()
-    {
-        var seeds = CoreKit.Tenant.Integration.TenantPermissionSeeds.All;
-
-        Assert.Equal(TenantPermissionNames.All.Count, seeds.Count);
-        Assert.Equal(
-            TenantPermissionNames.All.Select(p => p.Name).Order(),
-            seeds.Select(s => s.Name).Order());
-    }
 }

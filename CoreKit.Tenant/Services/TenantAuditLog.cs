@@ -14,7 +14,7 @@ public sealed class TenantAuditLog : ITenantAuditLog
     public async Task<TenantResult<TenantPagedResult<TenantAuditEntryDto>>> ListAsync(
         Guid tenantId, TenantAuditQuery query, CancellationToken ct = default)
     {
-        if (_guard.EnsureCanAccess(tenantId) is { } denied)
+        if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
 
         var page = Math.Max(query.Page, 1);

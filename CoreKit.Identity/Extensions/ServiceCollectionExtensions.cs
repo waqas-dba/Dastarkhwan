@@ -1,6 +1,5 @@
 ﻿using CoreKit.Access.Extensions;
 using CoreKit.Identity.Repositories;
-using CoreKit.SharedKernel;
 
 namespace CoreKit.Identity.Extensions;
 
@@ -104,7 +103,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISessionIssuer, SessionIssuer>();
         services.AddSingleton<ITokenService, TokenService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
-        services.AddScoped<CoreKit.SharedKernel.ICurrentUser>(sp => sp.GetRequiredService<ICurrentUserService>());   // new: the kernel's view of the same user
+        services.AddScoped<CoreKit.Access.Abstractions.ICurrentUser>(sp => sp.GetRequiredService<ICurrentUserService>());
+        // Identity's current-user is the host's current-user for Access too, so there is one implementation.
+        services.TryAddScoped<CoreKit.Access.Abstractions.IAccessCurrentUser>(sp => sp.GetRequiredService<ICurrentUserService>());
 
         // Business services.
         services.AddScoped<IAuthService, AuthService>();

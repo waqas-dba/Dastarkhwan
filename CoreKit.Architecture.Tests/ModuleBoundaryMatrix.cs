@@ -23,10 +23,9 @@ internal static class ModuleBoundaryMatrix
     public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> CompiledAssemblyAllowlist =
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
         {
-            ["CoreKit.SharedKernel"] = Array.Empty<string>(),
-            ["CoreKit.Identity"] = new[] { "CoreKit.SharedKernel", "CoreKit.Access" },
+            ["CoreKit.Identity"] = new[] { "CoreKit.Access" },
             ["CoreKit.Access"] = Array.Empty<string>(),
-            ["CoreKit.Tenant"] = new[] { "CoreKit.Access", "CoreKit.SharedKernel" },
+            ["CoreKit.Tenant"] = new[] { "CoreKit.Access" },
         };
 
     /// <summary>
@@ -39,15 +38,12 @@ internal static class ModuleBoundaryMatrix
             ["CoreKit.Access/CoreKit.Access.csproj"] = Array.Empty<string>(),
             ["CoreKit.Identity/CoreKit.Identity.csproj"] = new[]
             {
-                "CoreKit.SharedKernel/CoreKit.SharedKernel.csproj",
                 "CoreKit.Access/CoreKit.Access.csproj",
             },
             ["CoreKit.Tenant/CoreKit.Tenant.csproj"] = new[]
             {
                 "CoreKit.Access/CoreKit.Access.csproj",
-                "CoreKit.SharedKernel/CoreKit.SharedKernel.csproj",
             },
-            ["CoreKit.SharedKernel/CoreKit.SharedKernel.csproj"] = Array.Empty<string>(),
             ["CoreKit.SampleHost/CoreKit.SampleHost.csproj"] = new[]
             {
                 "CoreKit.Access/CoreKit.Access.csproj",
@@ -68,7 +64,7 @@ internal static class ModuleBoundaryMatrix
 
     /// <summary>All production module names (evaluated assembly names).</summary>
     public static readonly IReadOnlyList<string> ProductionModules =
-        new[] { "CoreKit.SharedKernel", "CoreKit.Identity", "CoreKit.Access", "CoreKit.Tenant" };
+        new[] { "CoreKit.Identity", "CoreKit.Access", "CoreKit.Tenant" };
 
     /// <summary>All production module project paths, solution-relative forward-slash.</summary>
     /// <remarks>Sourced from SolutionInventory (canonical classification) to prevent drift.</remarks>

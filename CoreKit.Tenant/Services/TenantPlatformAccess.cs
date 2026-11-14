@@ -7,7 +7,8 @@ public sealed class TenantPlatformAccess : ITenantPlatformAccess
 
     public TenantPlatformAccess(ITenantActor actor) => _actor = actor;
 
-    public bool IsGranted => _grants > 0 || _actor.IsPlatformAdmin;
+    public Task<bool> IsGrantedAsync(CancellationToken ct = default)
+        => _grants > 0 ? Task.FromResult(true) : _actor.IsPlatformAdminAsync(ct);
 
     public IDisposable Grant()
     {

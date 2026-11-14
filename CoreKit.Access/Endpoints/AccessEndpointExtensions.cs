@@ -10,7 +10,7 @@ public static class AccessEndpointExtensions
     /// </summary>
     public static IEndpointRouteBuilder MapAccess(this IEndpointRouteBuilder app, string prefix = "/access")
     {
-        var basePath = NormalizePrefix(prefix);
+        var basePath = EndpointRoutes.NormalizePrefix(prefix);
         var access = app.MapGroup(basePath).WithTags("Access").RequireAuthorization();
 
         // What the signed-in user may do right now in this scope.
@@ -57,12 +57,5 @@ public static class AccessEndpointExtensions
             (await s.ListAsync(page ?? 1, pageSize ?? 50, ct)).ToHttpResult());
 
         return app;
-    }
-
-    private static string NormalizePrefix(string? prefix)
-    {
-        var trimmed = (prefix ?? string.Empty).Trim().TrimEnd('/');
-
-        return trimmed.Length == 0 || trimmed.StartsWith('/') ? trimmed : "/" + trimmed;
     }
 }

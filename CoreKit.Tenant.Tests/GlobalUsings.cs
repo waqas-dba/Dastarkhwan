@@ -1,9 +1,10 @@
 ﻿global using System.Security.Claims;
-global using CoreKit.SharedKernel;
 global using CoreKit.Tenant.Abstractions;
+global using CoreKit.Tenant.Authorization;
 global using CoreKit.Tenant.Common;
 global using CoreKit.Tenant.Constants;
 global using CoreKit.Tenant.Entities;
+global using CoreKit.Tenant.Events;
 global using CoreKit.Tenant.Isolation;
 global using CoreKit.Tenant.Models;
 global using CoreKit.Tenant.Persistence;

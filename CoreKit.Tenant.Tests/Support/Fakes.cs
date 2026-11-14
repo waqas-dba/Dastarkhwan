@@ -16,6 +16,25 @@ public sealed class FakeTenantActor : ITenantActor
     public Guid? UserId { get; set; }
 
     public bool IsPlatformAdmin { get; set; }
+
+    public Task<bool> IsPlatformAdminAsync(CancellationToken ct = default) => Task.FromResult(IsPlatformAdmin);
+}
+
+public sealed class FakePermissionChecker : CoreKit.Access.Abstractions.IPermissionChecker
+{
+    private readonly ISet<string> _permissions = new HashSet<string>(StringComparer.Ordinal);
+
+    public FakePermissionChecker(params string[] permissions)
+    {
+        foreach (var permission in permissions)
+            _permissions.Add(permission);
+    }
+
+    public Task<bool> HasPermissionAsync(string permission, CancellationToken ct = default)
+        => Task.FromResult(_permissions.Contains(permission));
+
+    public Task<bool> HasPlatformPermissionAsync(string permission, CancellationToken ct = default)
+        => Task.FromResult(_permissions.Contains(permission));
 }
 
 /// <summary>Stands in for the host-provided current user from the shared kernel.</summary>

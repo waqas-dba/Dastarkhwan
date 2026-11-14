@@ -23,19 +23,19 @@ public sealed class TenantAccessGuard
     public Guid? CurrentTenantId => _currentTenant.Id;
 
     /// <summary>For work that spans tenants: listing, creating, changing status, deleting.</summary>
-    public TenantError? EnsurePlatformScope()
-        => !_platform.IsGranted ? TenantErrors.PlatformOnly : null;
+    public async Task<TenantError?> EnsurePlatformScopeAsync(CancellationToken ct = default)
+        => await _platform.IsGrantedAsync(ct) ? null : TenantErrors.PlatformOnly;
 
     /// <summary>For work on one tenant.</summary>
-    public TenantError? EnsureCanAccess(Guid tenantId)
+    public async Task<TenantError?> EnsureCanAccessAsync(Guid tenantId, CancellationToken ct = default)
     {
         if (_currentTenant.IsResolved)
             return _currentTenant.Id == tenantId ? null : TenantErrors.CrossTenantAccess;
 
-        return _platform.IsGranted ? null : TenantErrors.PlatformOnly;
+        return await _platform.IsGrantedAsync(ct) ? null : TenantErrors.PlatformOnly;
     }
 
     /// <summary>For data about one user: the user themselves, or platform access.</summary>
-    public TenantError? EnsureSelfOrPlatform(Guid userId)
-        => _platform.IsGranted || _actor.UserId == userId ? null : TenantErrors.CrossTenantAccess;
+    public async Task<TenantError?> EnsureSelfOrPlatformAsync(Guid userId, CancellationToken ct = default)
+        => _actor.UserId == userId || await _platform.IsGrantedAsync(ct) ? null : TenantErrors.CrossTenantAccess;
 }

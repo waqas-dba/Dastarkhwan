@@ -1,4 +1,4 @@
-﻿using CoreKit.SharedKernel;
+﻿using CoreKit.Access.Abstractions;
 
 namespace CoreKit.Identity.Services;
 

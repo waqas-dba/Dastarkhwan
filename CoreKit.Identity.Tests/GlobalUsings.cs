@@ -13,7 +13,6 @@ global using CoreKit.Identity.Services;
 global using CoreKit.Identity.Settings;
 global using CoreKit.Identity.Tests.Support;
 global using CoreKit.Identity.Validation;
-global using CoreKit.SharedKernel;
 global using Microsoft.Data.Sqlite;
 global using Microsoft.EntityFrameworkCore;
 global using Microsoft.Extensions.Logging.Abstractions;

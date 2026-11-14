@@ -9,7 +9,6 @@ global using CoreKit.Access.Persistence;
 global using CoreKit.Access.Services;
 global using CoreKit.Access.Settings;
 global using CoreKit.Access.Tests.Support;
-global using CoreKit.SharedKernel;
 global using Microsoft.AspNetCore.Http;
 global using Microsoft.Data.Sqlite;
 global using Microsoft.EntityFrameworkCore;

@@ -1,4 +1,4 @@
-﻿namespace CoreKit.SharedKernel;
+namespace CoreKit.Tenant.Events;
 
 /// <summary>
 /// A fact one module announces for others to react to. Integration events carry ids only, never entities,

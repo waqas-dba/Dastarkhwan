@@ -37,7 +37,7 @@ public sealed class TenantService : ITenantService
     public async Task<TenantResult<TenantPagedResult<TenantDto>>> ListAsync(
         TenantListQuery query, CancellationToken ct = default)
     {
-        if (_guard.EnsurePlatformScope() is { } denied)
+        if (await _guard.EnsurePlatformScopeAsync(ct) is { } denied)
             return denied;
 
         var page = Math.Max(query.Page, 1);
@@ -56,7 +56,7 @@ public sealed class TenantService : ITenantService
 
     public async Task<TenantResult<TenantDto>> GetAsync(Guid id, CancellationToken ct = default)
     {
-        if (_guard.EnsureCanAccess(id) is { } denied)
+        if (await _guard.EnsureCanAccessAsync(id, ct) is { } denied)
             return denied;
 
         var tenant = await _tenants.FindByIdAsync(id, ct);
@@ -76,7 +76,7 @@ public sealed class TenantService : ITenantService
 
     public async Task<TenantResult<TenantDto>> CreateAsync(CreateTenantRequest request, CancellationToken ct = default)
     {
-        if (_guard.EnsurePlatformScope() is { } denied)
+        if (await _guard.EnsurePlatformScopeAsync(ct) is { } denied)
             return denied;
 
         var nameError = TenantValidation.ValidateName(request.Name, out var name);
@@ -157,7 +157,7 @@ public sealed class TenantService : ITenantService
 
     public async Task<TenantResult<TenantDto>> UpdateAsync(Guid id, UpdateTenantRequest request, CancellationToken ct = default)
     {
-        if (_guard.EnsureCanAccess(id) is { } denied)
+        if (await _guard.EnsureCanAccessAsync(id, ct) is { } denied)
             return denied;
 
         // Validate everything first, then change anything, so a refused request leaves nothing half-done.
@@ -175,7 +175,7 @@ public sealed class TenantService : ITenantService
 
         if (request.Slug is not null)
         {
-            if (_guard.EnsurePlatformScope() is { } slugDenied)
+            if (await _guard.EnsurePlatformScopeAsync(ct) is { } slugDenied)
                 return slugDenied;
 
             newSlug = TenantSlug.Normalize(request.Slug);
@@ -248,7 +248,7 @@ public sealed class TenantService : ITenantService
 
     public async Task<TenantResult> DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        if (_guard.EnsurePlatformScope() is { } denied)
+        if (await _guard.EnsurePlatformScopeAsync(ct) is { } denied)
             return denied;
 
         var tenant = await _tenants.FindForUpdateAsync(id, ct);
@@ -278,7 +278,7 @@ public sealed class TenantService : ITenantService
     private async Task<TenantResult<TenantDto>> ChangeStatusAsync(
         Guid id, TenantStatus target, string? reason, string action, CancellationToken ct, bool requireArchived = false)
     {
-        if (_guard.EnsurePlatformScope() is { } denied)
+        if (await _guard.EnsurePlatformScopeAsync(ct) is { } denied)
             return denied;
 
         var reasonError = TenantValidation.ValidateReason(reason, out var cleanReason);

@@ -1,4 +1,5 @@
-﻿using CoreKit.Tenant.Authorization;
+﻿using CoreKit.Access.Common;
+using CoreKit.Tenant.Authorization;
 using Microsoft.AspNetCore.Routing;
 
 namespace CoreKit.Tenant.Endpoints;
@@ -11,7 +12,7 @@ public static class TenantEndpointExtensions
     /// </summary>
     public static IEndpointRouteBuilder MapTenants(this IEndpointRouteBuilder app, string prefix = "/tenants")
     {
-        prefix = NormalizePrefix(prefix);
+        prefix = EndpointRoutes.NormalizePrefix(prefix);
 
         var tenants = app.MapGroup(prefix).WithTags("Tenants");
 
@@ -25,13 +26,6 @@ public static class TenantEndpointExtensions
             .RequireAccessPermission(TenantPermissionNames.AuditRead);
 
         return app;
-    }
-
-    private static string NormalizePrefix(string? prefix)
-    {
-        var trimmed = (prefix ?? string.Empty).Trim().TrimEnd('/');
-
-        return trimmed.Length == 0 || trimmed.StartsWith('/') ? trimmed : "/" + trimmed;
     }
 
     private static void MapTenantRoutes(RouteGroupBuilder tenants, string basePath)

@@ -1,5 +1,4 @@
-﻿using CoreKit.SharedKernel;
-using Npgsql;
+﻿using Npgsql;
 
 namespace CoreKit.Tenant.Persistence;
 

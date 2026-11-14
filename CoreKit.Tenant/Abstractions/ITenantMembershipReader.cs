@@ -1,4 +1,4 @@
-﻿namespace CoreKit.SharedKernel;
+namespace CoreKit.Tenant.Abstractions;
 
 /// <summary>A person's standing in a tenant.</summary>
 public sealed record TenantMemberInfo(bool IsOwner, long MembershipGeneration = 1);

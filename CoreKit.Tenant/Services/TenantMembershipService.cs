@@ -41,7 +41,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
 
     public async Task<TenantResult<IReadOnlyList<TenantMemberDto>>> ListMembersAsync(Guid tenantId, CancellationToken ct = default)
     {
-        if (_guard.EnsureCanAccess(tenantId) is { } denied)
+        if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
 
         if (await _tenants.FindByIdAsync(tenantId, ct) is null)
@@ -55,7 +55,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
     public async Task<TenantResult<TenantMemberDto>> AddMemberAsync(
         Guid tenantId, AddTenantMemberRequest request, CancellationToken ct = default)
     {
-        if (_guard.EnsureCanAccess(tenantId) is { } denied)
+        if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
 
         // F1: Require an identified actor for ownership assignment.
@@ -66,7 +66,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
                 return TenantErrors.Forbidden("An identified actor is required to assign ownership.");
             if (_actor.UserId == request.UserId)
                 return TenantErrors.Forbidden("You cannot promote yourself to owner.");
-            if (!_platform.IsGranted)
+            if (!await _platform.IsGrantedAsync(ct))
             {
                 var caller = await _members.FindAsync(tenantId, _actor.UserId.Value, ct);
                 if (caller is null || !caller.IsOwner)
@@ -148,7 +148,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
 
     public async Task<TenantResult> RemoveMemberAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
     {
-        if (_guard.EnsureCanAccess(tenantId) is { } denied)
+        if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
 
         // F3: Load and track the tenant BEFORE reading the membership state, so the
@@ -209,7 +209,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
     public async Task<TenantResult<TenantMemberDto>> SetOwnerAsync(
         Guid tenantId, Guid userId, SetTenantOwnerRequest request, CancellationToken ct = default)
     {
-        if (_guard.EnsureCanAccess(tenantId) is { } denied)
+        if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
 
         // F3: Load and track the tenant BEFORE the owner-count decision, so the
@@ -237,7 +237,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
             return TenantErrors.Forbidden("You cannot promote yourself to owner.");
 
         // F1: Only tenant owners or platform administrators can change ownership.
-        if (!_platform.IsGranted)
+        if (!await _platform.IsGrantedAsync(ct))
         {
             var caller = await _members.FindAsync(tenantId, _actor.UserId.Value, ct);
             if (caller is null || !caller.IsOwner)
@@ -260,7 +260,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
 
     public async Task<TenantResult<IReadOnlyList<TenantMembershipDto>>> ListForUserAsync(Guid userId, CancellationToken ct = default)
     {
-        if (_guard.EnsureSelfOrPlatform(userId) is { } denied)
+        if (await _guard.EnsureSelfOrPlatformAsync(userId, ct) is { } denied)
             return denied;
 
         var memberships = await _members.ListForUserAsync(userId, ct);
@@ -271,7 +271,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
 
     public async Task<TenantResult> SetDefaultTenantAsync(Guid userId, Guid tenantId, CancellationToken ct = default)
     {
-        if (_guard.EnsureSelfOrPlatform(userId) is { } denied)
+        if (await _guard.EnsureSelfOrPlatformAsync(userId, ct) is { } denied)
             return denied;
 
         var memberships = await _members.ListForUserForUpdateAsync(userId, ct);

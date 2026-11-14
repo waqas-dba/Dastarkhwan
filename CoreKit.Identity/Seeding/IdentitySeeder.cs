@@ -1,6 +1,5 @@
 ﻿using CoreKit.Access.Abstractions;
 using CoreKit.Access.Catalog;
-using CoreKit.SharedKernel.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace CoreKit.Identity.Seeding;

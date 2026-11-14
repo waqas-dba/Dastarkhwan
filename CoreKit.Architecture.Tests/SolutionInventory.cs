@@ -23,7 +23,6 @@ internal static class SolutionInventory
     /// <summary>Production module project paths, solution-relative, forward-slash.</summary>
     public static readonly IReadOnlyList<string> ProductionModules = new[]
     {
-        "CoreKit.SharedKernel/CoreKit.SharedKernel.csproj",
         "CoreKit.Identity/CoreKit.Identity.csproj",
         "CoreKit.Access/CoreKit.Access.csproj",
         "CoreKit.Tenant/CoreKit.Tenant.csproj",
@@ -64,7 +63,6 @@ internal static class SolutionInventory
     public static readonly IReadOnlyDictionary<string, string> ExpectedAssemblyNames =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["CoreKit.SharedKernel/CoreKit.SharedKernel.csproj"] = "CoreKit.SharedKernel",
             ["CoreKit.Identity/CoreKit.Identity.csproj"] = "CoreKit.Identity",
             ["CoreKit.Access/CoreKit.Access.csproj"] = "CoreKit.Access",
             ["CoreKit.Tenant/CoreKit.Tenant.csproj"] = "CoreKit.Tenant",

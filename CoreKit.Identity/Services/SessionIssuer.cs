@@ -4,7 +4,6 @@ using CoreKit.Identity.Common;
 using CoreKit.Identity.Entities;
 using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Models;
-using CoreKit.SharedKernel.Abstractions;
 
 namespace CoreKit.Identity.Services;
 

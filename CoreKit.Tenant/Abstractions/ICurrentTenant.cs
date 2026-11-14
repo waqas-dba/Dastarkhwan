@@ -1,4 +1,4 @@
-﻿namespace CoreKit.SharedKernel;
+namespace CoreKit.Tenant.Abstractions;
 
 /// <summary>
 /// The tenant of the current request or operation. Any module reads this and never has to know

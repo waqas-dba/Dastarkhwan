@@ -44,25 +44,6 @@ public sealed class FakeMembership : IAccessMembership
     }
 }
 
-public sealed class FakeCurrentTenant : ICurrentTenant
-{
-    public Guid? Id { get; set; }
-
-    public bool IsResolved => Id is not null;
-
-    public Guid RequiredId => Id ?? throw new TenantNotResolvedException();
-
-    public IDisposable Change(Guid? tenantId) => throw new NotSupportedException();
-}
-
-public sealed class FakeTenantMembershipReader : ITenantMembershipReader
-{
-    public Dictionary<(Guid TenantId, Guid UserId), bool> Members { get; } = new();
-
-    public Task<TenantMemberInfo?> FindAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
-        => Task.FromResult(Members.TryGetValue((tenantId, userId), out var isOwner) ? new TenantMemberInfo(isOwner) : null);
-}
-
 internal static class ResultAssert
 {
     public static T Ok<T>(AccessResult<T> result)

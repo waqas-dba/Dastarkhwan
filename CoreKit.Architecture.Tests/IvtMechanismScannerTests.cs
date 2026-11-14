@@ -324,12 +324,33 @@ public sealed class IvtMechanismScannerTests
     [Fact]
     public void Ignores_file_level_alias_from_another_file()
     {
+        // FileA declares a file-level alias and uses it; FileB uses the same alias name
+        // without declaring it. FileA's alias is scoped to FileA, so FileB's `IVT` is
+        // unresolved and must not be reported.
         var files = new List<(string Path, string Text)>
         {
             ("Tests/FileA.cs", """
                 using IVT = System.Runtime.CompilerServices.InternalsVisibleToAttribute;
                 [assembly: IVT("OtherTarget")]
                 """),
+            ("Tests/FileB.cs", """
+                [assembly: IVT("CoreKit.Access.Tests")]
+                """)
+        };
+
+        var findings = IvtMechanismScanner.ScanProject(files);
+
+        Assert.Single(findings);
+        Assert.Equal("Tests/FileA.cs", findings[0].RelativePath);
+        Assert.Equal("InternalsVisibleTo attribute", findings[0].Kind);
+    }
+
+    [Fact]
+    public void Detects_file_level_alias_declared_in_the_same_file()
+    {
+        // The counterpart to the test above: a file that declares its own alias does resolve it.
+        var files = new List<(string Path, string Text)>
+        {
             ("Tests/FileB.cs", """
                 using IVT = System.Runtime.CompilerServices.InternalsVisibleToAttribute;
                 [assembly: IVT("CoreKit.Access.Tests")]
@@ -338,9 +359,8 @@ public sealed class IvtMechanismScannerTests
 
         var findings = IvtMechanismScanner.ScanProject(files);
 
-        // FileA's file-level alias must not leak into FileB.
-        // FileB's own alias should resolve.
         Assert.Single(findings);
+        Assert.Equal("Tests/FileB.cs", findings[0].RelativePath);
         Assert.Equal("InternalsVisibleTo attribute", findings[0].Kind);
     }
 }

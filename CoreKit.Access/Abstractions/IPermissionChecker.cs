@@ -8,4 +8,11 @@ namespace CoreKit.Access.Abstractions;
 public interface IPermissionChecker
 {
     Task<bool> HasPermissionAsync(string permission, CancellationToken ct = default);
+
+    /// <summary>
+    /// The same question, always answered against the fixed platform scope rather than the ambient
+    /// request scope. Used by platform-level operations (for example Identity user management) that
+    /// are not inside a tenant. Fail closed: no user, or no permission, means false.
+    /// </summary>
+    Task<bool> HasPlatformPermissionAsync(string permission, CancellationToken ct = default);
 }

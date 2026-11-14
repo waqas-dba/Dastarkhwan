@@ -16,8 +16,6 @@ public static class IdentityEndpointExtensions
 
         MapAuth(Identity.MapGroup("/auth"));
         MapUsers(Identity.MapGroup("/users"), $"{prefix}/users");
-        MapRoles(Identity.MapGroup("/roles"), $"{prefix}/roles");
-        MapPermissions(Identity.MapGroup("/permissions"));
 
         return app;
     }
@@ -69,6 +67,10 @@ public static class IdentityEndpointExtensions
 
     private static void MapUsers(RouteGroupBuilder users, string basePath)
     {
+        // Every user-management route requires a signed-in user; the service enforces the specific
+        // identity.* permission through Access (platform scope).
+        users.RequireAuthorization();
+
         users.MapGet("/", async (
                 string? search,
                 bool? isActive,
@@ -86,12 +88,10 @@ public static class IdentityEndpointExtensions
             };
 
             return (await s.ListAsync(query, ct)).ToHttpResult();
-        })
-            .RequirePermission(IdentityPermissionNames.UsersRead);
+        });
 
         users.MapGet("/{id:guid}", async (Guid id, IUserService s, CancellationToken ct) =>
-                (await s.GetAsync(id, ct)).ToHttpResult())
-            .RequirePermission(IdentityPermissionNames.UsersRead);
+                (await s.GetAsync(id, ct)).ToHttpResult());
 
         users.MapPost("/", async (CreateUserRequest r, IUserService s, CancellationToken ct) =>
         {
@@ -100,63 +100,15 @@ public static class IdentityEndpointExtensions
             return result.IsSuccess
                 ? Results.Created($"{basePath}/{result.Value.Id}", result.Value)
                 : result.ToHttpResult();
-        })
-            .RequirePermission(IdentityPermissionNames.UsersCreate);
+        });
 
         users.MapPut("/{id:guid}", async (Guid id, UpdateUserRequest r, IUserService s, CancellationToken ct) =>
-                (await s.UpdateAsync(id, r, ct)).ToHttpResult())
-            .RequirePermission(IdentityPermissionNames.UsersUpdate);
+                (await s.UpdateAsync(id, r, ct)).ToHttpResult());
 
         users.MapPut("/{id:guid}/roles", async (Guid id, SetUserRolesRequest r, IUserService s, CancellationToken ct) =>
-                (await s.SetRolesAsync(id, r, ct)).ToHttpResult())
-            .RequirePermission(IdentityPermissionNames.UsersUpdate);
+                (await s.SetRolesAsync(id, r, ct)).ToHttpResult());
 
         users.MapDelete("/{id:guid}", async (Guid id, IUserService s, CancellationToken ct) =>
-                (await s.DeleteAsync(id, ct)).ToHttpResult())
-            .RequirePermission(IdentityPermissionNames.UsersDelete);
-    }
-
-    private static void MapRoles(RouteGroupBuilder roles, string basePath)
-    {
-        roles.MapGet("/", async (IRoleService s, CancellationToken ct) =>
-                (await s.ListAsync(ct)).ToHttpResult())
-            .RequirePermission(IdentityPermissionNames.RolesRead);
-
-        roles.MapGet("/{id:guid}", async (Guid id, IRoleService s, CancellationToken ct) =>
-                (await s.GetAsync(id, ct)).ToHttpResult())
-            .RequirePermission(IdentityPermissionNames.RolesRead);
-
-        roles.MapPost("/", async (CreateRoleRequest r, IRoleService s, CancellationToken ct) =>
-        {
-            var result = await s.CreateAsync(r, ct);
-
-            return result.IsSuccess
-                ? Results.Created($"{basePath}/{result.Value.Id}", result.Value)
-                : result.ToHttpResult();
-        })
-            .RequirePermission(IdentityPermissionNames.RolesCreate);
-
-        roles.MapPut("/{id:guid}", async (Guid id, UpdateRoleRequest r, IRoleService s, CancellationToken ct) =>
-                (await s.UpdateAsync(id, r, ct)).ToHttpResult())
-            .RequirePermission(IdentityPermissionNames.RolesUpdate);
-
-        roles.MapPut("/{id:guid}/permissions", async (Guid id, SetRolePermissionsRequest r, IRoleService s, CancellationToken ct) =>
-                (await s.SetPermissionsAsync(id, r, ct)).ToHttpResult())
-            .RequirePermission(IdentityPermissionNames.RolesUpdate);
-
-        roles.MapDelete("/{id:guid}", async (Guid id, IRoleService s, CancellationToken ct) =>
-                (await s.DeleteAsync(id, ct)).ToHttpResult())
-            .RequirePermission(IdentityPermissionNames.RolesDelete);
-    }
-
-    private static void MapPermissions(RouteGroupBuilder permissions)
-    {
-        permissions.MapGet("/", async (IPermissionService s, CancellationToken ct) =>
-                (await s.ListAsync(ct)).ToHttpResult())
-            .RequirePermission(IdentityPermissionNames.PermissionsRead);
-
-        permissions.MapGet("/{id:guid}", async (Guid id, IPermissionService s, CancellationToken ct) =>
-                (await s.GetAsync(id, ct)).ToHttpResult())
-            .RequirePermission(IdentityPermissionNames.PermissionsRead);
+                (await s.DeleteAsync(id, ct)).ToHttpResult());
     }
 }

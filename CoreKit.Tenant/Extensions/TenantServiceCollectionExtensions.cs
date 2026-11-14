@@ -1,6 +1,8 @@
 ﻿using CoreKit.Access.Abstractions;
+using CoreKit.Access.Extensions;
 using CoreKit.SharedKernel.Abstractions;
 using CoreKit.Tenant.Abstractions;
+using CoreKit.Tenant.Constants;
 using CoreKit.Tenant.Integration;
 
 namespace CoreKit.Tenant.Extensions;
@@ -55,6 +57,13 @@ public static class TenantServiceCollectionExtensions
 
         services.TryAddSingleton(TimeProvider.System);
         services.AddMemoryCache();
+
+        // Declare Tenant's permissions in the Access catalog so Access can grant them to tenant roles.
+        services.AddAccessPermissions(p =>
+        {
+            foreach (var permission in TenantPermissionNames.All)
+                p.Add(permission.Name, permission.Description);
+        });
 
         // Persistence
         services.AddScoped<ITenantUnitOfWork, TenantUnitOfWork>();

@@ -1,35 +1,27 @@
-﻿using CoreKit.SharedKernel.Abstractions;
+﻿using CoreKit.Access.Abstractions;
+using CoreKit.Access.Catalog;
+using CoreKit.SharedKernel.Abstractions;
 using Microsoft.Extensions.Logging;
 
 namespace CoreKit.Identity.Seeding;
 
 /// <summary>
-/// Safe to run on every startup. It creates what is missing and never removes anything:
-/// permissions, the default roles, and the first admin user.
+/// Safe to run on every startup. It creates what is missing and never removes anything: the first
+/// administrator. Roles and permissions are owned by Access (the catalog); the seeder only ensures the
+/// platform Administrator role exists with every catalog permission and makes the first user a platform
+/// member holding it.
 /// </summary>
 public sealed class IdentitySeeder
 {
-    // Roles besides Administrator. Created once with these permissions; an administrator owns them afterwards.
-    private static readonly (string Name, string Description, string[] Permissions)[] DefaultRoles =
-    {
-        (IdentityRoleNames.Manager, "Manages users and can read roles.",
-            new[]
-            {
-                IdentityPermissionNames.UsersRead,
-                IdentityPermissionNames.UsersCreate,
-                IdentityPermissionNames.UsersUpdate,
-                IdentityPermissionNames.RolesRead,
-                IdentityPermissionNames.PermissionsRead
-            }),
-
-        (IdentityRoleNames.Staff, "Basic read access.",
-            new[] { IdentityPermissionNames.UsersRead })
-    };
+    private static readonly AccessScope PlatformScope = AccessScope.ForPlatform(AccessScope.PlatformId);
 
     private readonly IdentityDbContext _db;
     private readonly IPasswordHasher _hasher;
     private readonly TimeProvider _time;
     private readonly IdentitySeedOptions _options;
+    private readonly IAccessService _access;
+    private readonly IAccessMaintenance _maintenance;
+    private readonly AccessCatalog _catalog;
     private readonly ILogger<IdentitySeeder> _logger;
 
     public IdentitySeeder(
@@ -37,133 +29,26 @@ public sealed class IdentitySeeder
         IPasswordHasher hasher,
         TimeProvider time,
         IOptions<IdentitySeedOptions> options,
+        IAccessService access,
+        IAccessMaintenance maintenance,
+        AccessCatalog catalog,
         ILogger<IdentitySeeder> logger)
     {
         _db = db;
         _hasher = hasher;
         _time = time;
         _options = options.Value;
+        _access = access;
+        _maintenance = maintenance;
+        _catalog = catalog;
         _logger = logger;
     }
 
-    /// <param name="modulePermissions">Permissions that other modules define for themselves.</param>
-    public async Task SeedAsync(IEnumerable<PermissionSeed>? modulePermissions = null, CancellationToken ct = default)
+    /// <summary>Creates the first administrator if none exists yet. Idempotent.</summary>
+    public async Task SeedAsync(CancellationToken ct = default)
     {
-        var permissions = await SeedPermissionsAsync(modulePermissions, ct);
-        var admin = await SeedAdministratorRoleAsync(permissions, ct);
-        await SeedDefaultRolesAsync(permissions, ct);
-
-        await _db.SaveChangesAsync(ct);
-
-        await SeedFirstAdministratorAsync(admin, ct);
-    }
-
-    private async Task<List<Permission>> SeedPermissionsAsync(
-        IEnumerable<PermissionSeed>? modulePermissions, CancellationToken ct)
-    {
-        var wanted = IdentityPermissionNames.All
-            .Concat(modulePermissions ?? Enumerable.Empty<PermissionSeed>())
-            .Select(p => new PermissionSeed(p.Name.Trim().ToLowerInvariant(), p.Description))
-            .DistinctBy(p => p.Name)
-            .ToList();
-
-        var existing = await _db.Permissions.ToListAsync(ct);
-
-        foreach (var seed in wanted)
-        {
-            var permission = existing.FirstOrDefault(p => p.Name == seed.Name);
-
-            if (permission is null)
-            {
-                permission = new Permission
-                {
-                    Id = Guid.NewGuid(),
-                    Name = seed.Name,
-                    Description = seed.Description,
-                    IsActive = true
-                };
-
-                _db.Permissions.Add(permission);
-                existing.Add(permission);
-            }
-            else if (permission.Description != seed.Description)
-            {
-                permission.Description = seed.Description;
-            }
-        }
-
-        return existing;
-    }
-
-    private async Task<Role> SeedAdministratorRoleAsync(List<Permission> permissions, CancellationToken ct)
-    {
-        var normalized = IdentityNormalizer.NormalizeName(IdentityRoleNames.Administrator);
-
-        var admin = await _db.Roles
-            .Include(r => r.RolePermissions)
-            .FirstOrDefaultAsync(r => r.NormalizedName == normalized, ct);
-
-        if (admin is null)
-        {
-            admin = new Role
-            {
-                Id = Guid.NewGuid(),
-                Name = IdentityRoleNames.Administrator,
-                NormalizedName = normalized,
-                Description = "Full access. Cannot be changed or deleted.",
-                IsActive = true
-            };
-
-            _db.Roles.Add(admin);
-        }
-        else if (!admin.IsActive)
-        {
-            admin.IsActive = true;
-        }
-
-        // Administrator always holds every permission, including ones added by newer modules.
-        var linked = admin.RolePermissions.Select(rp => rp.PermissionId).ToHashSet();
-
-        foreach (var permission in permissions.Where(p => !linked.Contains(p.Id)))
-            admin.RolePermissions.Add(new RolePermission { RoleId = admin.Id, PermissionId = permission.Id });
-
-        return admin;
-    }
-
-    private async Task SeedDefaultRolesAsync(List<Permission> permissions, CancellationToken ct)
-    {
-        foreach (var (name, description, permissionNames) in DefaultRoles)
-        {
-            var normalized = IdentityNormalizer.NormalizeName(name);
-
-            // Already there? Leave it alone: an administrator may have changed it on purpose.
-            if (await _db.Roles.AnyAsync(r => r.NormalizedName == normalized, ct))
-                continue;
-
-            var role = new Role
-            {
-                Id = Guid.NewGuid(),
-                Name = name,
-                NormalizedName = normalized,
-                Description = description,
-                IsActive = true
-            };
-
-            foreach (var permissionName in permissionNames)
-            {
-                var permission = permissions.FirstOrDefault(p => p.Name == permissionName);
-
-                if (permission is not null)
-                    role.RolePermissions.Add(new RolePermission { RoleId = role.Id, PermissionId = permission.Id });
-            }
-
-            _db.Roles.Add(role);
-        }
-    }
-
-    private async Task SeedFirstAdministratorAsync(Role admin, CancellationToken ct)
-    {
-        if (await _db.UserRoles.AnyAsync(ur => ur.RoleId == admin.Id, ct))
+        // If any platform member already holds the Administrator role, the first admin exists.
+        if ((await _access.ListUserIdsWithRoleAsync(PlatformScope, "Administrator", ct)).Count > 0)
             return;
 
         var email = _options.AdminEmail?.Trim();
@@ -195,30 +80,29 @@ public sealed class IdentitySeeder
 
         var normalizedEmail = IdentityNormalizer.NormalizeEmail(email);
 
-        var user = await _db.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail, ct);
-
-        if (user is null)
+        var user = new User
         {
-            user = new User
-            {
-                Id = Guid.NewGuid(),
-                Email = email,
-                NormalizedEmail = normalizedEmail,
-                Mobile = mobile,
-                NormalizedMobile = normalizedMobile,
-                PasswordHash = _hasher.Hash(password),
-                DisplayName = _options.AdminDisplayName,
-                IsActive = true,
-                EmailConfirmed = true,
-                CreatedAt = _time.GetUtcNow().UtcDateTime
-            };
+            Id = Guid.NewGuid(),
+            Email = email,
+            NormalizedEmail = normalizedEmail,
+            Mobile = mobile,
+            NormalizedMobile = normalizedMobile,
+            PasswordHash = _hasher.Hash(password),
+            DisplayName = _options.AdminDisplayName,
+            IsActive = true,
+            EmailConfirmed = true,
+            CreatedAt = _time.GetUtcNow().UtcDateTime
+        };
 
-            _db.Users.Add(user);
-        }
-
-        _db.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = admin.Id });
-
+        _db.Users.Add(user);
         await _db.SaveChangesAsync(ct);
+
+        // Ensure the Administrator role holds every catalog permission (including newer modules).
+        var adminRoleId = await _maintenance.EnsurePlatformRoleAsync(
+            "Administrator", "Full access. Cannot be changed or deleted.", _catalog.Names.ToList(), ct);
+
+        await _maintenance.AddPlatformMemberAsync(user.Id, ct);
+        await _maintenance.SetPlatformUserRolesAsync(user.Id, new[] { adminRoleId }, ct);
 
         _logger.LogInformation("The first Identity administrator {UserId} was created.", user.Id);
     }

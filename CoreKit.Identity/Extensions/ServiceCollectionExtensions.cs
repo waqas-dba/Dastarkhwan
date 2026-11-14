@@ -1,4 +1,5 @@
-﻿using CoreKit.Identity.Repositories;
+﻿using CoreKit.Access.Extensions;
+using CoreKit.Identity.Repositories;
 using CoreKit.SharedKernel;
 
 namespace CoreKit.Identity.Extensions;
@@ -61,6 +62,15 @@ public static class ServiceCollectionExtensions
     {
         services.AddIdentityPersistence(configuration, configureDatabase);
 
+        // Identity's own permissions are declared in the Access catalog. Access owns the catalog and
+        // the authorization decision; Identity only names what it needs. Contributions are lazy and
+        // harmless when AddAccess is not called.
+        services.AddAccessPermissions(p =>
+        {
+            foreach (var (name, description) in IdentityAccessPermissionNames.All)
+                p.Add(name, description);
+        });
+
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection(JwtOptions.SectionName))
             .Validate(
@@ -86,13 +96,10 @@ public static class ServiceCollectionExtensions
 
         // Persistence: the only code that touches the DbContext.
         services.AddScoped<IUserRepository, UserRepository>();
-        services.AddScoped<IRoleRepository, RoleRepository>();
-        services.AddScoped<IPermissionRepository, PermissionRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
 
         // Focused collaborators.
-        services.AddScoped<IAccessResolver, AccessResolver>();
         services.AddScoped<IAdministratorGuard, AdministratorGuard>();
         services.AddScoped<ISessionIssuer, SessionIssuer>();
         services.AddSingleton<ITokenService, TokenService>();
@@ -102,8 +109,6 @@ public static class ServiceCollectionExtensions
         // Business services.
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IUserService, UserService>();
-        services.AddScoped<IRoleService, RoleService>();
-        services.AddScoped<IPermissionService, PermissionService>();
 
         services.TryAddSingleton<IIdentityEmailSender, NullIdentityEmailSender>();
         services.AddScoped<IEmailVerificationService, EmailVerificationService>();
@@ -135,8 +140,6 @@ public static class ServiceCollectionExtensions
             });
 
         services.AddAuthorization();
-        services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
-        services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
         services.AddRateLimiter(limiter =>
         {

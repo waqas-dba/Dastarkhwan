@@ -1,19 +1,27 @@
-﻿using CoreKit.Identity.Common;
+﻿using CoreKit.Access.Abstractions;
+using CoreKit.Identity.Constants;
 using CoreKit.Identity.Interfaces;
 
 namespace CoreKit.Identity.Services;
 
+/// <summary>
+/// Prevents the one mistake that locks everybody out: removing, deactivating or deleting the last
+/// administrator. Administrators are current platform members holding the Administrator role in the
+/// platform scope (Access is the source of truth); deactivating a user revokes their platform
+/// membership, so a deactivated administrator is never counted.
+/// </summary>
 public sealed class AdministratorGuard : IAdministratorGuard
 {
-    private readonly IUserRepository _userRepository;
+    private static readonly AccessScope PlatformScope = AccessScope.ForPlatform(AccessScope.PlatformId);
 
-    public AdministratorGuard(IUserRepository userRepository) => _userRepository = userRepository;
+    private readonly IAccessService _access;
+
+    public AdministratorGuard(IAccessService access) => _access = access;
 
     public async Task<bool> IsLastActiveAdministratorAsync(Guid userId, CancellationToken ct = default)
     {
-        var activeAdministratorIds =
-            await _userRepository.GetActiveUserIdsInRoleAsync(AdministratorRole.NormalizedName, ct);
+        var adminIds = await _access.ListUserIdsWithRoleAsync(PlatformScope, IdentityRoleNames.Administrator, ct);
 
-        return activeAdministratorIds.Count == 1 && activeAdministratorIds[0] == userId;
+        return adminIds.Count == 1 && adminIds[0] == userId;
     }
 }

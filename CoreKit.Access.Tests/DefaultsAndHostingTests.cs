@@ -84,7 +84,7 @@ public sealed class AccessPermissionCheckerTests : IDisposable
     public async Task AnswersForTheSignedInUserInTheCurrentScope()
     {
         _env.SignInAs("sales.create");
-        var checker = new AccessPermissionChecker(_env.Access);
+        var checker = new AccessPermissionChecker(_env.Access, _env.User);
 
         Assert.True(await checker.HasPermissionAsync("sales.create"));
         Assert.False(await checker.HasPermissionAsync("sales.refund"));
@@ -93,7 +93,7 @@ public sealed class AccessPermissionCheckerTests : IDisposable
     [Fact]
     public async Task WithoutAUserOrAScope_TheAnswerIsNo()
     {
-        var checker = new AccessPermissionChecker(_env.Access);
+        var checker = new AccessPermissionChecker(_env.Access, _env.User);
 
         Assert.False(await checker.HasPermissionAsync("sales.create"));
 

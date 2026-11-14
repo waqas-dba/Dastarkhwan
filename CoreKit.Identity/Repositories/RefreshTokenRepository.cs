@@ -14,7 +14,7 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
     public Task<RefreshToken?> FindByHashWithUserAsync(string tokenHash, CancellationToken ct = default)
         => _db.RefreshTokens
             .AsNoTracking()
-            .Include(t => t.User).ThenInclude(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .Include(t => t.User)
             .FirstOrDefaultAsync(t => t.TokenHash == tokenHash, ct);
 
     public async Task<GuardedIssuanceResult> TryIssueGuardedAsync(

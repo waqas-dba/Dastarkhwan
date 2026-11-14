@@ -30,11 +30,7 @@ public sealed class TokenService : ITokenService
         _signingCredentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
     }
 
-    public AccessTokenResult CreateAccessToken(
-        User user,
-        IReadOnlyCollection<string> roles,
-        IReadOnlyCollection<string> permissions,
-        IEnumerable<Claim>? extraClaims = null)
+    public AccessTokenResult CreateAccessToken(User user, IEnumerable<Claim>? extraClaims = null)
     {
         var now = _time.GetUtcNow().UtcDateTime;
         var expires = now.AddMinutes(_options.AccessTokenMinutes);
@@ -48,9 +44,7 @@ public sealed class TokenService : ITokenService
             [JwtRegisteredClaimNames.Aud] = _options.Audience,
             [JwtRegisteredClaimNames.Iat] = new DateTimeOffset(now).ToUnixTimeSeconds(),
             [JwtRegisteredClaimNames.Nbf] = new DateTimeOffset(now).ToUnixTimeSeconds(),
-            [JwtRegisteredClaimNames.Exp] = new DateTimeOffset(expires).ToUnixTimeSeconds(),
-            [IdentityClaimTypes.Role] = roles.ToArray(),
-            [IdentityClaimTypes.Permission] = permissions.ToArray()
+            [JwtRegisteredClaimNames.Exp] = new DateTimeOffset(expires).ToUnixTimeSeconds()
         };
 
         if (!string.IsNullOrWhiteSpace(user.DisplayName))

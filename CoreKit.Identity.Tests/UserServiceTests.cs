@@ -7,9 +7,11 @@ namespace CoreKit.Identity.Tests;
 /// including the administrator protections that prevent locking everyone out.
 /// Why it matters: if an ordinary user could promote themselves to Administrator, or if the last
 /// administrator could be deleted, the system would be compromised or bricked.
-/// The rule under test (see UserService): only an administrator can create users; role changes
-/// cannot strip the last active administrator; a user cannot deactivate or delete themselves;
-/// Administrator role assignment and removal are guarded.
+/// The rule under test (see UserService): only a caller holding the identity.* platform permission
+/// can manage users; role changes cannot strip the last active administrator; a user cannot
+/// deactivate or delete themselves; Administrator role assignment and removal are guarded.
+/// Permissions and roles are owned by Access, so these tests configure the caller's platform
+/// access on the in-memory Access fakes rather than in the Identity schema.
 /// </summary>
 public sealed class UserServiceTests : IDisposable
 {
@@ -43,7 +45,7 @@ public sealed class UserServiceTests : IDisposable
         Assert.Equal("+15551000010", dto.Mobile);
         Assert.Equal("New User", dto.DisplayName);
         Assert.True(dto.IsActive);
-        Assert.Contains(IdentityRoleNames.Staff, dto.Roles);
+        Assert.Contains(TestEnv.StaffRoleName, dto.Roles);
     }
 
     [Fact]
@@ -324,7 +326,7 @@ public sealed class UserServiceTests : IDisposable
         var dto = ResultAssert.Ok(await _env.UserService.GetAsync(_env.StaffUserId));
 
         Assert.Equal("staff@example.com", dto.Email);
-        Assert.Contains(IdentityRoleNames.Staff, dto.Roles);
+        Assert.Contains(TestEnv.StaffRoleName, dto.Roles);
     }
 
     [Fact]
@@ -546,11 +548,10 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task UpdateUser_DeactivateLastActiveAdministrator_Fails()
     {
-        // The owner is the only active administrator. Sign in as someone else who is allowed to
-        // update users, so the permission check and self-modification check are passed and the
-        // administrator guard is what refuses the change.
-        _env.SignInWith(_env.StaffUserId, new List<string> { IdentityRoleNames.Staff },
-            IdentityPermissionNames.UsersUpdate);
+        // The owner is the only active administrator. Sign in as someone else who holds the
+        // update permission, so the permission check and self-modification check are passed and
+        // the administrator guard is what refuses the change.
+        _env.SignInWith(_env.StaffUserId, IdentityAccessPermissionNames.UsersUpdate);
 
         ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.OwnerUserId, new UpdateUserRequest
         {
@@ -570,10 +571,9 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task UpdateUser_DeleteLastActiveAdministrator_Fails()
     {
-        // Sign in as someone else who may delete users, so the permission check and
+        // Sign in as someone else who holds the delete permission, so the permission check and
         // self-modification check are passed and the administrator guard is what refuses the delete.
-        _env.SignInWith(_env.StaffUserId, new List<string> { IdentityRoleNames.Staff },
-            IdentityPermissionNames.UsersDelete);
+        _env.SignInWith(_env.StaffUserId, IdentityAccessPermissionNames.UsersDelete);
 
         ResultAssert.Fails(await _env.UserService.DeleteAsync(_env.OwnerUserId),
             IdentityErrorKind.Conflict, "conflict");
@@ -593,16 +593,15 @@ public sealed class UserServiceTests : IDisposable
 
         var dto = ResultAssert.Ok(result);
         Assert.Contains(IdentityRoleNames.Administrator, dto.Roles);
-        Assert.Contains(IdentityRoleNames.Staff, dto.Roles);
+        Assert.Contains(TestEnv.StaffRoleName, dto.Roles);
     }
 
     [Fact]
     public async Task SetRoles_RemoveLastActiveAdministratorRole_Fails()
     {
-        // Owner is the only active administrator. Another user who may edit roles tries to remove
-        // Administrator from owner, so the administrator guard is what refuses the change.
-        _env.SignInWith(_env.StaffUserId, new List<string> { IdentityRoleNames.Staff },
-            IdentityPermissionNames.UsersUpdate);
+        // Owner is the only active administrator. Another user who holds the update permission
+        // tries to remove Administrator from owner, so the administrator guard is what refuses it.
+        _env.SignInWith(_env.StaffUserId, IdentityAccessPermissionNames.UsersUpdate);
 
         ResultAssert.Fails(await _env.UserService.SetRolesAsync(_env.OwnerUserId, new SetUserRolesRequest
         {
@@ -640,7 +639,7 @@ public sealed class UserServiceTests : IDisposable
     public async Task GetUser_WithoutUsersReadPermission_Fails()
     {
         // Staff normally holds users.read, so sign this actor in with no permissions at all.
-        _env.SignInWith(_env.StaffUserId, new List<string> { IdentityRoleNames.Staff });
+        _env.SignInWith(_env.StaffUserId);
 
         ResultAssert.Fails(await _env.UserService.GetAsync(_env.StaffUserId),
             IdentityErrorKind.Forbidden, "access.denied");
@@ -651,7 +650,7 @@ public sealed class UserServiceTests : IDisposable
     {
         // Listing must be guarded at the service, not only at the endpoint, so a caller that
         // reaches the service another way still cannot enumerate users.
-        _env.SignInWith(_env.StaffUserId, new List<string> { IdentityRoleNames.Staff });
+        _env.SignInWith(_env.StaffUserId);
 
         ResultAssert.Fails(await _env.UserService.ListAsync(new UserListQuery()),
             IdentityErrorKind.Forbidden, "access.denied");
@@ -662,8 +661,7 @@ public sealed class UserServiceTests : IDisposable
     {
         // A write must not depend on a read permission: the caller may create users without
         // being allowed to browse them, and still needs the created record back.
-        _env.SignInWith(_env.StaffUserId, new List<string> { IdentityRoleNames.Staff },
-            IdentityPermissionNames.UsersCreate);
+        _env.SignInWith(_env.StaffUserId, IdentityAccessPermissionNames.UsersCreate);
 
         var dto = ResultAssert.Ok(await _env.UserService.CreateAsync(new CreateUserRequest
         {
@@ -675,7 +673,7 @@ public sealed class UserServiceTests : IDisposable
         }));
 
         Assert.Equal("createonly@example.com", dto.Email);
-        Assert.Contains(IdentityRoleNames.Staff, dto.Roles);
+        Assert.Contains(TestEnv.StaffRoleName, dto.Roles);
     }
 
     [Fact]
@@ -701,7 +699,9 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task CreateUser_NonAdmin_CannotGrantAdministrator_Fails()
     {
-        _env.SignInStaff();
+        // Staff holds the create permission but is not an administrator, so granting the
+        // Administrator role must be refused by the admin-grant guard, not the create permission.
+        _env.SignInWith(_env.StaffUserId, IdentityAccessPermissionNames.UsersCreate);
 
         ResultAssert.Fails(await _env.UserService.CreateAsync(new CreateUserRequest
         {
@@ -715,7 +715,9 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task SetRoles_NonAdmin_CannotGrantAdministrator_Fails()
     {
-        _env.SignInStaff();
+        // Staff holds the update permission but is not an administrator, so granting the
+        // Administrator role must be refused by the admin-grant guard.
+        _env.SignInWith(_env.StaffUserId, IdentityAccessPermissionNames.UsersUpdate);
 
         ResultAssert.Fails(await _env.UserService.SetRolesAsync(_env.StaffUserId, new SetUserRolesRequest
         {
@@ -726,7 +728,9 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task UpdateUser_NonAdmin_CannotChangeAnotherAdminEmail_Fails()
     {
-        _env.SignInStaff();
+        // Staff holds the update permission but is not an administrator, so changing another
+        // administrator's credentials must be refused by the admin-protection guard.
+        _env.SignInWith(_env.StaffUserId, IdentityAccessPermissionNames.UsersUpdate);
 
         ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.OwnerUserId, new UpdateUserRequest
         {
@@ -737,7 +741,7 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task UpdateUser_NonAdmin_CannotChangeAnotherAdminPassword_Fails()
     {
-        _env.SignInStaff();
+        _env.SignInWith(_env.StaffUserId, IdentityAccessPermissionNames.UsersUpdate);
 
         ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.OwnerUserId, new UpdateUserRequest
         {
@@ -1224,7 +1228,6 @@ public sealed class UserServiceTests : IDisposable
         var db = _env.NewContext();
         userRepository ??= new UserRepository(db);
         var refreshTokenRepository = new RefreshTokenRepository(db);
-        var accessResolver = new AccessResolver(new PermissionRepository(db));
         var currentUser = new FakeCurrentUserService();
         var emailOptions = Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false });
 
@@ -1234,7 +1237,7 @@ public sealed class UserServiceTests : IDisposable
             _env.Hasher,
             new FakeTokenService(),
             new FakeSessionIssuer(),
-            accessResolver,
+            _env.AccessService,
             currentUser,
             emailOptions,
             _env.Time,

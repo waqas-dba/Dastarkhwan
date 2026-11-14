@@ -13,22 +13,14 @@ public sealed class UserRepository : IUserRepository
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == id, ct);
 
-    public Task<User?> FindByIdWithRolesAsync(Guid id, CancellationToken ct = default)
+    public Task<User?> FindByNormalizedEmailAsync(string normalizedEmail, CancellationToken ct = default)
         => _db.Users
             .AsNoTracking()
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .FirstOrDefaultAsync(u => u.Id == id, ct);
+            .FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail, ct);
 
     public Task<User?> FindForUpdateAsync(Guid id, CancellationToken ct = default)
         => _db.Users
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => u.Id == id, ct);
-
-    public Task<User?> FindByNormalizedEmailWithRolesAsync(string normalizedEmail, CancellationToken ct = default)
-        => _db.Users
-            .AsNoTracking()
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
-            .FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail, ct);
 
     public Task<Guid?> FindUnconfirmedActiveIdByEmailAsync(string normalizedEmail, CancellationToken ct = default)
         => _db.Users
@@ -74,19 +66,22 @@ public sealed class UserRepository : IUserRepository
             .OrderBy(u => u.NormalizedEmail)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Include(u => u.UserRoles).ThenInclude(ur => ur.Role)
             .ToListAsync(ct);
 
         return (items, totalCount);
     }
 
-    public async Task<IReadOnlyList<Guid>> GetActiveUserIdsInRoleAsync(
-        string normalizedRoleName, CancellationToken ct = default)
-        => await _db.UserRoles
-            .Where(ur => ur.Role.NormalizedName == normalizedRoleName && ur.Role.IsActive && ur.User.IsActive)
-            .Select(ur => ur.UserId)
-            .Distinct()
+    public async Task<IReadOnlyList<Guid>> GetActiveUserIdsAsync(
+        IReadOnlyCollection<Guid> userIds, CancellationToken ct = default)
+    {
+        if (userIds.Count == 0)
+            return new List<Guid>();
+
+        return await _db.Users
+            .Where(u => userIds.Contains(u.Id) && u.IsActive)
+            .Select(u => u.Id)
             .ToListAsync(ct);
+    }
 
     public async Task<bool> CreateAsync(User user, CancellationToken ct = default)
     {
@@ -272,19 +267,6 @@ public sealed class UserRepository : IUserRepository
                 ct);
 
         return affected > 0;
-    }
-
-    public async Task ReplaceRolesAsync(User user, IReadOnlyCollection<Guid> roleIds, CancellationToken ct = default)
-    {
-        foreach (var link in user.UserRoles.Where(ur => !roleIds.Contains(ur.RoleId)).ToList())
-            _db.UserRoles.Remove(link);
-
-        var current = user.UserRoles.Select(ur => ur.RoleId).ToHashSet();
-
-        foreach (var roleId in roleIds.Where(r => !current.Contains(r)))
-            _db.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = roleId });
-
-        await _db.SaveChangesAsync(ct);
     }
 
     public async Task DeleteAsync(User user, CancellationToken ct = default)

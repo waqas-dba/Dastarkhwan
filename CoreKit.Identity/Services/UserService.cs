@@ -1,4 +1,5 @@
-﻿using CoreKit.Identity.Common;
+﻿using CoreKit.Access.Abstractions;
+using CoreKit.Identity.Common;
 using CoreKit.Identity.Constants;
 using CoreKit.Identity.Entities;
 using CoreKit.Identity.Interfaces;
@@ -9,11 +10,20 @@ using CoreKit.Identity.Validation;
 
 namespace CoreKit.Identity.Services;
 
+/// <summary>
+/// Identity user management. Authorization and role/permission authority live in Access: Identity asks
+/// Access whether the signed-in user holds an identity.* permission in the platform scope, and delegates
+/// platform membership and role assignment to Access. Identity keeps the user record, credentials and the
+/// last-active-administrator protection.
+/// </summary>
 public sealed class UserService : IUserService
 {
+    private static readonly AccessScope PlatformScope = AccessScope.ForPlatform(AccessScope.PlatformId);
+
     private readonly IUserRepository _userRepository;
-    private readonly IRoleRepository _roleRepository;
-    private readonly IAccessResolver _accessResolver;
+    private readonly IPermissionChecker _permissions;
+    private readonly IAccessService _access;
+    private readonly IAccessMaintenance _maintenance;
     private readonly IAdministratorGuard _administratorGuard;
     private readonly IPasswordHasher _hasher;
     private readonly ICurrentUserService _currentUser;
@@ -21,16 +31,18 @@ public sealed class UserService : IUserService
 
     public UserService(
         IUserRepository userRepository,
-        IRoleRepository roleRepository,
-        IAccessResolver accessResolver,
+        IPermissionChecker permissions,
+        IAccessService access,
+        IAccessMaintenance maintenance,
         IAdministratorGuard administratorGuard,
         IPasswordHasher hasher,
         ICurrentUserService currentUser,
         TimeProvider time)
     {
         _userRepository = userRepository;
-        _roleRepository = roleRepository;
-        _accessResolver = accessResolver;
+        _permissions = permissions;
+        _access = access;
+        _maintenance = maintenance;
         _administratorGuard = administratorGuard;
         _hasher = hasher;
         _currentUser = currentUser;
@@ -39,7 +51,7 @@ public sealed class UserService : IUserService
 
     public async Task<IdentityResult<PagedResult<UserDto>>> ListAsync(UserListQuery query, CancellationToken ct = default)
     {
-        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.UsersRead))
+        if (!await _permissions.HasPlatformPermissionAsync(IdentityAccessPermissionNames.UsersRead, ct))
             return IdentityErrors.AccessDenied("You cannot view users.");
 
         var page = Math.Max(query.Page, 1);
@@ -58,7 +70,7 @@ public sealed class UserService : IUserService
 
     public async Task<IdentityResult<UserDto>> GetAsync(Guid id, CancellationToken ct = default)
     {
-        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.UsersRead))
+        if (!await _permissions.HasPlatformPermissionAsync(IdentityAccessPermissionNames.UsersRead, ct))
             return IdentityErrors.AccessDenied("You cannot view users.");
 
         return await LoadDtoAsync(id, ct);
@@ -71,19 +83,19 @@ public sealed class UserService : IUserService
     /// </summary>
     private async Task<IdentityResult<UserDto>> LoadDtoAsync(Guid id, CancellationToken ct)
     {
-        var user = await _userRepository.FindByIdWithRolesAsync(id, ct);
+        var user = await _userRepository.FindByIdAsync(id, ct);
 
         if (user is null)
             return IdentityErrors.NotFound("User");
 
-        var access = await _accessResolver.ResolveAsync(user, ct);
+        var access = await _access.GetAccessAsync(user.Id, PlatformScope, ct);
 
-        return Common.IdentityResult.Success(IdentityMapper.ToDto(user, access.Permissions));
+        return Common.IdentityResult.Success(IdentityMapper.ToDto(user, access.Roles, access.Permissions));
     }
 
     public async Task<IdentityResult<UserDto>> CreateAsync(CreateUserRequest request, CancellationToken ct = default)
     {
-        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.UsersCreate))
+        if (!await _permissions.HasPlatformPermissionAsync(IdentityAccessPermissionNames.UsersCreate, ct))
             return IdentityErrors.AccessDenied("You cannot create users.");
 
         var email = request.Email?.Trim() ?? string.Empty;
@@ -112,15 +124,10 @@ public sealed class UserService : IUserService
             return nameError;
 
         var roleIds = (request.RoleIds ?? new List<Guid>()).Distinct().ToList();
-        var roles = await _roleRepository.FindByIdsAsync(roleIds, ct);
+        var roleError = await ValidateRolesAsync(roleIds, ct);
 
-        if (roles.Count != roleIds.Count)
-            return IdentityErrors.Validation("One or more roles do not exist.");
-
-        // Only an administrator can grant the Administrator role
-        var wantsAdministrator = roles.Any(r => AdministratorRole.Is(r));
-        if (wantsAdministrator && !_currentUser.Roles.Contains(IdentityRoleNames.Administrator))
-            return IdentityErrors.AccessDenied("You cannot grant administrator privileges.");
+        if (roleError is not null)
+            return roleError;
 
         var normalizedEmail = IdentityNormalizer.NormalizeEmail(email);
 
@@ -144,18 +151,27 @@ public sealed class UserService : IUserService
             CreatedAt = Now()
         };
 
-        foreach (var role in roles)
-            user.UserRoles.Add(new UserRole { UserId = user.Id, RoleId = role.Id });
-
         if (!await _userRepository.CreateAsync(user, ct))
             return IdentityErrors.Conflict("A user with this email or mobile number already exists.");
+
+        // An inactive account is not a platform member; membership and roles are granted on activation.
+        if (user.IsActive)
+        {
+            await _maintenance.AddPlatformMemberAsync(user.Id, ct);
+
+            if (roleIds.Count > 0)
+                await _maintenance.SetPlatformUserRolesAsync(user.Id, roleIds, ct);
+        }
 
         return await LoadDtoAsync(user.Id, ct);
     }
 
     public async Task<IdentityResult<UserDto>> UpdateAsync(Guid id, UpdateUserRequest request, CancellationToken ct = default)
     {
-        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.UsersUpdate))
+        if (!await _permissions.HasPlatformPermissionAsync(IdentityAccessPermissionNames.UsersUpdate, ct))
+            return IdentityErrors.AccessDenied("You cannot update users.");
+
+        if (_currentUser.UserId is not { } actorId)
             return IdentityErrors.AccessDenied("You cannot update users.");
 
         var user = await _userRepository.FindForUpdateAsync(id, ct);
@@ -163,11 +179,15 @@ public sealed class UserService : IUserService
         if (user is null)
             return IdentityErrors.NotFound("User");
 
-        // Only an administrator can change another administrator's credentials
-        if ((request.Password is not null || request.Email is not null) && id != _currentUser.UserId)
+        var actorAccess = await _access.GetAccessAsync(actorId, PlatformScope, ct);
+        var actorIsAdmin = IsAdministrator(actorAccess);
+
+        // Only an administrator can change another administrator's credentials.
+        if ((request.Password is not null || request.Email is not null) && id != actorId)
         {
-            var isTargetAdmin = user.UserRoles.Any(ur => AdministratorRole.Is(ur.Role));
-            if (isTargetAdmin && !_currentUser.Roles.Contains(IdentityRoleNames.Administrator))
+            var userAccess = await _access.GetAccessAsync(id, PlatformScope, ct);
+
+            if (IsAdministrator(userAccess) && !actorIsAdmin)
                 return IdentityErrors.AccessDenied("You cannot change another administrator's credentials.");
         }
 
@@ -208,7 +228,7 @@ public sealed class UserService : IUserService
         {
             if (!isActive)
             {
-                if (_currentUser.UserId == id)
+                if (actorId == id)
                     return IdentityErrors.Forbidden("You cannot deactivate your own account.");
 
                 if (await _administratorGuard.IsLastActiveAdministratorAsync(id, ct))
@@ -221,6 +241,10 @@ public sealed class UserService : IUserService
 
                 if (deactivated != CredentialUpdateResult.Updated)
                     return IdentityErrors.Conflict("The account was changed by another request. Please try again.");
+
+                // Revoking platform membership ends the account's platform access and makes any stale
+                // role assignments inactive (membership generation bump).
+                await _maintenance.RemovePlatformMemberAsync(id, ct);
             }
             else
             {
@@ -257,12 +281,16 @@ public sealed class UserService : IUserService
         if (!await _userRepository.UpdateAsync(user, ct))
             return IdentityErrors.Conflict("A user with this email or mobile number already exists.");
 
+        // Reactivation grants platform membership again (idempotent).
+        if (request.IsActive == true && !user.IsActive)
+            await _maintenance.AddPlatformMemberAsync(id, ct);
+
         return await LoadDtoAsync(id, ct);
     }
 
     public async Task<Common.IdentityResult> DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.UsersDelete))
+        if (!await _permissions.HasPlatformPermissionAsync(IdentityAccessPermissionNames.UsersDelete, ct))
             return IdentityErrors.AccessDenied("You cannot delete users.");
 
         if (_currentUser.UserId == id)
@@ -278,12 +306,18 @@ public sealed class UserService : IUserService
 
         await _userRepository.DeleteAsync(user, ct);
 
+        // Platform membership is revoked so the deleted user's assignments can never resurface.
+        await _maintenance.RemovePlatformMemberAsync(id, ct);
+
         return Common.IdentityResult.Success();
     }
 
     public async Task<IdentityResult<UserDto>> SetRolesAsync(Guid id, SetUserRolesRequest request, CancellationToken ct = default)
     {
-        if (!_currentUser.Permissions.Contains(IdentityPermissionNames.UsersUpdate))
+        if (!await _permissions.HasPlatformPermissionAsync(IdentityAccessPermissionNames.UsersUpdate, ct))
+            return IdentityErrors.AccessDenied("You cannot update user roles.");
+
+        if (_currentUser.UserId is not { } actorId)
             return IdentityErrors.AccessDenied("You cannot update user roles.");
 
         var user = await _userRepository.FindForUpdateAsync(id, ct);
@@ -292,29 +326,69 @@ public sealed class UserService : IUserService
             return IdentityErrors.NotFound("User");
 
         var wanted = (request.RoleIds ?? new List<Guid>()).Distinct().ToList();
-        var roles = await _roleRepository.FindByIdsAsync(wanted, ct);
+        var roleError = await ValidateRolesAsync(wanted, ct);
 
-        if (roles.Count != wanted.Count)
-            return IdentityErrors.Validation("One or more roles do not exist.");
+        if (roleError is not null)
+            return roleError;
 
-        // Only an administrator can grant the Administrator role
-        var wantsAdministrator = roles.Any(r => AdministratorRole.Is(r));
-        if (wantsAdministrator && !_currentUser.Roles.Contains(IdentityRoleNames.Administrator))
-            return IdentityErrors.AccessDenied("You cannot grant administrator privileges.");
+        var platformRoles = await _access.ListRolesAsync(PlatformScope, ct);
+        var adminRoleId = platformRoles.FirstOrDefault(r => r.Name == IdentityRoleNames.Administrator)?.Id;
 
-        var losesAdministrator =
-            user.UserRoles.Any(ur => AdministratorRole.Is(ur.Role)) &&
-            roles.All(r => !AdministratorRole.Is(r));
+        var wantsAdministrator = adminRoleId is { } adminId && wanted.Contains(adminId);
+
+        if (wantsAdministrator)
+        {
+            var actorAccess = await _access.GetAccessAsync(actorId, PlatformScope, ct);
+
+            if (!IsAdministrator(actorAccess))
+                return IdentityErrors.AccessDenied("You cannot grant administrator privileges.");
+        }
+
+        var userAccess = await _access.GetAccessAsync(id, PlatformScope, ct);
+
+        var losesAdministrator = IsAdministrator(userAccess) && !wantsAdministrator;
 
         if (losesAdministrator && await _administratorGuard.IsLastActiveAdministratorAsync(id, ct))
             return IdentityErrors.Conflict("The last active administrator cannot lose the Administrator role.");
 
-        user.UpdatedAt = Now();
-
-        await _userRepository.ReplaceRolesAsync(user, wanted, ct);
+        await _maintenance.SetPlatformUserRolesAsync(id, wanted, ct);
 
         return await LoadDtoAsync(id, ct);
     }
+
+    /// <summary>
+    /// Validates that every role id is a platform-scope role and that the signed-in user may grant the
+    /// Administrator role. Returns null when the set is acceptable.
+    /// </summary>
+    private async Task<Common.IdentityError?> ValidateRolesAsync(IReadOnlyCollection<Guid> roleIds, CancellationToken ct)
+    {
+        if (roleIds.Count == 0)
+            return null;
+
+        if (_currentUser.UserId is not { } actorId)
+            return IdentityErrors.AccessDenied("You cannot assign roles.");
+
+        var platformRoles = await _access.ListRolesAsync(PlatformScope, ct);
+        var validIds = platformRoles.Select(r => r.Id).ToHashSet();
+
+        if (roleIds.Any(id => !validIds.Contains(id)))
+            return IdentityErrors.Validation("One or more roles do not exist.");
+
+        var adminRoleId = platformRoles.FirstOrDefault(r => r.Name == IdentityRoleNames.Administrator)?.Id;
+
+        if (adminRoleId is { } adminId && roleIds.Contains(adminId))
+        {
+            var actorAccess = await _access.GetAccessAsync(actorId, PlatformScope, ct);
+
+            if (!IsAdministrator(actorAccess))
+                return IdentityErrors.AccessDenied("You cannot grant administrator privileges.");
+        }
+
+        return null;
+    }
+
+    private static bool IsAdministrator(CoreKit.Access.Abstractions.EffectiveAccess access)
+        => access.IsOwner || access.Roles.Contains(IdentityRoleNames.Administrator);
 
     private DateTime Now() => _time.GetUtcNow().UtcDateTime;
 }

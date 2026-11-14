@@ -1,6 +1,4 @@
-﻿using CoreKit.SharedKernel.Abstractions;
-
-namespace CoreKit.Identity.Seeding;
+﻿namespace CoreKit.Identity.Seeding;
 
 public static class SeedingExtensions
 {
@@ -13,12 +11,9 @@ public static class SeedingExtensions
     }
 
     /// <summary>Runs the seeder once. Call after migrations, before the app starts serving.</summary>
-    public static async Task SeedIdentityAsync(
-        this IServiceProvider provider,
-        IEnumerable<PermissionSeed>? modulePermissions = null,
-        CancellationToken ct = default)
+    public static async Task SeedIdentityAsync(this IServiceProvider provider, CancellationToken ct = default)
     {
         using var scope = provider.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().SeedAsync(modulePermissions, ct);
+        await scope.ServiceProvider.GetRequiredService<IdentitySeeder>().SeedAsync(ct);
     }
 }

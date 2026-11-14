@@ -236,7 +236,7 @@ public sealed class PostgresLoginTransitionTests
             new PasswordHasher(),
             new FakeTokenService(),
             new FakeSessionIssuer(),
-            new AccessResolver(new PermissionRepository(CreateContext(connectionString))),
+            new FakeAccessService(new FakeAccessState()),
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             new FixedTimeProvider(FixedNow),

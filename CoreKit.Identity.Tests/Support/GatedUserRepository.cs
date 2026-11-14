@@ -80,14 +80,11 @@ internal sealed class GatedUserRepository : IUserRepository
     public Task<User?> FindByIdAsync(Guid id, CancellationToken ct = default)
         => _inner.FindByIdAsync(id, ct);
 
-    public Task<User?> FindByIdWithRolesAsync(Guid id, CancellationToken ct = default)
-        => _inner.FindByIdWithRolesAsync(id, ct);
+    public Task<User?> FindByNormalizedEmailAsync(string normalizedEmail, CancellationToken ct = default)
+        => _inner.FindByNormalizedEmailAsync(normalizedEmail, ct);
 
     public Task<User?> FindForUpdateAsync(Guid id, CancellationToken ct = default)
         => _inner.FindForUpdateAsync(id, ct);
-
-    public Task<User?> FindByNormalizedEmailWithRolesAsync(string normalizedEmail, CancellationToken ct = default)
-        => _inner.FindByNormalizedEmailWithRolesAsync(normalizedEmail, ct);
 
     public Task<Guid?> FindUnconfirmedActiveIdByEmailAsync(string normalizedEmail, CancellationToken ct = default)
         => _inner.FindUnconfirmedActiveIdByEmailAsync(normalizedEmail, ct);
@@ -102,17 +99,14 @@ internal sealed class GatedUserRepository : IUserRepository
         string? search, bool? isActive, int page, int pageSize, CancellationToken ct = default)
         => _inner.ListAsync(search, isActive, page, pageSize, ct);
 
-    public Task<IReadOnlyList<Guid>> GetActiveUserIdsInRoleAsync(string normalizedRoleName, CancellationToken ct = default)
-        => _inner.GetActiveUserIdsInRoleAsync(normalizedRoleName, ct);
+    public Task<IReadOnlyList<Guid>> GetActiveUserIdsAsync(IReadOnlyCollection<Guid> userIds, CancellationToken ct = default)
+        => _inner.GetActiveUserIdsAsync(userIds, ct);
 
     public Task<bool> CreateAsync(User user, CancellationToken ct = default)
         => _inner.CreateAsync(user, ct);
 
     public Task<bool> UpdateAsync(User user, CancellationToken ct = default)
         => _inner.UpdateAsync(user, ct);
-
-    public Task ReplaceRolesAsync(User user, IReadOnlyCollection<Guid> roleIds, CancellationToken ct = default)
-        => _inner.ReplaceRolesAsync(user, roleIds, ct);
 
     public Task DeleteAsync(User user, CancellationToken ct = default)
         => _inner.DeleteAsync(user, ct);

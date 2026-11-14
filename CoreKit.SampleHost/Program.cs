@@ -1,8 +1,8 @@
+using CoreKit.Access.Abstractions;
 using CoreKit.Access.Constants;
 using CoreKit.Access.Endpoints;
 using CoreKit.Access.Extensions;
 using CoreKit.Access.Persistence;
-using CoreKit.Identity.Authorization;
 using CoreKit.Identity.Constants;
 using CoreKit.Identity.Endpoints;
 using CoreKit.Identity.Extensions;
@@ -55,8 +55,8 @@ using (var scope = app.Services.CreateScope())
     await scope.ServiceProvider.GetRequiredService<AccessDbContext>().Database.MigrateAsync();
 }
 
-// The Administrator role receives every permission, including the tenants.* ones.
-await app.Services.SeedIdentityAsync(TenantPermissionSeeds.All);
+// Access owns roles and permissions; the seeder only ensures the first administrator exists.
+await app.Services.SeedIdentityAsync();
 
 app.UseIdentity();      // authentication -> rate limiter -> authorization
 app.UseTenant();   // after UseIdentity: it reads the tenant claim from the signed-in user
@@ -72,8 +72,11 @@ app.MapGet("/demo/public", () => "Anyone can read this.");
 app.MapGet("/demo/needs-login", () => "You are signed in.")
    .RequireAuthorization();
 
-app.MapGet("/demo/needs-users-read", () => "You hold the users.read permission.")
-   .RequirePermission(IdentityPermissionNames.UsersRead);
+app.MapGet("/demo/needs-users-read", async (CoreKit.Access.Abstractions.IPermissionChecker checker, CancellationToken ct) =>
+        await checker.HasPlatformPermissionAsync(IdentityAccessPermissionNames.UsersRead, ct)
+            ? Results.Ok("You hold the identity.users.read permission.")
+            : Results.Forbid())
+   .RequireAuthorization();
 
 // Works only when the request belongs to a tenant. A suspended tenant never gets this far.
 app.MapGet("/demo/needs-tenant", (ICurrentTenant tenant) => $"You are acting inside tenant {tenant.RequiredId}.")

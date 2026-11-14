@@ -62,32 +62,6 @@ namespace CoreKit.Identity.Migrations
                     b.ToTable("Idenity_EmailVerificationTokens", (string)null);
                 });
 
-            modelBuilder.Entity("CoreKit.Identity.Entities.Permission", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .IsUnique()
-                        .HasDatabaseName("UX_Identity_Permissions_Name");
-
-                    b.ToTable("Identity_Permissions", (string)null);
-                });
-
             modelBuilder.Entity("CoreKit.Identity.Entities.RefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -129,52 +103,6 @@ namespace CoreKit.Identity.Migrations
                     b.ToTable("Identity_RefreshTokens", (string)null);
                 });
 
-            modelBuilder.Entity("CoreKit.Identity.Entities.Role", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<string>("NormalizedName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("NormalizedName")
-                        .IsUnique()
-                        .HasDatabaseName("UX_Identity_Roles_NormalizedName");
-
-                    b.ToTable("Identity_Roles", (string)null);
-                });
-
-            modelBuilder.Entity("CoreKit.Identity.Entities.RolePermission", b =>
-                {
-                    b.Property<Guid>("RoleId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("PermissionId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("RoleId", "PermissionId");
-
-                    b.HasIndex("PermissionId");
-
-                    b.ToTable("Identity_RolePermissions", (string)null);
-                });
-
             modelBuilder.Entity("CoreKit.Identity.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -195,14 +123,6 @@ namespace CoreKit.Identity.Migrations
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
 
-                    b.Property<string>("Mobile")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("NormalizedMobile")
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("boolean");
 
@@ -212,10 +132,18 @@ namespace CoreKit.Identity.Migrations
                     b.Property<DateTime?>("LockoutEnd")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("Mobile")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.Property<string>("NormalizedEmail")
                         .IsRequired()
                         .HasMaxLength(320)
                         .HasColumnType("character varying(320)");
+
+                    b.Property<string>("NormalizedMobile")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
@@ -242,21 +170,6 @@ namespace CoreKit.Identity.Migrations
                     b.ToTable("Identity_Users", (string)null);
                 });
 
-            modelBuilder.Entity("CoreKit.Identity.Entities.UserRole", b =>
-                {
-                    b.Property<Guid>("UserId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("RoleId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("UserId", "RoleId");
-
-                    b.HasIndex("RoleId");
-
-                    b.ToTable("Identity_UserRoles", (string)null);
-                });
-
             modelBuilder.Entity("CoreKit.Identity.Entities.EmailVerificationToken", b =>
                 {
                     b.HasOne("CoreKit.Identity.Entities.User", "User")
@@ -279,61 +192,9 @@ namespace CoreKit.Identity.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("CoreKit.Identity.Entities.RolePermission", b =>
-                {
-                    b.HasOne("CoreKit.Identity.Entities.Permission", "Permission")
-                        .WithMany("RolePermissions")
-                        .HasForeignKey("PermissionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("CoreKit.Identity.Entities.Role", "Role")
-                        .WithMany("RolePermissions")
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Permission");
-
-                    b.Navigation("Role");
-                });
-
-            modelBuilder.Entity("CoreKit.Identity.Entities.UserRole", b =>
-                {
-                    b.HasOne("CoreKit.Identity.Entities.Role", "Role")
-                        .WithMany("UserRoles")
-                        .HasForeignKey("RoleId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("CoreKit.Identity.Entities.User", "User")
-                        .WithMany("UserRoles")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Role");
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("CoreKit.Identity.Entities.Permission", b =>
-                {
-                    b.Navigation("RolePermissions");
-                });
-
-            modelBuilder.Entity("CoreKit.Identity.Entities.Role", b =>
-                {
-                    b.Navigation("RolePermissions");
-
-                    b.Navigation("UserRoles");
-                });
-
             modelBuilder.Entity("CoreKit.Identity.Entities.User", b =>
                 {
                     b.Navigation("RefreshTokens");
-
-                    b.Navigation("UserRoles");
                 });
 #pragma warning restore 612, 618
         }

@@ -5,8 +5,11 @@ namespace CoreKit.Identity.Services;
 
 public static class IdentityMapper
 {
-    /// <summary>The user must be loaded with UserRoles and each UserRole's Role.</summary>
-    public static UserDto ToDto(User user, IReadOnlyCollection<string>? permissions = null) => new()
+    /// <summary>Roles and permissions come from Access (the platform scope); Identity no longer owns them.</summary>
+    public static UserDto ToDto(
+        User user,
+        IReadOnlyCollection<string>? roles = null,
+        IReadOnlyCollection<string>? permissions = null) => new()
     {
         Id = user.Id,
         Email = user.Email,
@@ -16,7 +19,7 @@ public static class IdentityMapper
         EmailConfirmed = user.EmailConfirmed,
         CreatedAt = user.CreatedAt,
         UpdatedAt = user.UpdatedAt,
-        Roles = user.UserRoles.Select(ur => ur.Role.Name).OrderBy(name => name).ToList(),
-        Permissions = permissions?.ToList() ?? new List<string>()
+        Roles = roles?.OrderBy(name => name, StringComparer.Ordinal).ToList() ?? new List<string>(),
+        Permissions = permissions?.OrderBy(name => name, StringComparer.Ordinal).ToList() ?? new List<string>()
     };
 }

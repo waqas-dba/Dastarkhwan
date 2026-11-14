@@ -1,15 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿namespace CoreKit.Identity.Constants;
 
-namespace CoreKit.Identity.Constants;
-
+/// <summary>
+/// The role names Identity still needs to know about. Roles and assignments are owned by Access; Identity
+/// only names the protected platform Administrator role for its last-administrator protection.
+/// </summary>
 public static class IdentityRoleNames
 {
-    /// <summary>Always holds every permission and can never be deleted or renamed.</summary>
     public const string Administrator = "Administrator";
-
-    public const string Manager = "Manager";
-
-    public const string Staff = "Staff";
 }

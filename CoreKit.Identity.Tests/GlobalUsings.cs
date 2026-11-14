@@ -1,3 +1,6 @@
+global using CoreKit.Access.Abstractions;
+global using CoreKit.Access.Common;
+global using CoreKit.Access.Models;
 global using CoreKit.Identity.Common;
 global using CoreKit.Identity.Constants;
 global using CoreKit.Identity.Entities;

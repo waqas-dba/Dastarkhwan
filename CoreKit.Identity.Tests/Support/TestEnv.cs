@@ -1,3 +1,6 @@
+using CoreKit.Access.Abstractions;
+using CoreKit.Access.Models;
+using CoreKit.Identity.Constants;
 using CoreKit.Identity.Repositories;
 using CoreKit.Identity.Security;
 using Microsoft.Extensions.Caching.Memory;
@@ -13,11 +16,15 @@ namespace CoreKit.Identity.Tests.Support;
 /// <summary>
 /// One real object graph on an in-memory SQLite database, built like a single request.
 /// Repositories are created from one context and read back from another, so nothing is
-/// served from a tracker. Permissions, roles and users are seeded directly into the
-/// database so tests start from a known state.
+/// served from a tracker. Users are seeded directly into the database so tests start from a
+/// known state. Roles and permissions are owned by Access, not Identity, so the platform access
+/// of each user is configured on the in-memory <see cref="FakeAccessState"/> instead of in the
+/// Identity schema.
 /// </summary>
 internal sealed class TestEnv : IDisposable
 {
+    public const string StaffRoleName = "Staff";
+
     private readonly string _databasePath;
     private readonly List<SqliteConnection> _connections = new();
 
@@ -36,79 +43,25 @@ internal sealed class TestEnv : IDisposable
         Time = new FixedTimeProvider(new DateTimeOffset(2026, 10, 9, 12, 0, 0, TimeSpan.Zero));
         Hasher = new PasswordHasher();
 
-        // ---- seed permissions ----
-        var permissions = new List<Permission>();
-        foreach (var seed in IdentityPermissionNames.All)
-        {
-            permissions.Add(new Permission
-            {
-                Id = Guid.NewGuid(),
-                Name = seed.Name,
-                Description = seed.Description,
-                IsActive = true
-            });
-        }
-        Db.Permissions.AddRange(permissions);
-        Db.SaveChanges();
+        AdministratorRoleId = Guid.NewGuid();
+        StaffRoleId = Guid.NewGuid();
 
-        // ---- seed roles ----
-        var adminPerms = permissions.ToDictionary(p => p.Name);
-        var adminRole = new Role
+        // ---- Access platform state (roles + per-user access) ----
+        AccessState = new FakeAccessState();
+        AccessState.PlatformRoles.Add(new AccessRoleDto
         {
-            Id = Guid.NewGuid(),
+            Id = AdministratorRoleId,
             Name = IdentityRoleNames.Administrator,
-            NormalizedName = IdentityNormalizer.NormalizeName(IdentityRoleNames.Administrator),
-            Description = "Full access. Cannot be changed or deleted.",
-            IsActive = true
-        };
-        foreach (var p in permissions)
-            adminRole.RolePermissions.Add(new RolePermission { RoleId = adminRole.Id, PermissionId = p.Id });
-
-        var managerPermIds = new[]
+            Description = "Full access."
+        });
+        AccessState.PlatformRoles.Add(new AccessRoleDto
         {
-            IdentityPermissionNames.UsersRead,
-            IdentityPermissionNames.UsersCreate,
-            IdentityPermissionNames.UsersUpdate,
-            IdentityPermissionNames.RolesRead,
-            IdentityPermissionNames.PermissionsRead
-        };
-        var managerRole = new Role
-        {
-            Id = Guid.NewGuid(),
-            Name = IdentityRoleNames.Manager,
-            NormalizedName = IdentityNormalizer.NormalizeName(IdentityRoleNames.Manager),
-            Description = "Manages users and can read roles.",
-            IsActive = true
-        };
-        foreach (var name in managerPermIds)
-        {
-            var p = adminPerms[name];
-            managerRole.RolePermissions.Add(new RolePermission { RoleId = managerRole.Id, PermissionId = p.Id });
-        }
+            Id = StaffRoleId,
+            Name = StaffRoleName,
+            Description = "Basic read access."
+        });
 
-        var staffRole = new Role
-        {
-            Id = Guid.NewGuid(),
-            Name = IdentityRoleNames.Staff,
-            NormalizedName = IdentityNormalizer.NormalizeName(IdentityRoleNames.Staff),
-            Description = "Basic read access.",
-            IsActive = true
-        };
-        staffRole.RolePermissions.Add(new RolePermission
-            { RoleId = staffRole.Id, PermissionId = adminPerms[IdentityPermissionNames.UsersRead].Id });
-
-        Db.Roles.AddRange(adminRole, managerRole, staffRole);
-        Db.SaveChanges();
-
-        AdministratorRoleId = adminRole.Id;
-        ManagerRoleId = managerRole.Id;
-        StaffRoleId = staffRole.Id;
-
-        UserPermissionId = adminPerms[IdentityPermissionNames.UsersRead].Id;
-        UserCreatePermissionId = adminPerms[IdentityPermissionNames.UsersCreate].Id;
-        UserUpdatePermissionId = adminPerms[IdentityPermissionNames.UsersUpdate].Id;
-
-        // ---- seed users ----
+        // ---- seed users (no role tables: Access owns roles) ----
         OwnerUserId = Guid.NewGuid();
         var owner = new User
         {
@@ -123,7 +76,6 @@ internal sealed class TestEnv : IDisposable
             EmailConfirmed = true,
             CreatedAt = Time.GetUtcNow().UtcDateTime
         };
-        owner.UserRoles.Add(new UserRole { UserId = OwnerUserId, RoleId = AdministratorRoleId });
 
         StaffUserId = Guid.NewGuid();
         var staff = new User
@@ -139,7 +91,6 @@ internal sealed class TestEnv : IDisposable
             EmailConfirmed = true,
             CreatedAt = Time.GetUtcNow().UtcDateTime
         };
-        staff.UserRoles.Add(new UserRole { UserId = StaffUserId, RoleId = StaffRoleId });
 
         InactiveUserId = Guid.NewGuid();
         var inactive = new User
@@ -155,32 +106,42 @@ internal sealed class TestEnv : IDisposable
             EmailConfirmed = true,
             CreatedAt = Time.GetUtcNow().UtcDateTime
         };
-        inactive.UserRoles.Add(new UserRole { UserId = InactiveUserId, RoleId = StaffRoleId });
 
         Db.Users.AddRange(owner, staff, inactive);
         Db.SaveChanges();
 
+        // Owner is an administrator (platform member holding the Administrator role).
+        AccessState.SetAccess(OwnerUserId, isMember: true, isOwner: false,
+            IdentityAccessPermissionNames.All.Select(p => p.Name), new[] { IdentityRoleNames.Administrator });
+
+        // Staff holds users.read and the Staff role.
+        AccessState.SetAccess(StaffUserId, isMember: true, isOwner: false,
+            new[] { IdentityAccessPermissionNames.UsersRead }, new[] { StaffRoleName });
+
+        // The inactive user has the same platform access as staff (only their Identity account is off).
+        AccessState.SetAccess(InactiveUserId, isMember: true, isOwner: false,
+            new[] { IdentityAccessPermissionNames.UsersRead }, new[] { StaffRoleName });
+
+        // ---- Access fakes (backed by the state above) ----
+        PermissionChecker = new FakePermissionChecker(AccessState);
+        AccessService = new FakeAccessService(AccessState);
+        Maintenance = new FakeAccessMaintenance(AccessState);
+
         // ---- services ----
         UserRepository = new UserRepository(Db);
-        RoleRepository = new RoleRepository(Db);
-        PermissionRepository = new PermissionRepository(Db);
         RefreshTokenRepository = new RefreshTokenRepository(Db);
-        AdministratorGuard = new AdministratorGuard(UserRepository);
-        AccessResolver = new AccessResolver(PermissionRepository);
+        AdministratorGuard = new AdministratorGuard(AccessService);
         CurrentUser = new FakeCurrentUserService();
 
         UserService = new UserService(
-            UserRepository, RoleRepository,
-            AccessResolver, AdministratorGuard, Hasher, CurrentUser, Time);
-
-        RoleService = new RoleService(RoleRepository, PermissionRepository, CurrentUser);
-        PermissionService = new PermissionService(PermissionRepository, CurrentUser);
+            UserRepository, PermissionChecker, AccessService, Maintenance,
+            AdministratorGuard, Hasher, CurrentUser, Time);
 
         var emailOptions = Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false });
         AuthService = new AuthService(
             UserRepository, RefreshTokenRepository, Hasher,
             new FakeTokenService(), new FakeSessionIssuer(),
-            AccessResolver, CurrentUser, emailOptions, Time,
+            AccessService, CurrentUser, emailOptions, Time,
             NullLogger<AuthService>.Instance);
     }
 
@@ -192,23 +153,21 @@ internal sealed class TestEnv : IDisposable
 
     public FakeCurrentUserService CurrentUser { get; }
 
+    public FakeAccessState AccessState { get; }
+
+    public CoreKit.Access.Abstractions.IPermissionChecker PermissionChecker { get; }
+
+    public IAccessService AccessService { get; }
+
+    public IAccessMaintenance Maintenance { get; }
+
     public IUserRepository UserRepository { get; }
 
-    public IRoleRepository RoleRepository { get; }
-
-    public IPermissionRepository PermissionRepository { get; }
-
     public IRefreshTokenRepository RefreshTokenRepository { get; }
-
-    public IAccessResolver AccessResolver { get; }
 
     public IAdministratorGuard AdministratorGuard { get; }
 
     public IUserService UserService { get; }
-
-    public IRoleService RoleService { get; }
-
-    public IPermissionService PermissionService { get; }
 
     public IAuthService AuthService { get; }
 
@@ -220,15 +179,7 @@ internal sealed class TestEnv : IDisposable
 
     public Guid AdministratorRoleId { get; }
 
-    public Guid ManagerRoleId { get; }
-
     public Guid StaffRoleId { get; }
-
-    public Guid UserPermissionId { get; }
-
-    public Guid UserCreatePermissionId { get; }
-
-    public Guid UserUpdatePermissionId { get; }
 
     public IdentityDbContext NewContext()
     {
@@ -244,36 +195,36 @@ internal sealed class TestEnv : IDisposable
     {
         CurrentUser.UserId = OwnerUserId;
         CurrentUser.Email = "owner@example.com";
-        CurrentUser.Roles = new List<string> { IdentityRoleNames.Administrator };
-        CurrentUser.Permissions = IdentityPermissionNames.All.Select(p => p.Name).ToList();
+        AccessState.CurrentUserId = OwnerUserId;
     }
 
     public void SignInStaff()
     {
         CurrentUser.UserId = StaffUserId;
         CurrentUser.Email = "staff@example.com";
-        CurrentUser.Roles = new List<string> { IdentityRoleNames.Staff };
-        CurrentUser.Permissions = new List<string> { IdentityPermissionNames.UsersRead };
+        AccessState.CurrentUserId = StaffUserId;
     }
 
     /// <summary>
     /// Signs in a seeded user with an exact permission set. Tests use this when the point is a
     /// caller who holds one permission (for example create) but not a neighbouring one (read).
+    /// Membership and roles stay as configured for that user; only the platform permissions change.
     /// </summary>
-    public void SignInWith(Guid userId, IReadOnlyCollection<string> roles, params string[] permissions)
+    public void SignInWith(Guid userId, params string[] permissions)
     {
         CurrentUser.UserId = userId;
         CurrentUser.Email = null;
-        CurrentUser.Roles = roles;
-        CurrentUser.Permissions = permissions;
+        AccessState.CurrentUserId = userId;
+
+        var current = AccessState.Get(userId);
+        AccessState.SetAccess(userId, current.IsMember, current.IsOwner, permissions, current.Roles);
     }
 
     public void SignOut()
     {
         CurrentUser.UserId = null;
         CurrentUser.Email = null;
-        CurrentUser.Roles = new List<string>();
-        CurrentUser.Permissions = new List<string>();
+        AccessState.CurrentUserId = null;
     }
 
     public void Dispose()
@@ -287,9 +238,7 @@ internal sealed class TestEnv : IDisposable
 /// <summary>Minimal fake ITokenService for tests.</summary>
 internal sealed class FakeTokenService : ITokenService
 {
-    public AccessTokenResult CreateAccessToken(
-        User user, IReadOnlyCollection<string> roles, IReadOnlyCollection<string> permissions,
-        IEnumerable<Claim>? extraClaims = null)
+    public AccessTokenResult CreateAccessToken(User user, IEnumerable<Claim>? extraClaims = null)
         => new("fake-access-token", DateTime.UtcNow.AddMinutes(5));
 
     public GeneratedRefreshToken CreateRefreshToken()

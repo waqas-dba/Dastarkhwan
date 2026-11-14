@@ -12,11 +12,11 @@ public sealed record GeneratedRefreshToken(string RawToken, string TokenHash, Da
 
 public interface ITokenService
 {
-    AccessTokenResult CreateAccessToken(
-    User user,
-    IReadOnlyCollection<string> roles,
-    IReadOnlyCollection<string> permissions,
-    IEnumerable<Claim>? extraClaims = null);
+    /// <summary>
+    /// Creates the signed access token. Roles and permissions are no longer embedded: Access is the
+    /// authority and reads them from the database per request, so a stale token cannot grant access.
+    /// </summary>
+    AccessTokenResult CreateAccessToken(User user, IEnumerable<Claim>? extraClaims = null);
 
     /// <summary>Creates a random token. RawToken goes to the client; only TokenHash is stored.</summary>
     GeneratedRefreshToken CreateRefreshToken();

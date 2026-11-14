@@ -21,4 +21,12 @@ public interface IAccessService
 
     /// <summary>For the signed-in user in the current scope.</summary>
     Task<AccessResult<EffectiveAccess>> GetMyAccessAsync(CancellationToken ct = default);
+
+    /// <summary>User ids holding a role by name in a scope (current membership generation). Used by platform
+    /// administration to find, for example, the active administrators of the platform.</summary>
+    Task<IReadOnlyList<Guid>> ListUserIdsWithRoleAsync(AccessScope scope, string roleName, CancellationToken ct = default);
+
+    /// <summary>All roles of a scope (read-only, unguarded). For callers that have already authorized their
+    /// operation, for example Identity user management validating role ids and detecting the Administrator role.</summary>
+    Task<IReadOnlyList<AccessRoleDto>> ListRolesAsync(AccessScope scope, CancellationToken ct = default);
 }

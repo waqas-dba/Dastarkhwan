@@ -11,6 +11,8 @@ namespace CoreKit.Identity.Tests;
 /// overwrite a newer password, and email must be immutable after creation.
 /// Every race is forced with deterministic gates (task completion sources), never sleeps, and
 /// every assertion checks persisted database state, not just return values.
+/// Roles and permissions are owned by Access, so the platform access the services consult is
+/// configured on the in-memory Access fakes rather than in the Identity schema.
 /// </summary>
 public sealed class CredentialVersionTests : IDisposable
 {
@@ -38,7 +40,7 @@ public sealed class CredentialVersionTests : IDisposable
             hasher ?? _env.Hasher,
             new FakeTokenService(),
             sessions ?? new FakeSessionIssuer(),
-            new AccessResolver(new PermissionRepository(db)),
+            _env.AccessService,
             currentUser ?? new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.Time,
@@ -46,32 +48,33 @@ public sealed class CredentialVersionTests : IDisposable
     }
 
     private UserService CreateAdminService(IUserRepository? userRepository = null)
-        => new(
+    {
+        _env.AccessState.CurrentUserId = _env.OwnerUserId;
+        return new(
             userRepository ?? new UserRepository(_env.NewContext()),
-            new RoleRepository(_env.NewContext()),
-            new AccessResolver(new PermissionRepository(_env.NewContext())),
-            new AdministratorGuard(new UserRepository(_env.NewContext())),
+            _env.PermissionChecker,
+            _env.AccessService,
+            _env.Maintenance,
+            new AdministratorGuard(_env.AccessService),
             _env.Hasher,
             OwnerCurrentUser(),
             _env.Time);
+    }
 
     private FakeCurrentUserService OwnerCurrentUser()
         => new()
         {
             UserId = _env.OwnerUserId,
-            Email = "owner@example.com",
-            Roles = new List<string> { IdentityRoleNames.Administrator },
-            Permissions = IdentityPermissionNames.All.Select(p => p.Name).ToList()
+            Email = "owner@example.com"
         };
 
     private Task<IdentityResult> SelfServiceChangePasswordAsync(string newPassword)
     {
+        _env.AccessState.CurrentUserId = _env.StaffUserId;
         var auth = CreateLoginService(currentUser: new FakeCurrentUserService
         {
             UserId = _env.StaffUserId,
-            Email = StaffEmail,
-            Roles = new List<string> { IdentityRoleNames.Staff },
-            Permissions = new List<string> { IdentityPermissionNames.UsersUpdate }
+            Email = StaffEmail
         });
         return auth.ChangePasswordAsync(new ChangePasswordRequest
         {
@@ -113,7 +116,7 @@ public sealed class CredentialVersionTests : IDisposable
 
     private SessionIssuer CreateRealSessionIssuer(IdentityDbContext db)
         => new(
-            new AccessResolver(new PermissionRepository(db)),
+            _env.AccessService,
             new FakeTokenService(),
             new RefreshTokenRepository(db),
             Array.Empty<IAccessTokenClaimsContributor>(),
@@ -133,7 +136,7 @@ public sealed class CredentialVersionTests : IDisposable
             _env.Hasher,
             new FakeTokenService(),
             CreateRealSessionIssuer(db),
-            new AccessResolver(new PermissionRepository(db)),
+            _env.AccessService,
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.Time,
@@ -257,7 +260,7 @@ public sealed class CredentialVersionTests : IDisposable
             _env.Hasher,
             new FakeTokenService(),
             gatedSessions,
-            new AccessResolver(new PermissionRepository(db)),
+            _env.AccessService,
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.Time,
@@ -298,7 +301,7 @@ public sealed class CredentialVersionTests : IDisposable
             _env.Hasher,
             new FakeTokenService(),
             gatedSessions,
-            new AccessResolver(new PermissionRepository(db)),
+            _env.AccessService,
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.Time,
@@ -433,12 +436,11 @@ public sealed class CredentialVersionTests : IDisposable
                 await release.Task;
             });
 
+        _env.AccessState.CurrentUserId = _env.StaffUserId;
         var changeTask = CreateLoginService(userRepository: gatedRepo, currentUser: new FakeCurrentUserService
         {
             UserId = _env.StaffUserId,
-            Email = StaffEmail,
-            Roles = new List<string> { IdentityRoleNames.Staff },
-            Permissions = new List<string> { IdentityPermissionNames.UsersUpdate }
+            Email = StaffEmail
         }).ChangePasswordAsync(new ChangePasswordRequest
         {
             CurrentPassword = StaffPassword,
@@ -535,7 +537,7 @@ public sealed class CredentialVersionTests : IDisposable
             stubHasher,
             new FakeTokenService(),
             CreateRealSessionIssuer(db),
-            new AccessResolver(new PermissionRepository(db)),
+            _env.AccessService,
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.Time,
@@ -579,7 +581,7 @@ public sealed class CredentialVersionTests : IDisposable
                     atIssuance.SetResult();
                     await releaseIssuance.Task;
                 }),
-            new AccessResolver(new PermissionRepository(db)),
+            _env.AccessService,
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.Time,
@@ -620,7 +622,7 @@ public sealed class CredentialVersionTests : IDisposable
                     atIssuance.SetResult();
                     await releaseIssuance.Task;
                 }),
-            new AccessResolver(new PermissionRepository(db)),
+            _env.AccessService,
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.Time,

@@ -24,7 +24,7 @@ internal static class ModuleBoundaryMatrix
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
         {
             ["CoreKit.SharedKernel"] = Array.Empty<string>(),
-            ["CoreKit.Identity"] = new[] { "CoreKit.SharedKernel" },
+            ["CoreKit.Identity"] = new[] { "CoreKit.SharedKernel", "CoreKit.Access" },
             ["CoreKit.Access"] = Array.Empty<string>(),
             ["CoreKit.Tenant"] = new[] { "CoreKit.Access", "CoreKit.SharedKernel" },
         };
@@ -37,7 +37,11 @@ internal static class ModuleBoundaryMatrix
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
         {
             ["CoreKit.Access/CoreKit.Access.csproj"] = Array.Empty<string>(),
-            ["CoreKit.Identity/CoreKit.Identity.csproj"] = new[] { "CoreKit.SharedKernel/CoreKit.SharedKernel.csproj" },
+            ["CoreKit.Identity/CoreKit.Identity.csproj"] = new[]
+            {
+                "CoreKit.SharedKernel/CoreKit.SharedKernel.csproj",
+                "CoreKit.Access/CoreKit.Access.csproj",
+            },
             ["CoreKit.Tenant/CoreKit.Tenant.csproj"] = new[]
             {
                 "CoreKit.Access/CoreKit.Access.csproj",

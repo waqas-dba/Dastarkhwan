@@ -539,7 +539,7 @@ public sealed class PlatformMembershipTests : IDisposable
         // Wire the real production adapters: PlatformAccessMembership reads ACCESS_PlatformMembers
         var realMembership = new PlatformAccessMembership(_env.Db);
         var composite = new CompositeAccessMembership(new[] { realMembership });
-        var accessService = new AccessService(composite, _env.Assignments, _env.Cache, _env.Catalog,
+        var accessService = new AccessService(composite, _env.Assignments, _env.Roles, _env.Cache, _env.Catalog,
             _env.ScopeContext, _env.User);
         var guard = new AccessGuard(_env.ScopeContext, _env.User, accessService);
         var svc = new PlatformMembershipService(_env.Db, _env.UnitOfWork, _env.Audit, _env.User,
@@ -657,6 +657,12 @@ public sealed class PlatformMembershipTests : IDisposable
 
         public Task<AccessResult<EffectiveAccess>> GetMyAccessAsync(CancellationToken ct = default)
             => Task.FromResult(AccessResult.Success(_access));
+
+        public Task<IReadOnlyList<Guid>> ListUserIdsWithRoleAsync(AccessScope scope, string roleName, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<Guid>>(new List<Guid>());
+
+        public Task<IReadOnlyList<AccessRoleDto>> ListRolesAsync(AccessScope scope, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<AccessRoleDto>>(new List<AccessRoleDto>());
     }
 
 }

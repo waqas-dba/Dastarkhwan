@@ -39,7 +39,7 @@ internal sealed class TestEnv : IDisposable
         AuditRepo = new AccessAuditRepository(Db);
         UnitOfWork = unitOfWork ?? new AccessUnitOfWork(Db, NullLogger<AccessUnitOfWork>.Instance);
         Audit = new AccessAuditRecorder(AuditRepo, User, Time);
-        Access = new AccessService(Membership, Assignments, Cache, Catalog, ScopeContext, User);
+        Access = new AccessService(Membership, Assignments, Roles, Cache, Catalog, ScopeContext, User);
         Guard = new AccessGuard(ScopeContext, User, Access);
     }
 
@@ -100,7 +100,7 @@ internal sealed class TestEnv : IDisposable
     public AccessAssignmentService CreateAssignmentService() => new(
         Guard, Membership, Roles, Assignments, Audit, UnitOfWork, Cache, Options.Create(Config), Time);
 
-    public AccessMaintenance CreateMaintenance() => new(Roles, Assignments, Audit, UnitOfWork, Cache, Catalog, Time);
+    public AccessMaintenance CreateMaintenance() => new(Db, Roles, Assignments, Audit, UnitOfWork, Cache, Catalog, Time);
 
     public AccessAuditLog CreateAuditLog() => new(Guard, AuditRepo);
 

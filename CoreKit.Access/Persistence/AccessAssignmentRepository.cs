@@ -11,6 +11,11 @@ internal interface IAccessAssignmentRepository
     /// <summary>How many people hold each role of the scope.</summary>
     Task<IReadOnlyDictionary<Guid, int>> CountByRoleAsync(AccessScope scope, CancellationToken ct = default);
 
+    /// <summary>Read-only. User ids holding a role by normalized name in a scope. When a generation is given,
+    /// only assignments at that generation are counted (otherwise every generation).</summary>
+    Task<IReadOnlyList<Guid>> ListUserIdsWithRoleAsync(
+        AccessScope scope, string normalizedRoleName, long? membershipGeneration, CancellationToken ct = default);
+
     Task<int> CountForRoleAsync(Guid roleId, CancellationToken ct = default);
 
     void Add(AccessAssignment assignment);
@@ -54,6 +59,29 @@ internal sealed class AccessAssignmentRepository : IAccessAssignmentRepository
 
     public Task<int> CountForRoleAsync(Guid roleId, CancellationToken ct = default)
         => _db.Assignments.CountAsync(a => a.RoleId == roleId, ct);
+
+    public async Task<IReadOnlyList<Guid>> ListUserIdsWithRoleAsync(
+        AccessScope scope, string normalizedRoleName, long? membershipGeneration, CancellationToken ct = default)
+    {
+        var query = _db.Assignments.AsNoTracking()
+            .Where(a => a.ScopeType == scope.Type && a.ScopeId == scope.Id)
+            .Where(a => _db.Roles.Any(r => r.Id == a.RoleId && r.NormalizedName == normalizedRoleName));
+
+        // For the platform scope, only assignments at the member's current generation count, so a
+        // deactivated (revoked) member's stale assignments never resurface as an active role holder.
+        if (scope.Type == AccessScope.PlatformType)
+        {
+            query = query.Where(a => _db.PlatformMembers.Any(m =>
+                m.PlatformId == scope.Id && m.UserId == a.UserId && m.RevokedAt == null &&
+                m.MembershipGeneration == a.MembershipGeneration));
+        }
+        else if (membershipGeneration is { } generation)
+        {
+            query = query.Where(a => a.MembershipGeneration == generation);
+        }
+
+        return await query.Select(a => a.UserId).Distinct().ToListAsync(ct);
+    }
 
     public void Add(AccessAssignment assignment) => _db.Assignments.Add(assignment);
 

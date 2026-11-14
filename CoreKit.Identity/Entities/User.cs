@@ -47,7 +47,5 @@ public sealed class User
     /// </summary>
     public int SecurityVersion { get; set; }
 
-    public ICollection<UserRole> UserRoles { get; set; } = new List<UserRole>();
-
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
 }

@@ -14,6 +14,7 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
 {
     private readonly IAccessMembership _membership;
     private readonly IAccessAssignmentRepository _assignments;
+    private readonly IAccessRoleRepository _roles;
     private readonly IAccessCache _cache;
     private readonly AccessCatalog _catalog;
     private readonly IAccessScopeContext _scopeContext;
@@ -22,6 +23,7 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
     public AccessService(
         IAccessMembership membership,
         IAccessAssignmentRepository assignments,
+        IAccessRoleRepository roles,
         IAccessCache cache,
         AccessCatalog catalog,
         IAccessScopeContext scopeContext,
@@ -29,6 +31,7 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
     {
         _membership = membership;
         _assignments = assignments;
+        _roles = roles;
         _cache = cache;
         _catalog = catalog;
         _scopeContext = scopeContext;
@@ -109,5 +112,25 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
             return AccessErrors.NotAuthenticated;
 
         return AccessResult.Success(await GetAccessAsync(userId, scope, ct));
+    }
+
+    public async Task<IReadOnlyList<Guid>> ListUserIdsWithRoleAsync(
+        AccessScope scope, string roleName, CancellationToken ct = default)
+    {
+        if (!scope.IsValid || string.IsNullOrWhiteSpace(roleName))
+            return new List<Guid>();
+
+        return await _assignments.ListUserIdsWithRoleAsync(scope, AccessValidation.NormalizeName(roleName), null, ct);
+    }
+
+    public async Task<IReadOnlyList<AccessRoleDto>> ListRolesAsync(AccessScope scope, CancellationToken ct = default)
+    {
+        if (!scope.IsValid)
+            return new List<AccessRoleDto>();
+
+        var roles = await _roles.ListAsync(scope, ct);
+        var counts = await _assignments.CountByRoleAsync(scope, ct);
+
+        return roles.Select(r => AccessMapper.ToDto(r, counts.GetValueOrDefault(r.Id))).ToList();
     }
 }

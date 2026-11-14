@@ -62,7 +62,9 @@ public sealed class RequireAccessFilter : IEndpointFilter
         if (_currentUser.UserId is null)
             return AccessErrors.NotAuthenticated.ToHttpResult();
 
-        // Access answers fresh from the database, so a permission revoked since the token was issued applies now.
+        // Access answers from its effective-access cache, which role and assignment changes invalidate.
+        // Revocation is therefore prompt, not immediate: a permission removed without going through Access
+        // keeps working until the cached entry expires.
         var allowed = await _access.HasPermissionAsync(_permission, context.HttpContext.RequestAborted);
 
         if (!allowed)

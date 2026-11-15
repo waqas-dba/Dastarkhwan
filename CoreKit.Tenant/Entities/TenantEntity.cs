@@ -26,6 +26,13 @@ public sealed class TenantEntity
     /// <summary>Changes on every update, so two people editing at the same time cannot overwrite each other.</summary>
     public Guid ConcurrencyStamp { get; set; }
 
+    /// <summary>
+    /// Last outbox event sequence issued for this tenant. It is incremented in the same transaction as the
+    /// change it describes, and that row update is guarded by <see cref="ConcurrencyStamp"/>, so two writers
+    /// can never issue the same number and a rolled-back change never consumes one (no gaps).
+    /// </summary>
+    public long LastEventSequence { get; set; }
+
     public ICollection<TenantSetting> Settings { get; set; } = new List<TenantSetting>();
 
     public ICollection<TenantMember> Members { get; set; } = new List<TenantMember>();

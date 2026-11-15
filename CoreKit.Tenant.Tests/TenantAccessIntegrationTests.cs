@@ -229,7 +229,7 @@ public sealed class AccessIntegrationDIRegistrationTests : IDisposable
         Assert.Equal("CompositeAccessMembership", membership.GetType().Name);
         Assert.Equal("CoreKit.Access.Abstractions", membership.GetType().Namespace);
 
-        // Tenant's scope context must win regardless of registration order.
+        // Access owns the scope context; without a validated HTTP scope item it is absent in this DI-only scope.
         var scopeContext = scopeProvider.GetRequiredService<IAccessScopeContext>();
         Assert.IsType<CoreKit.Access.Services.ClaimsAccessScopeContext>(scopeContext);
 
@@ -271,7 +271,7 @@ public sealed class AccessIntegrationDIRegistrationTests : IDisposable
         Assert.Equal("CompositeAccessMembership", membership.GetType().Name);
         Assert.Equal("CoreKit.Access.Abstractions", membership.GetType().Namespace);
 
-        // Tenant's scope context must win regardless of registration order.
+        // Access owns the scope context; without a validated HTTP scope item it is absent in this DI-only scope.
         var scopeContext = scopeProvider.GetRequiredService<IAccessScopeContext>();
         Assert.IsType<CoreKit.Access.Services.ClaimsAccessScopeContext>(scopeContext);
 

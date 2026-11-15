@@ -1,4 +1,7 @@
 ﻿using CoreKit.Tenant.Abstractions;
+using CoreKit.Tenant.Entities;
+using CoreKit.Tenant.Events;
+using CoreKit.Tenant.Persistence;
 
 namespace CoreKit.Tenant.Services;
 
@@ -14,6 +17,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
     private readonly ITenantActor _actor;
     private readonly TimeProvider _time;
     private readonly ITenantMembershipCache _membershipCache;
+    private readonly ITenantOutbox _outbox;
 
     public TenantMembershipService(
         ITenantRepository tenants,
@@ -25,7 +29,8 @@ public sealed class TenantMembershipService : ITenantMembershipService
         ITenantPlatformAccess platform,
         ITenantActor actor,
         TimeProvider time,
-        ITenantMembershipCache membershipCache)
+        ITenantMembershipCache membershipCache,
+        ITenantOutbox outbox)
     {
         _tenants = tenants;
         _members = members;
@@ -37,6 +42,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
         _actor = actor;
         _time = time;
         _membershipCache = membershipCache;
+        _outbox = outbox;
     }
 
     public async Task<TenantResult<IReadOnlyList<TenantMemberDto>>> ListMembersAsync(Guid tenantId, CancellationToken ct = default)
@@ -77,28 +83,17 @@ public sealed class TenantMembershipService : ITenantMembershipService
         if (request.UserId == Guid.Empty)
             return TenantErrors.Validation("A user id is required.");
 
-        // F3: For ownership changes, fetch the tenant tracked for optimistic concurrency.
-        TenantEntity? tenant = null;
-        if (request.IsOwner)
-        {
-            tenant = await _tenants.FindForUpdateAsync(tenantId, ct);
-            if (tenant is null)
-                return TenantErrors.NotFound("Tenant");
-            if (tenant.Status == TenantStatus.Archived)
-                return TenantErrors.ArchivedReadOnly;
-        }
-        else if (await _tenants.FindByIdAsync(tenantId, ct) is { } existingTenant)
-        {
-            if (existingTenant.Status == TenantStatus.Archived)
-                return TenantErrors.ArchivedReadOnly;
-        }
-        else
-        {
+        // The tenant is always loaded tracked: the outbox sequence lives on the tenant row and its
+        // concurrency stamp is what makes two concurrent membership writers fail instead of colliding.
+        var tenant = await _tenants.FindForUpdateAsync(tenantId, ct);
+        if (tenant is null)
             return TenantErrors.NotFound("Tenant");
-        }
+        if (tenant.Status == TenantStatus.Archived)
+            return TenantErrors.ArchivedReadOnly;
 
         var now = Now();
         TenantMember member;
+        string eventType;
 
         if (await _members.FindIncludingRemovedAsync(tenantId, request.UserId, ct) is { } existing)
         {
@@ -114,6 +109,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
             existing.IsDefault = !await _members.HasDefaultAsync(request.UserId, ct);
 
             member = existing;
+            eventType = TenantOutboxEventTypes.MemberReactivated;
         }
         else
         {
@@ -128,19 +124,21 @@ public sealed class TenantMembershipService : ITenantMembershipService
             };
             _members.Add(memberEntity);
             member = memberEntity;
+            eventType = TenantOutboxEventTypes.MemberAdded;
         }
 
         _audit.Record(tenantId, TenantAuditActions.MemberAdded, request.IsOwner ? $"user: {request.UserId}; owner" : $"user: {request.UserId}");
 
-        if (request.IsOwner)
-        {
-            tenant!.ConcurrencyStamp = Guid.NewGuid();
-        }
+        // Same SaveChanges as the membership change. StageMembershipEvent also rotates the tenant's
+        // concurrency stamp (F3), so no separate stamp update is needed here.
+        _outbox.StageMembershipEvent(tenant, eventType, member, now);
 
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
             return saveError;
 
         _membershipCache.Invalidate(tenantId, member.UserId);
+
+        // In-process notification only. It is NOT durable delivery: durable delivery is the outbox row above.
         await _events.PublishAsync(new TenantMemberAddedEvent(tenantId, member.UserId, member.IsOwner, now), ct);
 
         return TenantResult.Success(TenantMapper.ToDto(member));
@@ -176,10 +174,11 @@ public sealed class TenantMembershipService : ITenantMembershipService
             return TenantErrors.Conflict("The last owner of a tenant cannot be removed.");
 
         var wasDefault = member.IsDefault;
+        var removedAt = _time.GetUtcNow().UtcDateTime;
 
         // Soft-delete: keep the row (and its generation) so Access can enforce that old
         // assignments stay inactive after the member rejoins with a new generation.
-        member.RemovedAt = _time.GetUtcNow().UtcDateTime;
+        member.RemovedAt = removedAt;
         member.MembershipGeneration++;
 
         if (wasDefault)
@@ -193,14 +192,16 @@ public sealed class TenantMembershipService : ITenantMembershipService
 
         _audit.Record(tenantId, TenantAuditActions.MemberRemoved, $"user: {userId}");
 
-        // F3: Update the concurrency stamp for every successful membership removal,
+        // F3: StageMembershipEvent rotates the concurrency stamp for every successful removal,
         // including removal of a member initially read as a non-owner.
-        trackedTenant.ConcurrencyStamp = Guid.NewGuid();
+        _outbox.StageMembershipEvent(trackedTenant, TenantOutboxEventTypes.MemberRemoved, member, removedAt);
 
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
             return saveError;
 
         _membershipCache.Invalidate(tenantId, userId);
+
+        // In-process notification only. Durable delivery is the outbox row staged above.
         await _events.PublishAsync(new TenantMemberRemovedEvent(tenantId, userId, Now()), ct);
 
         return TenantResult.Success();
@@ -248,8 +249,10 @@ public sealed class TenantMembershipService : ITenantMembershipService
             return TenantErrors.Conflict("The last owner of a tenant cannot lose ownership.");
 
         member.IsOwner = request.IsOwner;
-        trackedTenant.ConcurrencyStamp = Guid.NewGuid();
         _audit.Record(tenantId, TenantAuditActions.OwnerChanged, $"user: {userId}; owner: {request.IsOwner}");
+
+        // Ownership does not change the generation. StageMembershipEvent rotates the concurrency stamp (F3).
+        _outbox.StageMembershipEvent(trackedTenant, TenantOutboxEventTypes.MemberOwnershipChanged, member, Now());
 
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
             return saveError;

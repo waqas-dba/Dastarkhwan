@@ -83,7 +83,7 @@ public sealed class TenantResolutionMiddleware
         }
 
         // Validate current membership for authenticated users. A valid JWT with a tenant claim is
-        // not enough — the user must currently be a member of the resolved tenant. Removed members
+        // not enough - the user must currently be a member of the resolved tenant. Removed members
         // are refused even when their token has not expired. An authenticated request without a
         // valid user ID cannot be mapped to a member and is refused.
         if (context.User.Identity?.IsAuthenticated == true)

@@ -103,7 +103,8 @@ public sealed class TestEnv : IDisposable
         Tenants, Settings, Audit, UnitOfWork, Publisher, Guard, Options.Create(Config), Time);
 
     public TenantMembershipService CreateMembershipService() => new(
-        Tenants, Members, Audit, UnitOfWork, Publisher, Guard, PlatformAccess, Actor, Time, MembershipReader);
+        Tenants, Members, Audit, UnitOfWork, Publisher, Guard, PlatformAccess, Actor, Time, MembershipReader,
+        new TenantOutbox(Db));
 
     public TenantAuditLog CreateAuditLog() => new(AuditEntries, Guard);
 

@@ -70,6 +70,7 @@ public static class TenantServiceCollectionExtensions
         services.AddScoped<ITenantSettingRepository, TenantSettingRepository>();
         services.AddScoped<ITenantMemberRepository, TenantMemberRepository>();
         services.AddScoped<ITenantAuditRepository, TenantAuditRepository>();
+        services.AddScoped<ITenantOutbox, TenantOutbox>();
 
         // The tenant of the current request: one object, three views of it.
         services.AddScoped<CurrentTenant>();

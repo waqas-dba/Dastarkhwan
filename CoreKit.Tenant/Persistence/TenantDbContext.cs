@@ -1,4 +1,5 @@
 ﻿using System.Reflection.Emit;
+using CoreKit.Tenant.Entities;
 
 namespace CoreKit.Tenant.Persistence;
 
@@ -20,6 +21,8 @@ public sealed class TenantDbContext : DbContext
 
     public DbSet<TenantAuditEntry> AuditEntries => Set<TenantAuditEntry>();
 
+    public DbSet<TenantOutboxMessage> OutboxMessages => Set<TenantOutboxMessage>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<TenantEntity>(b =>
@@ -32,6 +35,7 @@ public sealed class TenantDbContext : DbContext
             b.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
             b.Property(x => x.StatusReason).HasMaxLength(500);
             b.Property(x => x.ConcurrencyStamp).IsConcurrencyToken();
+            b.Property(x => x.LastEventSequence).IsRequired();
 
             // The database itself refuses a second tenant with the same slug, even if two requests race.
             b.HasIndex(x => x.Slug).IsUnique().HasDatabaseName("UX_TENANT_Tenants_Slug");
@@ -71,6 +75,26 @@ public sealed class TenantDbContext : DbContext
             b.Property(x => x.Action).IsRequired().HasMaxLength(100);
             b.Property(x => x.Details).HasMaxLength(2000);
             b.HasIndex(x => new { x.TenantId, x.OccurredAt });
+        });
+
+        modelBuilder.Entity<TenantOutboxMessage>(b =>
+        {
+            b.ToTable("TENANT_OutboxMessages");
+            b.HasKey(x => x.EventId);
+            b.Property(x => x.EventId).ValueGeneratedNever();
+            b.Property(x => x.EventType).IsRequired().HasMaxLength(100);
+            b.Property(x => x.PayloadJson).IsRequired().HasMaxLength(4000);
+            b.Property(x => x.Status).HasConversion<string>().HasMaxLength(20).IsRequired();
+            b.Property(x => x.LeaseOwner).HasMaxLength(100);
+            b.Property(x => x.LastError).HasMaxLength(2000);
+
+            // Backstop for the per-tenant ordering guarantee: two events can never share a sequence.
+            b.HasIndex(x => new { x.TenantId, x.Sequence })
+                .IsUnique().HasDatabaseName("UX_TENANT_OutboxMessages_Tenant_Sequence");
+
+            // The publisher's claim scan.
+            b.HasIndex(x => new { x.Status, x.NextAttemptAt })
+                .HasDatabaseName("IX_TENANT_OutboxMessages_Status_NextAttempt");
         });
     }
 }

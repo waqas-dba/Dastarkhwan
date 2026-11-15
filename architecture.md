@@ -61,7 +61,7 @@ A capability may remain inside a well-defined module until splitting provides re
 - Tenant requires Access for authorization of protected Tenant operations.
 - Tenant owns tenant lifecycle, membership, tenant context and tenant-specific business rules.
 - Access owns effective permissions and authorization decisions.
-- Tenant may implement adapters for Access public abstractions (`IAccessScopeContext`, `IAccessMembership`, `IAccessService`, `IPermissionChecker`).
+- An adapter-based Tenant→Access integration implementation exists at commit `aee85c2` (`TenantAccessScopeContext`, `TenantAccessMembership` registered via `AddScoped` in `TenantServiceCollectionExtensions`), but this adapter-based integration is architecturally unresolved under the Owner-approved direction rejecting cross-module adopter/interface patterns. It is existing implementation, not the approved target architecture. Redesign and Owner approval are outstanding.
 - `ITenantMembershipReader` lives in `CoreKit.Tenant.Abstractions` (module-owned, not SharedKernel) and is the contract Access uses to query Tenant membership.
 - Access must not reference Tenant's private services, repositories, `DbContext` or tables.
 - Tenant must not reference Identity private internals.
@@ -70,7 +70,7 @@ A capability may remain inside a well-defined module until splitting provides re
 - Platform scope is distinct from tenant scope and needs an explicit authorization design.
 - Tenant permission enforcement across individual operations remains implementation work, not an already completed capability.
 
-**Current evidence note (latest verified baseline `1c832de`, 2026-11-15):** `CoreKit.SharedKernel` is empty (no `.csproj`, no source, not referenced by any project). `CoreKit.Tenant` and `CoreKit.Identity` each reference only `CoreKit.Access`; `CoreKit.Access` is a leaf module with no project references. Tenant–Access authorization integration is implemented through Access public contracts (`IAccessScopeContext`, `IAccessMembership`) per D-016; Tenant owner does not map to Access owner. Platform authorization and per-operation Tenant permission enforcement remain pending. D-03 (JWT revocation / `SecurityVersion` validation) and D-18 (rate limiting on tenant and access write endpoints) remain unresolved Project Owner decisions. No SharedKernel and no SampleHost-as-future-requirement.
+**Current evidence note (latest verified baseline `c9dbbe12`, 2026-11-15):** `CoreKit.SharedKernel` is empty (no `.csproj`, no source, not referenced by any project). `CoreKit.Tenant` and `CoreKit.Identity` each reference only `CoreKit.Access`; `CoreKit.Access` is a leaf module with no project references. Tenant–Access authorization adapter implementation exists at commit `aee85c2` but is architecturally unresolved under the Owner-approved direction rejecting cross-module adopter/interface patterns; Tenant owner does not map to Access owner. Platform authorization and per-operation Tenant permission enforcement remain pending. D-03 (JWT revocation / `SecurityVersion` validation) and D-18 (rate limiting on tenant and access write endpoints) remain unresolved Project Owner decisions. No SharedKernel and no SampleHost-as-future-requirement.
 
 Preserve the modular monolith architecture and existing approved module ownership boundaries.
 

@@ -75,7 +75,8 @@ Use this log for decisions affecting product behavior, security, data, compatibi
 ## D-015 — Tenant must not depend directly on Identity
 **Status:** Accepted  
 **Decision:** Remove the direct `CoreKit.Tenant` dependency on `CoreKit.Identity` through stable SharedKernel contracts/abstractions.  
-**Consequences:** Inspect the existing six reported code-file references at the current baseline; classify each use before changing it. Choose contract ownership and dependency direction before implementation. Do not create duplicate user/account models or introduce circular references. Tenant must remain reusable by other SaaS applications.
+**Consequences:** Inspect the existing six reported code-file references at the current baseline; classify each use before changing it. Choose contract ownership and dependency direction before implementation. Do not create duplicate user/account models or introduce circular references. Tenant must remain reusable by other SaaS applications.  
+**Supersession:** The SharedKernel-contracts aspect of this decision is superseded by D-018 (2026-11-15), which directs that no SharedKernel be introduced and that cross-module contracts live in module-owned `Abstractions` namespaces. The direct-dependency requirement (Tenant does not reference Identity) remains accepted and is met at project-reference level at baseline `1c832de`.
 
 ## D-016 — Tenant requires Access for authorization
 **Status:** Accepted  
@@ -90,7 +91,8 @@ Use this log for decisions affecting product behavior, security, data, compatibi
 - Identity permission claims must not be treated as the authoritative source of Tenant authorization.
 - Protected operations must fail closed if Access authorization is unavailable or cannot establish a valid decision.
 - Existing Identity RBAC data and services must not be deleted until a separately reviewed ownership-transfer and compatibility plan is approved.
-- The dependency-registration mechanism is an implementation-design item to resolve; it is not invented here.
+- The dependency-registration mechanism is an implementation-design item to resolve; it is not invented here.  
+**Supersession:** The SharedKernel-bridge example in this decision (SharedKernel as a candidate neutral bridge for `ITenantMembershipReader`) is superseded by D-018 (2026-11-15). Tenant→Access integration through Access public contracts (`IAccessScopeContext`, `IAccessMembership`, `IAccessService`, `IPermissionChecker`) remains accepted; `ITenantMembershipReader` lives in `CoreKit.Tenant.Abstractions`, not SharedKernel.  
 **Review trigger:** Evidence that Tenant–Access authorization integration cannot be established through Access public contracts alone, or that platform authorization semantics conflict with tenant-scoped authorization.
 
 ## D-017 — Approved implementation-task automation (standing authorization)
@@ -106,6 +108,15 @@ Use this log for decisions affecting product behavior, security, data, compatibi
 - Independent review requirements, final owner acceptance, and architecture/security approval boundaries remain unchanged.
 - Weekly migration-drift monitoring is documented as a separate future read-only scheduled workflow and is not authorized to modify databases.
 **Review trigger:** Evidence of unsafe automation, baseline/scope violations, incorrect database targeting, or need to narrow/expand standing authorization.
+
+## D-018 — No SharedKernel; module-owned cross-module contracts; Identity RBAC data disposition
+**Status:** Accepted  
+**Date:** 2026-11-15  
+**Decision:** `CoreKit.SharedKernel` is not introduced or populated as an architectural component and is not referenced by any project. Cross-module contracts live in module-owned `Abstractions` namespaces (`CoreKit.Access.Abstractions`, `CoreKit.Tenant.Abstractions`, etc.). The empty `CoreKit.SharedKernel/` folder (no `.csproj`, no source files) is historical evidence only. `CoreKit.Tenant` and `CoreKit.Identity` each reference only `CoreKit.Access`; `CoreKit.Access` is a leaf module.  
+**Context:** The Project Owner's approved architecture direction is a modular monolith in which Identity owns accounts/authentication/credentials/sessions/lockout/recovery, Access exclusively owns roles/permissions/assignments/authorization, Tenant owns tenant lifecycle/membership/context and uses Access for authorization, Access must not access Identity private persistence, Tenant must not depend on Identity private implementation, and there is no SharedKernel and no SampleHost-as-future-requirement. The repository baseline `1c832de` confirms `CoreKit.SharedKernel/` has no project file or source and is unreferenced. This decision supersedes the SharedKernel-contract aspects of D-015 and D-016.  
+**Alternatives considered:** (1) Populate SharedKernel with shared contracts — rejected, contradicts the Owner's "no SharedKernel" direction. (2) Retain D-015/D-016 SharedKernel bridge language as active guidance — rejected; D-015/D-016 remain historically traceable with original IDs and context, but their SharedKernel references are superseded by this decision.  
+**Consequences:** D-015's direct-dependency requirement (Tenant does not reference Identity) is met at project-reference level (verified at baseline `1c832de`). D-016's Tenant→Access integration through Access public contracts stands; the SharedKernel bridge example in D-016 is superseded by module-owned `ITenantMembershipReader` in `CoreKit.Tenant.Abstractions`. The Project Owner confirmed there is no legacy Identity RBAC data to preserve and that the table-drop migration (`RemoveIdentityRbacTables`) removing Identity-owned roles/permissions tables is acceptable for the intended deployment. No data-transfer or legacy RBAC recovery requirement is added. D-03 (JWT revocation / `SecurityVersion` validation) and D-18 (rate limiting on tenant and access write endpoints) remain unresolved Project Owner decisions and are not resolved here.  
+**Review trigger:** Evidence that a genuine cross-module contract is required by multiple modules and has no module-owned home — any such contract must not be placed in SharedKernel without a separate Owner decision.
 
 ## Decision template
 ### D-XXX — Title

@@ -10,7 +10,6 @@ These are responsibilities, not a requirement to create every project immediatel
 
 | Module | Owns | Does not own |
 |---|---|---|
-| SharedKernel | Small, stable cross-module primitives/contracts genuinely needed by multiple modules | Business workflows or private module persistence |
 | Identity | Accounts, authentication, credentials, sessions/tokens, lockout, recovery | Business roles/permissions policy |
 | Access | Roles, permissions, assignments, authorization contracts/policy/enforcement | Identity credentials or Identity private tables |
 | Tenant | SaaS tenant lifecycle, tenant context/resolution contracts, tenant settings | Store/catalog/order rules; Identity implementation |
@@ -27,13 +26,15 @@ These are responsibilities, not a requirement to create every project immediatel
 | Market configuration | Country/currency/address/tax/payment settings and adapters | Duplicated core business logic |
 | Notifications | Workflow message delivery/preferences when justified | Owning the triggering transaction |
 
+**SharedKernel:** The `CoreKit.SharedKernel/` folder exists in the repository but contains no `.csproj`, no source files, and is referenced by no project. It is an empty historical artifact, not an active architectural component. Cross-module contracts live in module-owned `Abstractions` namespaces (e.g. `CoreKit.Access.Abstractions`, `CoreKit.Tenant.Abstractions`). Do not introduce or populate SharedKernel.
+
 A capability may remain inside a well-defined module until splitting provides real value. Do not create all planned modules up front.
 
 ## 3. Dependency rules
 1. Cross modules only through documented public contracts or documented events.
 2. Never access another module's private `DbContext`, tables, repositories, or internal classes.
 3. Avoid circular dependencies; redesign around stable contracts or orchestration when necessary.
-4. Keep shared contracts small, stable, and genuinely shared. Do not turn SharedKernel into a dumping ground.
+4. Keep shared contracts small, stable, and genuinely shared, owned in module-owned `Abstractions` namespaces. Do not turn any shared-contract location into a dumping ground. Do not introduce SharedKernel.
 5. Keep endpoints thin and provider SDKs behind adapters.
 6. Do not add event sourcing, distributed messaging, or microservices without a concrete need.
 7. The module that owns a business rule owns its implementation and persistence.
@@ -48,7 +49,7 @@ A capability may remain inside a well-defined module until splitting provides re
 
 ## 5. Tenant and data isolation
 - Tenant represents the SaaS account boundary; Store represents a merchant business. They are separate concepts.
-- Tenant must not depend directly on Identity. Use stable SharedKernel contracts/abstractions for any required identity reference or authorization integration.
+- Tenant must not depend directly on Identity or its private implementation. Tenant uses Access public contracts for authorization.
 - The initial strategy is one shared PostgreSQL database. Tenant-owned rows carry explicit `TenantId` ownership, or an explicitly documented ownership path where direct `TenantId` is not appropriate.
 - Apply EF Core global query filters as a default safety boundary, but **never treat filters as the only security control**. Enforce tenant scope in application services and authorization, and test cross-tenant denial.
 - Tenant context must be derived/validated from trusted server-side context and authenticated membership. A client-supplied header such as `X-Tenant-ID` is not authorization by itself.
@@ -61,7 +62,7 @@ A capability may remain inside a well-defined module until splitting provides re
 - Tenant owns tenant lifecycle, membership, tenant context and tenant-specific business rules.
 - Access owns effective permissions and authorization decisions.
 - Tenant may implement adapters for Access public abstractions (`IAccessScopeContext`, `IAccessMembership`, `IAccessService`, `IPermissionChecker`).
-- `ITenantMembershipReader` (SharedKernel) is a candidate neutral bridge for Access to query Tenant membership.
+- `ITenantMembershipReader` lives in `CoreKit.Tenant.Abstractions` (module-owned, not SharedKernel) and is the contract Access uses to query Tenant membership.
 - Access must not reference Tenant's private services, repositories, `DbContext` or tables.
 - Tenant must not reference Identity private internals.
 - Missing or invalid tenant scope, membership or authorization must fail closed.
@@ -69,7 +70,7 @@ A capability may remain inside a well-defined module until splitting provides re
 - Platform scope is distinct from tenant scope and needs an explicit authorization design.
 - Tenant permission enforcement across individual operations remains implementation work, not an already completed capability.
 
-**Current evidence note (latest verified local baseline `70d757fd`, 2026-11-13):** `DK-ACCESS-PLATFORM-SCOPE-01` introduced fixed platform-scope authorization for Access platform-membership add/revoke operations only; it is **Under review / Request Changes** and not accepted. It does not complete Tenant platform-authorization redesign, does not remove `TenantActor`/`ICurrentUser.Permissions` semantic coupling (D-015 outstanding coupling), and does not authorize removal of SharedKernel permission claims or Identity RBAC. Broader platform authorization and per-operation Tenant enforcement remain pending design/implementation under approved decisions.
+**Current evidence note (latest verified baseline `1c832de`, 2026-11-15):** `CoreKit.SharedKernel` is empty (no `.csproj`, no source, not referenced by any project). `CoreKit.Tenant` and `CoreKit.Identity` each reference only `CoreKit.Access`; `CoreKit.Access` is a leaf module with no project references. Tenant–Access authorization integration is implemented through Access public contracts (`IAccessScopeContext`, `IAccessMembership`) per D-016; Tenant owner does not map to Access owner. Platform authorization and per-operation Tenant permission enforcement remain pending. D-03 (JWT revocation / `SecurityVersion` validation) and D-18 (rate limiting on tenant and access write endpoints) remain unresolved Project Owner decisions. No SharedKernel and no SampleHost-as-future-requirement.
 
 Preserve the modular monolith architecture and existing approved module ownership boundaries.
 

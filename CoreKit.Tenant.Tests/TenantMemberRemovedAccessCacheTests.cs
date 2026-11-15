@@ -1,6 +1,15 @@
-using Microsoft.Extensions.Caching.Memory;
-using Microsoft.Extensions.DependencyInjection;
+using System;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using CoreKit.Access.Abstractions;
+using CoreKit.Access.Entities;
+using CoreKit.Access.Persistence;
+using CoreKit.Tenant.Abstractions;
+using CoreKit.Tenant.Entities;
+using CoreKit.Tenant.Persistence;
+using Xunit;
 
 namespace CoreKit.Tenant.Tests;
 
@@ -54,8 +63,8 @@ public sealed class TenantMemberRemovedAccessCacheTests : IDisposable
 
     private AccessRole AddRole(AccessScope scope, string name, string[] permissions)
     {
-        using var s = _provider.CreateScope();
-        var db = s.ServiceProvider.GetRequiredService<Access>();
+        using var scope_ = _provider.CreateScope();
+        var db = scope_.ServiceProvider.GetRequiredService<AccessDbContext>();
         db.Database.EnsureCreated();
 
         var role = new AccessRole
@@ -64,7 +73,7 @@ public sealed class TenantMemberRemovedAccessCacheTests : IDisposable
             ScopeType = scope.Type,
             ScopeId = scope.Id,
             Name = name,
-            NormalizedName = AccessValidation.NormalizeName(name),
+            NormalizedName = name.Trim().ToUpperInvariant(),
             CreatedAt = DateTime.UtcNow,
             ConcurrencyStamp = Guid.NewGuid()
         };
@@ -73,67 +82,85 @@ public sealed class TenantMemberRemovedAccessCacheTests : IDisposable
             role.Permissions.Add(new AccessRolePermission { RoleId = role.Id, Permission = permission });
 
         db.Roles.Add(role);
-        db.SaveChange();
+        db.SaveChanges();
         return role;
     }
 
     private void SeedTenantMembers(Guid tenantId, Guid owner, Guid member)
     {
-        using var s = _provider.CreateScope();
-        var db = s.ServiceProvider.GetRequiredService<Tenant>();
+        using var scope_ = _provider.CreateScope();
+        var db = scope_.ServiceProvider.GetRequiredService<TenantDbContext>();
         db.Database.EnsureCreated();
 
-        db.Tenants.Add(new Tenant
+        db.Tenants.Add(new TenantEntity
         {
             Id = tenantId,
             Name = "Acme",
             Slug = "acme",
-            Status = Active,
+            Status = TenantStatus.Active,
             CreatedAt = DateTime.UtcNow,
             StatusChangedAt = DateTime.UtcNow,
             ConcurrencyStamp = Guid.NewGuid()
         });
-        db.Members.Add(new Member { TenantId = tenantId, UserId = owner, Owner = true, Default = true, JoinedAt = DateTime.UtcNow, Generation = 1 });
-        db.Members.Add(new Member { TenantId = tenantId, UserId = member, Owner = false, Default = false, JoinedAt = DateTime.UtcNow, Generation = 1 });
-        db.SaveChange();
+        db.Members.Add(new TenantMember
+        {
+            TenantId = tenantId,
+            UserId = owner,
+            IsOwner = true,
+            IsDefault = true,
+            JoinedAt = DateTime.UtcNow,
+            MembershipGeneration = 1
+        });
+        db.Members.Add(new TenantMember
+        {
+            TenantId = tenantId,
+            UserId = member,
+            IsOwner = false,
+            IsDefault = false,
+            JoinedAt = DateTime.UtcNow,
+            MembershipGeneration = 1
+        });
+        db.SaveChanges();
     }
+
     private void SeedAccessAssignment(Guid tenantId, Guid member, AccessRole role, long generation = 1)
     {
-        using var s = _provider.CreateScope();
-        var db = s.ServiceProvider.GetRequiredService<Access>();
+        using var scope_ = _provider.CreateScope();
+        var db = scope_.ServiceProvider.GetRequiredService<AccessDbContext>();
         db.Database.EnsureCreated();
 
-        db.Assignments.Add(new Assignment
+        db.Assignments.Add(new AccessAssignment
         {
             RoleId = role.Id,
             UserId = member,
             ScopeType = AccessScope.TenantType,
             ScopeId = tenantId,
-            Generation = generation,
+            MembershipGeneration = generation,
             AssignedAt = DateTime.UtcNow
         });
-        db.SaveChange();
+        db.SaveChanges();
     }
 
     private int CountAccessAssignments(Guid tenantId, Guid member)
     {
-        using var s = _provider.CreateScope();
-        var db = s.ServiceProvider.GetRequiredService<Access>();
-        return db.Assignments.Count(a => a.TenantId == tenantId && a.UserId == member);
+        using var scope_ = _provider.CreateScope();
+        var db = scope_.ServiceProvider.GetRequiredService<AccessDbContext>();
+        return db.Assignments.Count(
+            a => a.ScopeType == AccessScope.TenantType && a.ScopeId == tenantId && a.UserId == member);
     }
 
     private EffectiveAccess GetFreshAccess(Guid tenantId, Guid member)
     {
-        using var s = _provider.CreateScope();
-        var access = s.ServiceProvider.GetRequiredService<IAccess>();
+        using var scope_ = _provider.CreateScope();
+        var access = scope_.ServiceProvider.GetRequiredService<IAccessService>();
         return access.GetAccessAsync(member, TenantScope(tenantId)).GetAwaiter().GetResult();
     }
 
     private void RemoveMemberAsyncFromTenant(Guid tenantId, Guid member)
     {
-        using var s = _provider.CreateScope();
-        var membership = s.ServiceProvider.GetRequiredService<ITenantMembershipService>();
-        using var tenantCtx = s.ServiceProvider.GetRequiredService<ICurrentTenant>().Change(tenantId);
+        using var scope_ = _provider.CreateScope();
+        var membership = scope_.ServiceProvider.GetRequiredService<ITenantMembershipService>();
+        using var tenantCtx = scope_.ServiceProvider.GetRequiredService<ICurrentTenant>().Change(tenantId);
 
         var result = membership.RemoveMemberAsync(tenantId, member).GetAwaiter().GetResult();
         Assert.True(result.IsSuccess, result.Error?.Message);

@@ -77,7 +77,7 @@ The approved team consists of multiple AI participants and the Project Owner. Ag
 
 Initial development priority is backend only:
 
-1. CoreKit module boundaries and SharedKernel contracts.
+1. CoreKit module boundaries and module-owned contract abstractions.
 2. Identity authentication, credentials, sessions, and tokens.
 3. Access roles, permissions, assignments, and authorization.
 4. Tenant lifecycle, context, and tenant isolation.

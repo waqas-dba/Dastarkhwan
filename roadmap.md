@@ -40,7 +40,7 @@ Slices are prepared/implemented by the assigned implementation owner (OpenCode d
 
 | Slice | Task | Status | Boundary / completion evidence |
 |---|---|---|---|
-| S1 | Documentation only: synchronize `current-state.md` and `roadmap.md` with accepted decisions, current evidence and current agent allocation | Under review | Documentation changes applied and committed at `45a5789`. Initial review identified documentation corrections; correction tasks `DK-TENANT-ACCESS-DOCS-FIX1`–`FIX4` addressed findings. `DK-DOCS-SYNC-03` updates core docs at latest verified local baseline `70d757fd` (2026-11-13). Independent review and Project Owner acceptance remain pending. |
+| S1 | Documentation only: synchronize `current-state.md` and `roadmap.md` with accepted decisions, current evidence and current agent allocation | Under review | Documentation changes applied against latest verified remote baseline `1c832de` (2026-11-15, `Fix Tenant membership revocation -> Access cache consistency`) in `DK-DOCUMENTATION-SYNC-04`, covering all six core documents. `DK-DOCS-SYNC-03` previously updated core docs at local baseline `70d757fd` (2026-11-13); correction tasks `DK-TENANT-ACCESS-DOCS-FIX1`–`FIX4` addressed earlier review findings. Independent review and Project Owner acceptance remain pending. |
 | S2.1 | Create a dedicated `CoreKit.Access.Tests` project | Under review | `CoreKit.Access.Tests` exists with its Access-focused suites (created in `470d42c`). Independent review and user-run tests pending. File presence alone is not completion. |
 | S2.2 | Update architecture-test coverage and references for intended modules | In progress | Boundary rules cover SharedKernel, Identity, Access and Tenant, with a documented temporary exception. Boundary enforcement now evaluates actual MSBuild project references (imports included), validates solution inventory/classification and the IVT policy. Tests have not been run as part of this documentation task. |
 | S3 | Review the Access migration | Under review | Access migration files are committed under `CoreKit.Access/Migrations/` at `43c2179`. Review schema, constraints, relationships and compatibility. Database application requires separate explicit authorization. |
@@ -57,21 +57,21 @@ Slices are prepared/implemented by the assigned implementation owner (OpenCode d
 
 | Task | Status | Notes |
 |---|---|---|
-| `DK-IDENTITY-BOUNDARY-01` | Blocked | Requested baseline `63a0eb1` did not match actual HEAD `70d757fd`; investigation completed read-only and stopped for baseline reconciliation. No implementation. Requires Project Owner approval of required architectural decisions before implementation planning proceeds. |
-| `DK-IDENTITY-BOUNDARY-01A–01E` | Proposed (not approved) | Proposed sequence: 01A design/contract approval, 01B Access-owned platform decision, 01C Tenant rewiring/fail-closed, 01D SharedKernel/Identity boundary cleanup with compatibility, 01E docs/status alignment if approved. Not implementation authorization. |
+| `DK-IDENTITY-BOUNDARY-01` | Blocked | Requested baseline `63a0eb1` did not match actual HEAD `1c832de`; investigation completed read-only and stopped for baseline reconciliation. No implementation. Requires Project Owner approval of required architectural decisions before implementation planning proceeds. |
+| `DK-IDENTITY-BOUNDARY-01A–01E` | Proposed (not approved) | Proposed sequence: 01A design/contract approval, 01B Access-owned platform decision, 01C Tenant rewiring/fail-closed, 01D SharedKernel/Identity boundary cleanup (no-op at baseline `1c832de` because `CoreKit.SharedKernel` is empty and unreferenced), 01E docs/status alignment if approved. Not implementation authorization. |
 
 ### Migration note
 
 The commit `43c2179` includes migration artifacts for Access, Identity and Tenant. Their committed presence does not establish successful migration execution, database compatibility, or production readiness. Do not apply them to any database without separate explicit user authorization.
 
-- **S4.3 (in progress, not accepted):** `DK-ACCESS-PLATFORM-SCOPE-01` at `70d757fd` targets Access platform-membership scope authorization only and is Under review / Request Changes. It must not be treated as completion of Tenant platform-authorization redesign (S4.3 broader scope) or as authorization to remove SharedKernel permission claims / Identity RBAC.
-- **Blocked planning:** `DK-IDENTITY-BOUNDARY-01` requires baseline reconciliation (requested `63a0eb1` vs actual `70d757fd`) and Project Owner approval of required architectural decisions before implementation. Proposed `DK-IDENTITY-BOUNDARY-01A–01E` is not approved work.
+- **S4.3 (in progress, not accepted):** `DK-ACCESS-PLATFORM-SCOPE-01` at `70d757fd` targets Access platform-membership scope authorization only and is Under review / Request Changes. It must not be treated as completion of Tenant platform-authorization redesign (S4.3 broader scope) or as authorization to remove SharedKernel permission claims / Identity RBAC. (`CoreKit.SharedKernel` is empty and unreferenced at current baseline `1c832de`.)
+- **Blocked planning:** `DK-IDENTITY-BOUNDARY-01` requires baseline reconciliation (requested `63a0eb1` vs actual `1c832de`) and Project Owner approval of required architectural decisions before implementation. Proposed `DK-IDENTITY-BOUNDARY-01A–01E` is not approved work.
 
 ## M2 — Module foundation
 
 Align module registration, public contracts, persistence ownership, configuration, errors and test conventions. Remove circular dependencies and private cross-module database access.
 
-Boundary tests cover SharedKernel, Identity, Access and Tenant, with Tenant → Identity as an explicit temporary exception under D-015. Access suites now live in `CoreKit.Access.Tests` (S2.1 under review); boundary enforcement uses evaluated project references (S2.2 in progress).
+Boundary tests cover Identity, Access and Tenant (`CoreKit.SharedKernel` is empty and unreferenced, not an active test boundary), with Tenant → Identity as an explicit temporary exception under D-015. Access suites now live in `CoreKit.Access.Tests` (S2.1 under review); boundary enforcement uses evaluated project references (S2.2 in progress).
 
 **Done when:** module dependency rules and test organization accurately cover the intended modules, with no circular or private persistence access.
 

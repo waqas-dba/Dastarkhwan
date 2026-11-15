@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using CoreKit.Access.Abstractions;
 using CoreKit.Access.Constants;
 using CoreKit.Access.Entities;

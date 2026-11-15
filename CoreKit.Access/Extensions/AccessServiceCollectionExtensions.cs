@@ -1,4 +1,4 @@
-﻿using CoreKit.Access.Persistence;
+using CoreKit.Access.Persistence;
 
 namespace CoreKit.Access.Extensions;
 

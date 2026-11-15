@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using System.Security.Claims;
 using System.Text.Json;
 using CoreKit.Access.Abstractions;
@@ -10,9 +10,11 @@ namespace CoreKit.Tenant.Resolution;
 /// strategy that found one must agree. Requests that identify no tenant continue without one
 /// (use RequireTenant() on routes that need a tenant).
 ///
-/// After resolving a tenant, the middleware also validates that the authenticated user is a current
+/// After resolving a tenant, the middleware validates that the authenticated user is a current
 /// member of that tenant. Removed or never-members are refused even when they hold a valid JWT with
-/// a tenant claim.
+/// a tenant claim. ICurrentTenant is set for successfully resolved active tenants, including valid
+/// anonymous storefront requests; IAccessScopeContext.Current is published only after authenticated
+/// membership validation succeeds.
 /// </summary>
 public sealed class TenantResolutionMiddleware
 {
@@ -98,10 +100,15 @@ public sealed class TenantResolutionMiddleware
                 await WriteErrorAsync(context, TenantErrors.Forbidden("You are not a member of this tenant."));
                 return;
             }
+
+            setter.Set(tenant.Id);
+            context.Items[AccessScopeContextItemKeys.TenantId] = tenant.Id;
+
+            await _next(context);
+            return;
         }
 
         setter.Set(tenant.Id);
-        context.Items[AccessScopeContextItemKeys.TenantId] = tenant.Id;
 
         await _next(context);
     }

@@ -1,4 +1,4 @@
-﻿using CoreKit.Access.Abstractions;
+using CoreKit.Access.Abstractions;
 using CoreKit.Access.Extensions;
 using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Constants;

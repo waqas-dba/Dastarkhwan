@@ -1,4 +1,4 @@
-﻿using CoreKit.Access.Endpoints;
+using CoreKit.Access.Endpoints;
 using CoreKit.Access.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Abstractions;

@@ -109,6 +109,11 @@ public static class TenantServiceCollectionExtensions
         services.AddScoped<IAccessScopeContext, TenantAccessScopeContext>();
         services.AddScoped<IAccessMembershipAdapter, TenantAccessMembership>();
 
+        // When a person leaves a tenant, clear their effective-authorization state in Access so a
+        // cached tenant-scoped permission set cannot outlive the membership. The handler runs
+        // in-process after the Tenant change is saved and uses the unguarded IAccessMaintenance.
+        services.AddScoped<IEventHandler<TenantMemberRemoved>, TenantMemberRemovedToAccessMaintenance>();
+
         return services;
     }
 }

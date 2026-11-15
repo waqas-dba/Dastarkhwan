@@ -61,6 +61,7 @@ public static class AccessServiceCollectionExtensions
         services.AddScoped<IAccessRoleRepository, AccessRoleRepository>();
         services.AddScoped<IAccessAssignmentRepository, AccessAssignmentRepository>();
         services.AddScoped<IAccessAuditRepository, AccessAuditRepository>();
+        services.AddScoped<IAccessMembershipProjectionRepository, AccessMembershipProjectionRepository>();
 
         // Services
         services.AddSingleton<IAccessCache, AccessCache>();

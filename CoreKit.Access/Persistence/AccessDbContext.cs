@@ -17,6 +17,8 @@ public sealed class AccessDbContext : DbContext
 
     public DbSet<AccessPlatformMember> PlatformMembers => Set<AccessPlatformMember>();
 
+    public DbSet<AccessMembershipProjection> MembershipProjections => Set<AccessMembershipProjection>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AccessRole>(b =>
@@ -81,6 +83,23 @@ public sealed class AccessDbContext : DbContext
             b.Property(x => x.Action).IsRequired().HasMaxLength(100);
             b.Property(x => x.Details).HasMaxLength(2000);
             b.HasIndex(x => new { x.ScopeType, x.ScopeId, x.OccurredAt });
+        });
+
+        modelBuilder.Entity<AccessMembershipProjection>(b =>
+        {
+            b.ToTable("ACCESS_MembershipProjections");
+            b.HasKey(x => new { x.TenantId, x.UserId });
+            b.Property(x => x.Status).IsRequired();
+            b.Property(x => x.MembershipGeneration).IsRequired();
+            b.Property(x => x.LastAppliedSequence).IsRequired();
+            b.Property(x => x.UpdatedAt).IsRequired();
+
+            b.HasIndex(x => new { x.TenantId, x.UserId })
+                .IsUnique()
+                .HasDatabaseName("UX_ACCESS_MembershipProjections_Tenant_User");
+
+            b.HasIndex(x => x.UserId)
+                .HasDatabaseName("IX_ACCESS_MembershipProjections_UserId");
         });
     }
 }

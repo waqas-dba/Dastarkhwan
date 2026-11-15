@@ -88,3 +88,28 @@ public sealed class AccessAuditEntry
 
     public DateTime OccurredAt { get; set; }
 }
+
+/// <summary>
+/// Access-owned projection of tenant membership facts, synchronized from Tenant-published events in later slices.
+/// This projection stores membership status and sequencing metadata only; it does not grant Access permissions by itself.
+/// </summary>
+public sealed class AccessMembershipProjection
+{
+    public Guid TenantId { get; set; }
+
+    public Guid UserId { get; set; }
+
+    public AccessMembershipProjectionStatus Status { get; set; }
+
+    public long MembershipGeneration { get; set; }
+
+    public long LastAppliedSequence { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
+}
+
+public enum AccessMembershipProjectionStatus
+{
+    Active = 1,
+    Removed = 2
+}

@@ -91,6 +91,38 @@ namespace CoreKit.Access.Migrations
                     b.ToTable("ACCESS_AuditEntries", (string)null);
                 });
 
+            modelBuilder.Entity("CoreKit.Access.Entities.AccessMembershipProjection", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("LastAppliedSequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("MembershipGeneration")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TenantId", "UserId");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("IX_ACCESS_MembershipProjections_UserId");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ACCESS_MembershipProjections_Tenant_User");
+
+                    b.ToTable("ACCESS_MembershipProjections", (string)null);
+                });
+
             modelBuilder.Entity("CoreKit.Access.Entities.AccessPlatformMember", b =>
                 {
                     b.Property<Guid>("UserId")

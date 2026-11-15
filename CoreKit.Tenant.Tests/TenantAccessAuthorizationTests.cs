@@ -6,6 +6,7 @@ using CoreKit.Access.Persistence;
 using CoreKit.Tenant.Extensions;
 using CoreKit.Tenant.Integration;
 using CoreKit.Tenant.Resolution;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,6 +21,7 @@ public sealed class TenantAccessAuthorizationTests : IDisposable
     private readonly TenantDbContext _tenantDb;
     private readonly CurrentTenant _currentTenant;
     private readonly TestAccessCurrentUser _currentUser;
+    private readonly DefaultHttpContext _httpContext;
     private readonly SqliteConnection _sharedConnection;
 
     public TenantAccessAuthorizationTests()
@@ -45,6 +47,8 @@ public sealed class TenantAccessAuthorizationTests : IDisposable
 
         _currentUser = new TestAccessCurrentUser(Guid.NewGuid(), true);
         services.AddScoped<IAccessCurrentUser>(_ => _currentUser);
+        _httpContext = new DefaultHttpContext();
+        services.AddSingleton<IHttpContextAccessor>(new HttpContextAccessor { HttpContext = _httpContext });
 
         services.AddTenant(config, options => options.UseSqlite(_sharedConnection));
         services.AddAccess(config, options => options.UseSqlite(_sharedConnection));
@@ -94,6 +98,12 @@ public sealed class TenantAccessAuthorizationTests : IDisposable
         cmd.ExecuteNonQuery();
     }
 
+    private void SetValidatedTenantScope(Guid tenantId)
+    {
+        _currentTenant.Set(tenantId);
+        _httpContext.Items[AccessScopeContextItemKeys.TenantId] = tenantId;
+    }
+
     public void Dispose()
     {
         _tenantDb.Dispose();
@@ -107,7 +117,7 @@ public sealed class TenantAccessAuthorizationTests : IDisposable
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
 
-        _currentTenant.Set(tenantId);
+        SetValidatedTenantScope(tenantId);
         _currentUser.UserId = userId;
 
         var checker = _provider.GetRequiredService<IPermissionChecker>();
@@ -134,7 +144,7 @@ public sealed class TenantAccessAuthorizationTests : IDisposable
     {
         var tenantId = Guid.NewGuid();
 
-        _currentTenant.Set(tenantId);
+        SetValidatedTenantScope(tenantId);
         _currentUser.UserId = null;
 
         var checker = _provider.GetRequiredService<CoreKit.Access.Abstractions.IPermissionChecker>();
@@ -150,7 +160,7 @@ public sealed class TenantAccessAuthorizationTests : IDisposable
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
 
-        _currentTenant.Set(tenantId);
+        SetValidatedTenantScope(tenantId);
         _currentUser.UserId = userId;
         _currentUser.IsAuthenticated = false;
 
@@ -167,7 +177,7 @@ public sealed class TenantAccessAuthorizationTests : IDisposable
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
 
-        _currentTenant.Set(tenantId);
+        SetValidatedTenantScope(tenantId);
         _currentUser.UserId = userId;
 
         _tenantDb.Tenants.Add(new CoreKit.Tenant.Entities.TenantEntity
@@ -203,7 +213,7 @@ public sealed class TenantAccessAuthorizationTests : IDisposable
         var tenantId = Guid.NewGuid();
         var userId = Guid.NewGuid();
 
-        _currentTenant.Set(tenantId);
+        SetValidatedTenantScope(tenantId);
         _currentUser.UserId = userId;
         _currentUser.IsAuthenticated = true;
 

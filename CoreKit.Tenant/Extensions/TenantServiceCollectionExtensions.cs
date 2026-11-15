@@ -103,10 +103,8 @@ public static class TenantServiceCollectionExtensions
         // Tenant adds its tenant claim to every access token Identity issues.
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IAccessTokenClaimsContributor, TenantClaimsContributor>());
 
-        // Expose Tenant's scope and membership to Access through public contracts.
-        // Tenant membership is an adapter: Access composes it with the platform (and default)
-        // adapter behind a single CompositeAccessMembership registered by AddAccess.
-        services.AddScoped<IAccessScopeContext, TenantAccessScopeContext>();
+        // Expose Tenant membership to Access through the public adapter contract. Access composes it
+        // with the platform (and default) adapter behind a single CompositeAccessMembership.
         services.AddScoped<IAccessMembershipAdapter, TenantAccessMembership>();
 
         // When a person leaves a tenant, clear their effective-authorization state in Access so a

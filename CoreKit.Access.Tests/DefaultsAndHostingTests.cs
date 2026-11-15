@@ -66,8 +66,11 @@ public sealed class ClaimsCurrentUserTests
 public sealed class DefaultPortsTests
 {
     [Fact]
-    public void ScopeContext_WithoutAScopeModule_HasNoScope()
-        => Assert.Null(new DefaultAccessScopeContext().Current);
+    public void ScopeContext_WithoutAValidatedHttpScope_HasNoScope()
+    {
+        var accessor = new HttpContextAccessor { HttpContext = new DefaultHttpContext() };
+        Assert.Null(new ClaimsAccessScopeContext(accessor).Current);
+    }
 
     [Fact]
     public async Task Membership_WithoutAMembershipModule_NobodyBelongs()

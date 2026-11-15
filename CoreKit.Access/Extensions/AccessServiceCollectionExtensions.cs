@@ -77,8 +77,8 @@ public static class AccessServiceCollectionExtensions
         // Identity may register its own IAccessCurrentUser implementation that overrides this default.
         services.TryAddScoped<IAccessCurrentUser, ClaimsCurrentUser>();
 
-        // Default scope context: no scope, so scoped calls are refused. A scope module (Tenant) may override.
-        services.TryAddScoped<IAccessScopeContext, DefaultAccessScopeContext>();
+        // Default scope context: reads the validated HTTP tenant scope item. Without a valid scope, scoped calls are refused.
+        services.TryAddScoped<IAccessScopeContext, ClaimsAccessScopeContext>();
 
         // Default membership: nobody is a member, so nobody is granted anything. A membership module
         // (Tenant) may override. TryAddScoped keeps the default as a fallback.

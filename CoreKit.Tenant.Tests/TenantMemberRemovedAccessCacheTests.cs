@@ -1,3 +1,5 @@
+using CoreKit.Access.Extensions;
+using CoreKit.Tenant.Extensions;
 using System;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -47,6 +49,7 @@ public sealed class TenantMemberRemovedAccessCacheTests : IDisposable
             .Build();
 
         var services = new ServiceCollection();
+        services.AddLogging();
         services.AddTenant(config, options => options.UseSqlite(_tenantConnection));
         services.AddAccess(config, options => options.UseSqlite(_accessConnection));
         _provider = services.BuildServiceProvider(validateScopes: true);

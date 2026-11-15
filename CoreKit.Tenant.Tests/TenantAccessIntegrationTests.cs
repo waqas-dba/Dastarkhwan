@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using CoreKit.Access.Abstractions;
 using CoreKit.Access.Constants;
 using CoreKit.Access.Entities;
@@ -9,43 +9,6 @@ using CoreKit.Tenant.Extensions;
 using Microsoft.Extensions.Configuration;
 
 namespace CoreKit.Tenant.Tests;
-
-public sealed class TenantAccessScopeContextTests
-{
-    [Fact]
-    public void Current_ReturnsTenantScope_WhenTenantIsResolved()
-    {
-        var tenantId = Guid.NewGuid();
-        var current = new CurrentTenant();
-        current.Set(tenantId);
-
-        var context = new TenantAccessScopeContext(current);
-
-        var scope = context.Current;
-
-        Assert.NotNull(scope);
-        Assert.Equal(AccessScope.TenantType, scope.Value.Type);
-        Assert.Equal(tenantId, scope.Value.Id);
-        Assert.True(scope.Value.IsValid);
-    }
-
-    [Fact]
-    public void Current_ReturnsNull_WhenNoTenantIsResolved()
-    {
-        var current = new CurrentTenant();
-
-        var context = new TenantAccessScopeContext(current);
-
-        Assert.Null(context.Current);
-    }
-
-    [Fact]
-    public void Current_ReturnsNull_WhenTenantIdIsEmpty()
-    {
-        var current = new CurrentTenant();
-        Assert.Throws<ArgumentException>(() => current.Set(Guid.Empty));
-    }
-}
 
 public sealed class TenantAccessMembershipTests
 {
@@ -81,7 +44,7 @@ public sealed class TenantAccessMembershipTests
         var result = await _membership.FindAsync(scope, userId);
 
         Assert.NotNull(result);
-        Assert.False(result!.IsOwner); // Tenant owner is NOT Access owner — no super permissions
+        Assert.False(result!.IsOwner); // Tenant owner is NOT Access owner â€” no super permissions
     }
 
     [Fact]
@@ -241,7 +204,7 @@ public sealed class AccessIntegrationDIRegistrationTests : IDisposable
 
         // Both adapters must be present so the composite can route tenant and platform lookups.
         // (The default adapter may or may not be present depending on registration order due to
-        // TryAddScoped/AddScoped interaction — see L-1 observation.)
+        // TryAddScoped/AddScoped interaction â€” see L-1 observation.)
         var adapterDescriptors = services.Where(d => d.ServiceType == typeof(IAccessMembershipAdapter)).ToList();
         Assert.Contains(adapterDescriptors, d => d.ImplementationType?.Name == "TenantAccessMembership");
         Assert.Contains(adapterDescriptors, d => d.ImplementationType?.Name == "PlatformAccessMembership");
@@ -268,7 +231,7 @@ public sealed class AccessIntegrationDIRegistrationTests : IDisposable
 
         // Tenant's scope context must win regardless of registration order.
         var scopeContext = scopeProvider.GetRequiredService<IAccessScopeContext>();
-        Assert.IsType<TenantAccessScopeContext>(scopeContext);
+        Assert.IsType<CoreKit.Access.Services.ClaimsAccessScopeContext>(scopeContext);
 
         // Tenant membership resolves through the composed service.
         var tenantId = Guid.NewGuid();
@@ -310,7 +273,7 @@ public sealed class AccessIntegrationDIRegistrationTests : IDisposable
 
         // Tenant's scope context must win regardless of registration order.
         var scopeContext = scopeProvider.GetRequiredService<IAccessScopeContext>();
-        Assert.IsType<TenantAccessScopeContext>(scopeContext);
+        Assert.IsType<CoreKit.Access.Services.ClaimsAccessScopeContext>(scopeContext);
 
         // Tenant membership resolves through the composed service.
         var tenantId = Guid.NewGuid();
@@ -374,3 +337,4 @@ public sealed class AccessIntegrationDIRegistrationTests : IDisposable
         await db.SaveChangesAsync();
     }
 }
+

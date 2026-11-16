@@ -513,6 +513,63 @@ public sealed class ProjectionAccessMembershipTests : IDisposable
             row.AsOf = _env.Time.GetUtcNow().UtcDateTime - watermarkAge;
         });
     }
+
+    [Fact]
+    public async Task RevokedMembership_Denies()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        await SeedWatermark(TimeSpan.Zero);
+        _env.Seed(db =>
+        {
+            db.TenantStates.Add(new AccessTenantState
+            {
+                TenantId = tenantId, Status = AccessTenantStatuses.Active, UpdatedAt = _env.UtcNow
+            });
+            db.MembershipProjections.Add(new AccessMembershipProjection
+            {
+                TenantId = tenantId,
+                UserId = userId,
+                Status = AccessMembershipProjectionStatus.Removed,
+                MembershipGeneration = 2,
+                LastAppliedSequence = 2,
+                UpdatedAt = _env.UtcNow
+            });
+        });
+
+        Assert.Null(await _graph.Projection.FindAsync(AccessScope.ForTenant(tenantId), userId));
+    }
+
+    [Fact]
+    public async Task ProjectionRepositoryThrows_Denies()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+
+        await _graph.Recorder.HeartbeatAsync();
+        _env.Seed(db =>
+        {
+            db.TenantStates.Add(new AccessTenantState
+            {
+                TenantId = tenantId, Status = AccessTenantStatuses.Active, UpdatedAt = _env.UtcNow
+            });
+        });
+
+        var failing = new FailingProjectionRepository();
+        var projection = new ProjectionAccessMembership(
+            _graph.Freshness, failing, _graph.TenantStates, _graph.Options, _graph.Time);
+
+        Assert.Null(await projection.FindAsync(AccessScope.ForTenant(tenantId), userId));
+    }
+
+    [Fact]
+    public async Task EmptyUserId_Denies()
+    {
+        await SeedWatermark(TimeSpan.Zero);
+
+        Assert.Null(await _graph.Projection.FindAsync(AccessScope.ForTenant(Guid.NewGuid()), Guid.Empty));
+    }
 }
 
 public sealed class AccessMembershipProjectionReaderTests : IDisposable
@@ -708,5 +765,67 @@ internal static class ProjectionTests
         return new AccessMembershipEventEnvelope(
             Guid.NewGuid(), tenantId, sequence, type, AccessMembershipEventTypes.SupportedSchemaVersion,
             null, null, payload, occurredAt);
+    }
+}
+
+public sealed class CompositeAccessMembershipTests
+{
+    [Fact]
+    public async Task NoFallbackToTenantMembership_WhenProjectionFailsAuthoritatively()
+    {
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var scope = AccessScope.ForTenant(tenantId);
+
+        var adapters = new IAccessMembershipAdapter[]
+        {
+            new FailingProjectionAdapter(),
+            new TenantMemberAdapter()
+        };
+
+        var composite = new CompositeAccessMembership(adapters);
+
+        var result = await composite.FindAsync(scope, userId);
+
+        // Projection is authoritative and failed: deny. Never fall through to Tenant membership.
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task Regression_FallbackToTenantMembershipDenied()
+    {
+        // Regression test: under the previous fallback behavior, a failed authoritative projection
+        // would silently fall through to the Tenant adapter and return its member. That behavior
+        // must not return — this test fails under the old behavior and passes under fail-closed.
+        var tenantId = Guid.NewGuid();
+        var userId = Guid.NewGuid();
+        var scope = AccessScope.ForTenant(tenantId);
+
+        var adapters = new IAccessMembershipAdapter[]
+        {
+            new FailingProjectionAdapter(),
+            new TenantMemberAdapter()
+        };
+
+        var composite = new CompositeAccessMembership(adapters);
+
+        var result = await composite.FindAsync(scope, userId);
+
+        Assert.Null(result);
+    }
+
+    private sealed class FailingProjectionAdapter : IProjectionMembershipAdapter
+    {
+        public Task<AccessMember?> FindAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
+            => Task.FromResult<AccessMember?>(null);
+
+        public Task<ProjectionAccessMembershipResult> TryFindAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
+            => Task.FromResult(ProjectionAccessMembershipResult.Failure(ProjectionAccessMembershipError.ProjectionFailure));
+    }
+
+    private sealed class TenantMemberAdapter : IAccessMembershipAdapter
+    {
+        public Task<AccessMember?> FindAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
+            => Task.FromResult<AccessMember?>(new AccessMember(false, 1));
     }
 }

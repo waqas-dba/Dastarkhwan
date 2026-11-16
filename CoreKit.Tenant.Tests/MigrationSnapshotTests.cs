@@ -6,20 +6,24 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace CoreKit.Tenant.Tests;
 
 /// <summary>
-/// What this protects: the committed Tenant migration snapshot and the live TenantDbContext model stay in
-/// agreement, and the transactional outbox is actually mapped (table, columns, primary key, indexes) with no
-/// foreign key to the tenant.
+/// What this protects: the committed Tenant migration snapshot stays faithful to the live TenantDbContext model
+/// for the metadata a migration cannot show - the TenantMember soft-delete query filter - and the transactional
+/// outbox is actually mapped (table, columns, primary key, indexes) with no foreign key to the tenant.
 /// Why it matters: the outbox model shipped before its migration. If the snapshot and the live model disagree,
 /// the next generated migration would contain changes nobody asked for (or silently miss the outbox table), and
-/// a foreign key to TENANT_Tenants would delete a tenant's undelivered events with the tenant row.
+/// a foreign key to TENANT_Tenants would delete a tenant's undelivered events with the tenant row. A query
+/// filter is runtime EF query behavior, not a schema object, so dropping it from the snapshot never shows up as
+/// a pending model change yet changes the model every later migration is generated from.
 /// The rule under test (see TenantDbContext.OnModelCreating, TenantOutboxMessage and the
 /// 20261116100911_AddTenantOutboxSchema migration): TENANT_OutboxMessages carries every TenantOutboxMessage
-/// property, its primary key is EventId, the per-tenant sequence index is unique, and there is no tenant FK.
+/// property, its primary key is EventId, the per-tenant sequence index is unique, there is no tenant FK, and
+/// TenantMember keeps its RemovedAt == null filter in both the live model and the committed snapshot.
 /// </summary>
 public sealed class MigrationSnapshotTests
 {
     private const string OutboxEntityName = "CoreKit.Tenant.Entities.TenantOutboxMessage";
     private const string TenantEntityName = "CoreKit.Tenant.Entities.TenantEntity";
+    private const string MemberEntityName = "CoreKit.Tenant.Entities.TenantMember";
 
     private const string OutboxTable = "TENANT_OutboxMessages";
     private const string TenantTable = "TENANT_Tenants";
@@ -48,13 +52,24 @@ public sealed class MigrationSnapshotTests
     };
 
     /// <summary>
-    /// The committed snapshot is generated from the live model. If they drift, the next migration would contain
-    /// changes nobody asked for or miss the ones they did.
+    /// The committed snapshot is generated from the live model. This compares table and column names only; the
+    /// query filter and the outbox constraints are asserted separately below.
     /// </summary>
     [Fact]
     public void TheCommittedSnapshotMatchesTheLiveModel()
     {
         Assert.Equal(TableShape(BuildSnapshotModel()), TableShape(BuildLiveModel()));
+    }
+
+    /// <summary>
+    /// A query filter is runtime query behavior, so its loss never appears as a pending model change. Both the
+    /// committed snapshot and the live model must keep excluding soft-deleted members.
+    /// </summary>
+    [Fact]
+    public void TenantMember_KeepsTheSoftDeleteQueryFilter()
+    {
+        AssertSoftDeleteFilter(BuildSnapshotModel());
+        AssertSoftDeleteFilter(BuildLiveModel());
     }
 
     [Fact]
@@ -90,6 +105,36 @@ public sealed class MigrationSnapshotTests
     {
         AssertNoTenantForeignKey(BuildSnapshotModel());
         AssertNoTenantForeignKey(BuildLiveModel());
+    }
+
+    /// <summary>
+    /// Accepts both EF-generated shapes of "not removed": the live model's <c>m =&gt; m.RemovedAt == null</c>
+    /// and the snapshot's <c>!EF.Property&lt;DateTime?&gt;(__filteredEntity, "RemovedAt").HasValue</c>. Either
+    /// shape must mention RemovedAt and test it against null; a filter meaning "removed" fails.
+    /// </summary>
+    private static void AssertSoftDeleteFilter(IModel model)
+    {
+        var member = model.FindEntityType(MemberEntityName);
+        Assert.NotNull(member);
+
+        var removedAt = member!.FindProperty("RemovedAt");
+        Assert.NotNull(removedAt);
+        Assert.True(removedAt!.IsNullable, "RemovedAt must stay nullable for the soft-delete filter to work.");
+
+        var filters = member.GetDeclaredQueryFilters();
+        Assert.NotEmpty(filters);
+
+        var expression = filters.Single().Expression!.ToString();
+        Assert.Contains("RemovedAt", expression, StringComparison.Ordinal);
+
+        var testsNull = expression.Contains("== null", StringComparison.Ordinal)
+            || (expression.Contains("\"RemovedAt\"", StringComparison.Ordinal)
+                && expression.Contains("HasValue", StringComparison.Ordinal)
+                && (expression.Contains('!') || expression.Contains("Not(", StringComparison.Ordinal)));
+
+        Assert.True(
+            testsNull,
+            $"The TenantMember query filter must exclude soft-deleted rows (RemovedAt == null). Actual: {expression}");
     }
 
     private static void AssertLastEventSequence(IModel model)

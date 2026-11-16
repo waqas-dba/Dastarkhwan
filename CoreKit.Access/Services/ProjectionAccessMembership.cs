@@ -1,3 +1,4 @@
+using System.Diagnostics.Metrics;
 using CoreKit.Access.Abstractions;
 
 namespace CoreKit.Access.Services;
@@ -11,6 +12,12 @@ namespace CoreKit.Access.Services;
 /// </summary>
 internal sealed class ProjectionAccessMembership : IProjectionMembershipAdapter
 {
+    private static readonly Meter Meter = new("CoreKit.Access.Membership");
+
+    private static readonly Counter<long> UntrustedCounter = Meter.CreateCounter<long>(
+        "access.membership.untrusted",
+        description: "Tenant-scoped lookups denied because the projection could not be trusted (tag: reason).");
+
     private readonly IAccessMembershipFreshnessRepository _freshness;
     private readonly IAccessMembershipProjectionRepository _projections;
     private readonly IAccessTenantStateRepository _tenantStates;
@@ -32,64 +39,80 @@ internal sealed class ProjectionAccessMembership : IProjectionMembershipAdapter
     }
 
     /// <summary>
-    /// Performs the authoritative lookup. When the configured source is not Projection, or the
-    /// scope is not a tenant scope, this adapter is not authoritative and the caller must fall
-    /// through to the next source. When it is authoritative, every untrusted state is reported
-    /// as an error and the caller must deny without falling through.
+    /// Performs the authoritative lookup. When the scope is not a tenant scope, or the configured
+    /// source is not Projection, this adapter is not authoritative and the caller continues to the
+    /// next source. When it is authoritative, every untrusted or missing state is a deny and the
+    /// caller must not fall through.
     /// </summary>
     public async Task<ProjectionAccessMembershipResult> TryFindAsync(
         AccessScope scope, Guid userId, CancellationToken ct = default)
     {
-        if (scope.Type != AccessScope.TenantType || userId == Guid.Empty)
+        if (scope.Type != AccessScope.TenantType)
             return ProjectionAccessMembershipResult.NotAuthoritative();
 
         if (_options.Value.MembershipSource != AccessMembershipSource.Projection)
             return ProjectionAccessMembershipResult.NotAuthoritative();
 
+        // Projection mode and a tenant scope: from here on every outcome is final. An invalid
+        // identity is a deny, never a fall-through to another source.
+        if (scope.Id == Guid.Empty || userId == Guid.Empty)
+            return ProjectionAccessMembershipResult.NotFound();
+
         try
         {
             var watermark = await _freshness.GetWatermarkAsync(ct);
             if (watermark is null)
-                return ProjectionAccessMembershipResult.Failure(ProjectionAccessMembershipError.NoWatermark);
+                return Untrusted(ProjectionAccessMembershipError.NoWatermark, "no_heartbeat");
 
             var staleness = (_time.GetUtcNow().UtcDateTime - watermark.AsOf).TotalSeconds;
             if (staleness > _options.Value.MaxMembershipStalenessSeconds)
-                return ProjectionAccessMembershipResult.Failure(ProjectionAccessMembershipError.StaleWatermark);
+                return Untrusted(ProjectionAccessMembershipError.StaleWatermark, "stale_heartbeat");
 
             if (await _freshness.IsQuarantinedAsync(scope.Id, ct))
-                return ProjectionAccessMembershipResult.Failure(ProjectionAccessMembershipError.Quarantined);
+                return Untrusted(ProjectionAccessMembershipError.Quarantined, "quarantined");
 
-            var tenantState = await _tenantStates.FindAsync(scope.Id, ct);
-            if (tenantState is null)
-                return ProjectionAccessMembershipResult.Failure(ProjectionAccessMembershipError.UnknownTenantState);
+            // Read-only status lookup: no change tracking on the authorization path.
+            var tenantStatus = await _tenantStates.GetStatusAsync(scope.Id, ct);
+            if (tenantStatus is null)
+                return Untrusted(ProjectionAccessMembershipError.UnknownTenantState, "tenant_state_unknown");
 
-            if (tenantState.Status != AccessTenantStatuses.Active)
-                return ProjectionAccessMembershipResult.Failure(ProjectionAccessMembershipError.NotActiveTenant);
+            if (tenantStatus != AccessTenantStatuses.Active)
+                return Untrusted(ProjectionAccessMembershipError.NotActiveTenant, "tenant_not_active");
 
             var projection = await _projections.FindReadOnlyAsync(scope.Id, userId, ct);
-            if (projection is null)
-                return ProjectionAccessMembershipResult.NotFound();
-
-            if (projection.Status != AccessMembershipProjectionStatus.Active)
+            if (projection is null || projection.Status != AccessMembershipProjectionStatus.Active)
                 return ProjectionAccessMembershipResult.NotFound();
 
             return ProjectionAccessMembershipResult.Found(
                 new AccessMember(false, projection.MembershipGeneration));
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Cancellation is not a projection failure. Let the caller's cancellation propagate.
+            throw;
+        }
         catch (Exception ex)
         {
-            return ProjectionAccessMembershipResult.Failure(ProjectionAccessMembershipError.ProjectionFailure, ex);
+            return Untrusted(ProjectionAccessMembershipError.ProjectionFailure, "projection_failure", ex);
         }
     }
 
-    /// <inheritdoc/>
-    /// Returns <c>null</c> for every untrusted or missing state. Never throws: a projection
-    /// error is converted into a deny so the caller fails closed. This member exists only for
-    /// consumers that resolve <see cref="IAccessMembershipAdapter"/> directly; the composite
-    /// prefers <see cref="TryFindAsync"/> so it can distinguish fall-through from deny.
+    /// <summary>
+    /// Returns <c>null</c> for every untrusted, missing or non-authoritative state. A projection
+    /// error is converted into a deny so the caller fails closed. This member exists for consumers
+    /// that resolve <see cref="IAccessMembershipAdapter"/> directly; the composite uses
+    /// <see cref="TryFindAsync"/> so it can tell fall-through from deny.
+    /// </summary>
     public async Task<AccessMember?> FindAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
     {
         var result = await TryFindAsync(scope, userId, ct);
         return result.IsFound ? result.Member : null;
+    }
+
+    private static ProjectionAccessMembershipResult Untrusted(
+        ProjectionAccessMembershipError error, string reason, Exception? exception = null)
+    {
+        UntrustedCounter.Add(1, new KeyValuePair<string, object?>("reason", reason));
+        return ProjectionAccessMembershipResult.Failure(error, exception);
     }
 }

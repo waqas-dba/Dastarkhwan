@@ -24,9 +24,11 @@ public sealed class ProjectionAccessMembershipResult
     /// <summary>The failure kind when the projection could not be trusted. Null when the lookup succeeded.</summary>
     public ProjectionAccessMembershipError? Error { get; }
 
-    /// <summary>The exception when <see cref="Error"/> is <see cref="ProjectionAccessMembershipError.ProjectionFailure"/>.
-    /// Null otherwise.</summary>
-    public Exception? Exception { get; }
+    /// <summary>
+    /// The exception when <see cref="Error"/> is <see cref="ProjectionAccessMembershipError.ProjectionFailure"/>.
+    /// Internal: callers must never branch on raw projection exceptions, only on <see cref="Error"/>.
+    /// </summary>
+    internal Exception? Exception { get; }
 
     /// <summary>True when this result is authoritative for the requested scope, so the caller must
     /// not fall through to another membership source.</summary>

@@ -24,7 +24,11 @@ public static class AccessServiceCollectionExtensions
             .Validate(o => o.MaxRolesPerScope >= 1, "Access:MaxRolesPerScope must be at least 1.")
             .Validate(o => o.MaxRolesPerUser >= 1, "Access:MaxRolesPerUser must be at least 1.")
             .Validate(o => o.CacheSeconds >= 0, "Access:CacheSeconds cannot be negative.")
-            .Validate(o => !string.IsNullOrWhiteSpace(o.UserIdClaimType), "Access:UserIdClaimType must be set.");
+            .Validate(o => !string.IsNullOrWhiteSpace(o.UserIdClaimType), "Access:UserIdClaimType must be set.")
+            .Validate(o => o.MaxMembershipStalenessSeconds >= 1,
+                "Access:MaxMembershipStalenessSeconds must be at least 1.")
+            .Validate(o => o.MembershipHeartbeatSeconds >= 1,
+                "Access:MembershipHeartbeatSeconds must be at least 1.");
 
         services.AddOptions<AccessDatabaseOptions>()
             .Bind(configuration.GetSection("Database"))
@@ -62,6 +66,9 @@ public static class AccessServiceCollectionExtensions
         services.AddScoped<IAccessAssignmentRepository, AccessAssignmentRepository>();
         services.AddScoped<IAccessAuditRepository, AccessAuditRepository>();
         services.AddScoped<IAccessMembershipProjectionRepository, AccessMembershipProjectionRepository>();
+        services.AddScoped<IAccessMembershipStreamRepository, AccessMembershipStreamRepository>();
+        services.AddScoped<IAccessMembershipFreshnessRepository, AccessMembershipFreshnessRepository>();
+        services.AddScoped<IAccessTenantStateRepository, AccessTenantStateRepository>();
 
         // Services
         services.AddSingleton<IAccessCache, AccessCache>();
@@ -72,6 +79,13 @@ public static class AccessServiceCollectionExtensions
         services.AddScoped<IAccessAssignmentService, AccessAssignmentService>();
         services.AddScoped<IAccessMaintenance, AccessMaintenance>();
         services.AddScoped<IAccessAuditLog, AccessAuditLog>();
+
+        // The projection side of tenant membership: the consumer applies Tenant's events, the installer
+        // replaces a tenant's rows from a snapshot, and the reader serves Tenant's recovery and reconciliation.
+        services.AddScoped<IAccessMembershipEventConsumer, AccessMembershipEventConsumer>();
+        services.AddScoped<IAccessMembershipSnapshotInstaller, AccessMembershipSnapshotInstaller>();
+        services.AddScoped<IAccessMembershipProjectionReader, AccessMembershipProjectionReader>();
+        services.AddScoped<IAccessMembershipFreshnessRecorder, AccessMembershipFreshnessRecorder>();
 
         // Access's own view of the current user: reads from the HttpContext claims (Identity issues "sub").
         // Identity may register its own IAccessCurrentUser implementation that overrides this default.
@@ -87,6 +101,11 @@ public static class AccessServiceCollectionExtensions
         // Platform membership adapter: handles platform-scoped lookups.
         services.AddScoped<IAccessMembershipAdapter, PlatformAccessMembership>();
 
+        // Projection adapter: always registered, but it answers only for a tenant scope and only while
+        // Access:MembershipSource is Projection. That keeps the cutover a configuration change, not a code change.
+        // In TenantAdapter mode it returns null before it touches the database.
+        services.AddScoped<IAccessMembershipAdapter, ProjectionAccessMembership>();
+
         // Composite router: tries each adapter in order, returns first match. Registered as the single
         // IAccessMembership so AccessService and other consumers get one implementation. TryAddScoped lets
         // a host or test register its own IAccessMembership instead.
@@ -97,6 +116,10 @@ public static class AccessServiceCollectionExtensions
 
         // What Access offers other modules, through Access's own abstractions.
         services.AddScoped<IPermissionChecker, AccessPermissionChecker>();
+
+        // Writes the Tenant heartbeat while the projection is selected. Without it the watermark ages out and
+        // every projection lookup fails closed. In TenantAdapter mode the service exits at once.
+        services.AddHostedService<AccessMembershipFreshnessHeartbeatService>();
 
         return services;
     }

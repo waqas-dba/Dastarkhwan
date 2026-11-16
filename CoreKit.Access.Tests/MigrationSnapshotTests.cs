@@ -43,6 +43,28 @@ public sealed class MigrationSnapshotTests
         AssertUniqueIndex(BuildLiveModel());
     }
 
+    /// <summary>
+    /// The committed snapshot is generated from the live model. If they drift, the next migration would
+    /// contain changes nobody asked for (or miss the ones they did).
+    /// </summary>
+    [Fact]
+    public void TheCommittedSnapshotMatchesTheLiveModel()
+    {
+        Assert.Equal(TableShape(BuildSnapshotModel()), TableShape(BuildLiveModel()));
+    }
+
+    /// <summary>Every mapped table with its columns, independent of the database provider's store types.</summary>
+    private static Dictionary<string, string[]> TableShape(IModel model)
+        => model.GetEntityTypes()
+            .Where(t => t.GetTableName() is not null)
+            .ToDictionary(
+                t => t.GetTableName()!,
+                t => t.GetProperties()
+                    .Select(p => p.GetColumnName()!)
+                    .OrderBy(c => c, StringComparer.Ordinal)
+                    .ToArray(),
+                StringComparer.Ordinal);
+
     private static void AssertCompositeAlternateKey(IModel model)
     {
         var role = model.FindEntityType("CoreKit.Access.Entities.AccessRole");

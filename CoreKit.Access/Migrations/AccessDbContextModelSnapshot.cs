@@ -123,6 +123,40 @@ namespace CoreKit.Access.Migrations
                     b.ToTable("ACCESS_MembershipProjections", (string)null);
                 });
 
+            modelBuilder.Entity("CoreKit.Access.Entities.AccessMembershipStreamCursor", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("LastAppliedSequence")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TenantId");
+
+                    b.ToTable("ACCESS_MembershipStreamCursors", (string)null);
+                });
+
+            modelBuilder.Entity("CoreKit.Access.Entities.AccessMembershipWatermark", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AsOf")
+                        .IsConcurrencyToken()
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("ACCESS_MembershipWatermarks", (string)null);
+                });
+
             modelBuilder.Entity("CoreKit.Access.Entities.AccessPlatformMember", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -146,6 +180,47 @@ namespace CoreKit.Access.Migrations
                     b.HasIndex("PlatformId", "UserId");
 
                     b.ToTable("ACCESS_PlatformMembers", (string)null);
+                });
+
+            modelBuilder.Entity("CoreKit.Access.Entities.AccessProcessedEvent", b =>
+                {
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("Sequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("EventId");
+
+                    b.HasIndex("TenantId", "Sequence")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ACCESS_ProcessedEvents_Tenant_Sequence");
+
+                    b.ToTable("ACCESS_ProcessedEvents", (string)null);
+                });
+
+            modelBuilder.Entity("CoreKit.Access.Entities.AccessQuarantinedTenant", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("Since")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TenantId");
+
+                    b.ToTable("ACCESS_QuarantinedTenants", (string)null);
                 });
 
             modelBuilder.Entity("CoreKit.Access.Entities.AccessRole", b =>
@@ -206,6 +281,24 @@ namespace CoreKit.Access.Migrations
                     b.HasKey("RoleId", "Permission");
 
                     b.ToTable("ACCESS_RolePermissions", (string)null);
+                });
+
+            modelBuilder.Entity("CoreKit.Access.Entities.AccessTenantState", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TenantId");
+
+                    b.ToTable("ACCESS_TenantStates", (string)null);
                 });
 
             modelBuilder.Entity("CoreKit.Access.Entities.AccessAssignment", b =>

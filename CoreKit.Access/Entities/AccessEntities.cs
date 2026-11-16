@@ -113,3 +113,52 @@ public enum AccessMembershipProjectionStatus
     Active = 1,
     Removed = 2
 }
+
+/// <summary>
+/// The last event sequence applied for one tenant. It is the consumer's position in the stream and a
+/// concurrency token: two consumers advancing the same tenant cannot both win.
+/// </summary>
+public sealed class AccessMembershipStreamCursor
+{
+    public Guid TenantId { get; set; }
+
+    public long LastAppliedSequence { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
+}
+
+/// <summary>One event id already applied. At-least-once redelivery is acknowledged as a duplicate.</summary>
+public sealed class AccessProcessedEvent
+{
+    public Guid EventId { get; set; }
+
+    public Guid TenantId { get; set; }
+
+    public long Sequence { get; set; }
+
+    public string EventType { get; set; } = null!;
+
+    public DateTime ProcessedAt { get; set; }
+}
+
+/// <summary>
+/// The last heartbeat from Tenant. A missing or stale watermark makes every projection lookup fail closed,
+/// so Access never authorizes from a projection it cannot trust.
+/// </summary>
+public sealed class AccessMembershipWatermark
+{
+    /// <summary>Fixed singleton id (<see cref="Guid.Empty"/>).</summary>
+    public Guid Id { get; set; }
+
+    public DateTime AsOf { get; set; }
+
+    public DateTime ReceivedAt { get; set; }
+}
+
+/// <summary>A tenant whose event stream is stuck. Projection lookups for it deny until it is cleared.</summary>
+public sealed class AccessQuarantinedTenant
+{
+    public Guid TenantId { get; set; }
+
+    public DateTime Since { get; set; }
+}

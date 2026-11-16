@@ -1,6 +1,6 @@
 ﻿namespace CoreKit.Access.Persistence;
 
-/// <summary>Roles, their permissions, who holds them, and the audit trail. Independent of every other module.</summary>
+/// <summary>Roles, their permissions, who holds them, the audit trail, and the tenant membership projection.</summary>
 public sealed class AccessDbContext : DbContext
 {
     public AccessDbContext(DbContextOptions<AccessDbContext> options) : base(options)
@@ -18,6 +18,16 @@ public sealed class AccessDbContext : DbContext
     public DbSet<AccessPlatformMember> PlatformMembers => Set<AccessPlatformMember>();
 
     public DbSet<AccessMembershipProjection> MembershipProjections => Set<AccessMembershipProjection>();
+
+    public DbSet<AccessMembershipStreamCursor> MembershipStreamCursors => Set<AccessMembershipStreamCursor>();
+
+    public DbSet<AccessProcessedEvent> ProcessedEvents => Set<AccessProcessedEvent>();
+
+    public DbSet<AccessMembershipWatermark> MembershipWatermarks => Set<AccessMembershipWatermark>();
+
+    public DbSet<AccessQuarantinedTenant> QuarantinedTenants => Set<AccessQuarantinedTenant>();
+
+    public DbSet<AccessTenantState> TenantStates => Set<AccessTenantState>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -43,7 +53,8 @@ public sealed class AccessDbContext : DbContext
                 .HasForeignKey(x => x.RoleId).OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<AccessRolePermission>(b =>        {
+        modelBuilder.Entity<AccessRolePermission>(b =>
+        {
             b.ToTable("ACCESS_RolePermissions");
             b.HasKey(x => new { x.RoleId, x.Permission });
             b.Property(x => x.Permission).IsRequired().HasMaxLength(100);
@@ -94,12 +105,66 @@ public sealed class AccessDbContext : DbContext
             b.Property(x => x.LastAppliedSequence).IsRequired();
             b.Property(x => x.UpdatedAt).IsRequired();
 
+            // The primary key already enforces uniqueness; this index matches the committed migration.
             b.HasIndex(x => new { x.TenantId, x.UserId })
                 .IsUnique()
                 .HasDatabaseName("UX_ACCESS_MembershipProjections_Tenant_User");
 
             b.HasIndex(x => x.UserId)
                 .HasDatabaseName("IX_ACCESS_MembershipProjections_UserId");
+        });
+
+        modelBuilder.Entity<AccessMembershipStreamCursor>(b =>
+        {
+            b.ToTable("ACCESS_MembershipStreamCursors");
+            b.HasKey(x => x.TenantId);
+            b.Property(x => x.TenantId).ValueGeneratedNever();
+
+            // Concurrency token: two consumers advancing the same tenant cannot both win.
+            b.Property(x => x.LastAppliedSequence).IsRequired().IsConcurrencyToken();
+            b.Property(x => x.UpdatedAt).IsRequired();
+        });
+
+        modelBuilder.Entity<AccessProcessedEvent>(b =>
+        {
+            b.ToTable("ACCESS_ProcessedEvents");
+            b.HasKey(x => x.EventId);
+            b.Property(x => x.EventId).ValueGeneratedNever();
+            b.Property(x => x.EventType).IsRequired().HasMaxLength(100);
+            b.Property(x => x.ProcessedAt).IsRequired();
+
+            // A tenant sequence is applied at most once, even if two different event ids claim it.
+            b.HasIndex(x => new { x.TenantId, x.Sequence })
+                .IsUnique()
+                .HasDatabaseName("UX_ACCESS_ProcessedEvents_Tenant_Sequence");
+        });
+
+        modelBuilder.Entity<AccessMembershipWatermark>(b =>
+        {
+            b.ToTable("ACCESS_MembershipWatermarks");
+            b.HasKey(x => x.Id);
+            b.Property(x => x.Id).ValueGeneratedNever();
+
+            // Concurrency token: the watermark can never be moved backwards by a racing, older heartbeat.
+            b.Property(x => x.AsOf).IsRequired().IsConcurrencyToken();
+            b.Property(x => x.ReceivedAt).IsRequired();
+        });
+
+        modelBuilder.Entity<AccessQuarantinedTenant>(b =>
+        {
+            b.ToTable("ACCESS_QuarantinedTenants");
+            b.HasKey(x => x.TenantId);
+            b.Property(x => x.TenantId).ValueGeneratedNever();
+            b.Property(x => x.Since).IsRequired();
+        });
+
+        modelBuilder.Entity<AccessTenantState>(b =>
+        {
+            b.ToTable("ACCESS_TenantStates");
+            b.HasKey(x => x.TenantId);
+            b.Property(x => x.TenantId).ValueGeneratedNever();
+            b.Property(x => x.Status).IsRequired().HasMaxLength(20);
+            b.Property(x => x.UpdatedAt).IsRequired();
         });
     }
 }

@@ -97,7 +97,8 @@ public sealed class TestEnv : IDisposable
     public List<T> EventsOf<T>() where T : ITenantEvent => Published.OfType<T>().ToList();
 
     public TenantService CreateTenantService() => new(
-        Tenants, Members, Audit, UnitOfWork, Publisher, InfoProvider, Guard, Options.Create(Config), Time);
+        Tenants, Members, Audit, UnitOfWork, Publisher, InfoProvider, Guard, Options.Create(Config), Time,
+        new TenantOutbox(Db));
 
     public TenantSettingsService CreateSettingsService() => new(
         Tenants, Settings, Audit, UnitOfWork, Publisher, Guard, Options.Create(Config), Time);

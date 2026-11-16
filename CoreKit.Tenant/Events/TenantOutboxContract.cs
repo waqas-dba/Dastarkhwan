@@ -14,9 +14,23 @@ public static class TenantOutboxEventTypes
     public const string MemberRemoved = "tenant.member.removed";
     public const string MemberOwnershipChanged = "tenant.member.ownership_changed";
 
-    // Lifecycle events. The contract is defined here; Tenant starts writing them in PR-8.
+    // Lifecycle events.
+    public const string TenantCreated = "tenant.lifecycle.created";
     public const string TenantStatusChanged = "tenant.lifecycle.status_changed";
     public const string TenantDeleted = "tenant.lifecycle.deleted";
+}
+
+/// <summary>
+/// Status strings used on the wire. The values match <see cref="CoreKit.Tenant.Entities.TenantStatus"/> names.
+/// "Deleted" exists only on the wire: the tenant row itself is gone.
+/// </summary>
+public static class TenantLifecycleStatuses
+{
+    public const string Pending = "Pending";
+    public const string Active = "Active";
+    public const string Suspended = "Suspended";
+    public const string Archived = "Archived";
+    public const string Deleted = "Deleted";
 }
 
 /// <summary>
@@ -29,4 +43,13 @@ public sealed record TenantMembershipEventPayload(
     long MembershipGeneration,
     bool IsOwner,
     bool IsActive,
+    DateTime OccurredAt);
+
+/// <summary>
+/// Schema version 1 payload of every lifecycle event. <c>FromStatus</c> is null for creation.
+/// </summary>
+public sealed record TenantLifecycleEventPayload(
+    Guid TenantId,
+    string? FromStatus,
+    string Status,
     DateTime OccurredAt);

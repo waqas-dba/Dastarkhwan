@@ -613,7 +613,8 @@ internal sealed class Graph : IDisposable
         Recorder = new AccessMembershipFreshnessRecorder(
             Freshness, UnitOfWork, Time, NullLogger<AccessMembershipFreshnessRecorder>.Instance);
         Reader = new AccessMembershipProjectionReader(Stream, Projections, TenantStates);
-        Projection = new ProjectionAccessMembership(Freshness, Projections, TenantStates, Options, Time);
+        Projection = new ProjectionAccessMembership(
+            (IAccessMembershipFreshnessRepository)Freshness, Projections, TenantStates, Options, Time);
     }
 
     public FixedTimeProvider Time { get; }

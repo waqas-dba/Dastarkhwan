@@ -1,5 +1,4 @@
-﻿using CoreKit.Access.Extensions;
-using CoreKit.Identity.Repositories;
+﻿using CoreKit.Identity.Repositories;
 
 namespace CoreKit.Identity.Extensions;
 
@@ -61,15 +60,6 @@ public static class ServiceCollectionExtensions
     {
         services.AddIdentityPersistence(configuration, configureDatabase);
 
-        // Identity's own permissions are declared in the Access catalog. Access owns the catalog and
-        // the authorization decision; Identity only names what it needs. Contributions are lazy and
-        // harmless when AddAccess is not called.
-        services.AddAccessPermissions(p =>
-        {
-            foreach (var (name, description) in IdentityAccessPermissionNames.All)
-                p.Add(name, description);
-        });
-
         services.AddOptions<JwtOptions>()
             .Bind(configuration.GetSection(JwtOptions.SectionName))
             .Validate(
@@ -99,14 +89,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
 
         // Focused collaborators.
-        services.AddScoped<IAdministratorGuard, AdministratorGuard>();
-        services.AddScoped<IIdentityAdminAuthorizer, AccessBackedIdentityAdminAuthorizer>();
+        services.AddScoped<IAdministratorGuard>(sp => new AdministratorGuard(Array.Empty<Guid>()));
         services.AddScoped<ISessionIssuer, SessionIssuer>();
         services.AddSingleton<ITokenService, TokenService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
-        services.AddScoped<CoreKit.Access.Abstractions.ICurrentUser>(sp => sp.GetRequiredService<ICurrentUserService>());
-        // Identity's current-user is the host's current-user for Access too, so there is one implementation.
-        services.TryAddScoped<CoreKit.Access.Abstractions.IAccessCurrentUser>(sp => sp.GetRequiredService<ICurrentUserService>());
 
         // Business services.
         services.AddScoped<IAuthService, AuthService>();

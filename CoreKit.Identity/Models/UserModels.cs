@@ -11,8 +11,6 @@ public sealed class CreateUserRequest
     public string? DisplayName { get; set; }
 
     public bool IsActive { get; set; } = true;
-
-    public List<Guid> RoleIds { get; set; } = new();
 }
 
 /// <summary>Every property is optional. A property that is not sent stays unchanged.</summary>
@@ -37,12 +35,6 @@ public sealed class UpdateUserRequest
     /// the user's sessions are ended and SecurityVersion is incremented in the same transaction.
     /// </summary>
     public string? Password { get; set; }
-}
-
-public sealed class SetUserRolesRequest
-{
-    /// <summary>The complete list of roles the user should have afterwards.</summary>
-    public List<Guid> RoleIds { get; set; } = new();
 }
 
 public sealed class UserListQuery

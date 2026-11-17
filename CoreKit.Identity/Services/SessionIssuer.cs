@@ -1,5 +1,4 @@
 ﻿using System.Security.Claims;
-using CoreKit.Access.Abstractions;
 using CoreKit.Identity.Common;
 using CoreKit.Identity.Entities;
 using CoreKit.Identity.Interfaces;
@@ -9,25 +8,17 @@ namespace CoreKit.Identity.Services;
 
 public sealed class SessionIssuer : ISessionIssuer
 {
-    private static readonly AccessScope PlatformScope = AccessScope.ForPlatform(AccessScope.PlatformId);
-
-    private readonly IAccessService _access;
     private readonly ITokenService _tokens;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
-    private readonly IEnumerable<IAccessTokenClaimsContributor> _contributors;
     private readonly TimeProvider _time;
 
     public SessionIssuer(
-        IAccessService access,
         ITokenService tokens,
         IRefreshTokenRepository refreshTokenRepository,
-        IEnumerable<IAccessTokenClaimsContributor> contributors,
         TimeProvider time)
     {
-        _access = access;
         _tokens = tokens;
         _refreshTokenRepository = refreshTokenRepository;
-        _contributors = contributors;
         _time = time;
     }
 
@@ -46,15 +37,7 @@ public sealed class SessionIssuer : ISessionIssuer
         Common.IdentityError failure,
         CancellationToken ct)
     {
-        // Roles and permissions come from Access (platform scope) for the response body only; they are
-        // not embedded in the token, so a stale token cannot grant access.
-        var access = await _access.GetAccessAsync(user.Id, PlatformScope, ct);
-
-        var extraClaims = new List<Claim>();
-        foreach (var contributor in _contributors)
-            extraClaims.AddRange(await contributor.GetClaimsAsync(user.Id, access.Roles, access.Permissions, ct));
-
-        var accessToken = _tokens.CreateAccessToken(user, extraClaims);
+        var accessToken = _tokens.CreateAccessToken(user);
         var refreshToken = _tokens.CreateRefreshToken();
         var now = _time.GetUtcNow().UtcDateTime;
 
@@ -85,7 +68,7 @@ public sealed class SessionIssuer : ISessionIssuer
             AccessTokenExpiresAt = accessToken.ExpiresAt,
             RefreshToken = refreshToken.RawToken,
             RefreshTokenExpiresAt = refreshToken.ExpiresAt,
-            User = IdentityMapper.ToDto(user, access.Roles, access.Permissions)
+            User = IdentityMapper.ToDto(user)
         });
     }
 }

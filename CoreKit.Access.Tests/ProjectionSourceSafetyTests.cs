@@ -99,7 +99,13 @@ public sealed class ProjectionSourceSafetyTests
         Assert.True(result.IsAuthoritative);
         Assert.False(result.IsFound);
         Assert.Null(result.Member);
-        Assert.True(result.IsError);
+
+        // No projection row or a removed projection row means "not a member" (NotFound),
+        // not a system error. Every other invalid state is an untrusted projection (IsError).
+        if (scenario == "no_projection_row" || scenario == "removed_projection_row")
+            Assert.True(result.IsNotFound);
+        else
+            Assert.True(result.IsError);
     }
 
     // ---- Exception handling ----
@@ -128,7 +134,7 @@ public sealed class ProjectionSourceSafetyTests
         using var env = new ProjectionTestEnv();
         var nonTenantScope = AccessScope.ForPlatform(AccessScope.PlatformId);
 
-        var result = await env.Projection.TryFindAsync(nonTenantScope, env.UserId, CancellationToken.None);
+        var result = await env.Membership.TryFindAsync(nonTenantScope, env.UserId, CancellationToken.None);
 
         Assert.False(result.IsAuthoritative);
         Assert.Null(result.Member);
@@ -163,7 +169,7 @@ public sealed class ProjectionSourceSafetyTests
         Assert.Null(await stale.Membership.FindAsync(stale.Scope, stale.UserId));
 
         var failing = new ProjectionTestEnv();
-        failing.Projections.ThrowFailure = true;
+        failing.Projections.Throw = true;
         Assert.Null(await failing.Membership.FindAsync(failing.Scope, failing.UserId));
     }
 
@@ -184,8 +190,10 @@ public sealed class ProjectionSourceSafetyTests
     }
 
     [Theory]
-    [InlineData(true)]
-    [InlineData(false)]
+    [InlineData(ProjectionAccessMembershipError.NoWatermark, true)]
+    [InlineData(ProjectionAccessMembershipError.StaleWatermark, false)]
+    [InlineData(ProjectionAccessMembershipError.Quarantined, true)]
+    [InlineData(ProjectionAccessMembershipError.NoProjection, false)]
     public async Task UntrustedProjection_Denies_AndNeverFallsBackToTenant(
         ProjectionAccessMembershipError error, bool tenantRegisteredFirst)
     {
@@ -259,6 +267,7 @@ public sealed class ProjectionSourceSafetyTests
 
     private static readonly AccessMember TenantMember = new(false, 99);
     private static readonly AccessMember PlatformMember = new(false, 3);
+    private static readonly AccessMember ProjectedMember = new(false, 7);
 
     private sealed class FakeFirstMatchAdapter : IAccessMembershipAdapter
     {
@@ -291,7 +300,7 @@ public sealed class ProjectionSourceSafetyTests
 
     // ---- Private test environment ----
 
-    private sealed class ProjectionTestEnv
+    private sealed class ProjectionTestEnv : IDisposable
     {
         public ProjectionTestEnv()
         {
@@ -360,6 +369,16 @@ public sealed class ProjectionSourceSafetyTests
 
         public async Task<ProjectionAccessMembershipResult> Lookup(Guid? userId = null)
             => await Membership.TryFindAsync(Scope, userId ?? UserId, CancellationToken.None);
+
+        public void Dispose() { }
+
+        public AccessMembershipWatermark NewWatermark(int ageSeconds)
+            => new AccessMembershipWatermark
+            {
+                Id = Guid.Empty,
+                AsOf = Time.GetUtcNow().UtcDateTime.AddSeconds(-ageSeconds),
+                ReceivedAt = Time.GetUtcNow().UtcDateTime
+            };
     }
 
     private sealed class FakeFreshnessRepository : IAccessMembershipFreshnessRepository

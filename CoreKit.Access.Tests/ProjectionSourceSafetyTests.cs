@@ -17,7 +17,7 @@ public sealed class ProjectionSourceSafetyTests
     // ---- Valid input ----
 
     [Fact]
-    public async Task IsValid_AcceptsValidProjection()
+    public async Task ActiveMember_WithFreshTrustedProjection_IsFoundAndNeverOwner()
     {
         using var env = new ProjectionTestEnv();
 
@@ -128,7 +128,7 @@ public sealed class ProjectionSourceSafetyTests
         using var env = new ProjectionTestEnv();
         var nonTenantScope = AccessScope.ForPlatform(AccessScope.PlatformId);
 
-        var result = await env.Projection.FindAsync(nonTenantScope, env.UserId, CancellationToken.None);
+        var result = await env.Projection.TryFindAsync(nonTenantScope, env.UserId, CancellationToken.None);
 
         Assert.False(result.IsAuthoritative);
         Assert.Null(result.Member);
@@ -148,6 +148,145 @@ public sealed class ProjectionSourceSafetyTests
         Assert.False(result.IsAuthoritative);
         Assert.Null(result.Member);
         Assert.Null(result.Error);
+    }
+
+    // ---- The adapter contract used by direct consumers ----
+
+    [Fact]
+    public async Task FindAsync_ReturnsTheMember_WhenTrusted_AndNullForEveryDeny()
+    {
+        var trusted = new ProjectionTestEnv();
+        Assert.NotNull(await trusted.Membership.FindAsync(trusted.Scope, trusted.UserId));
+
+        var stale = new ProjectionTestEnv();
+        stale.Freshness.Watermark = stale.NewWatermark(ageSeconds: stale.Config.MaxMembershipStalenessSeconds + 1);
+        Assert.Null(await stale.Membership.FindAsync(stale.Scope, stale.UserId));
+
+        var failing = new ProjectionTestEnv();
+        failing.Projections.ThrowFailure = true;
+        Assert.Null(await failing.Membership.FindAsync(failing.Scope, failing.UserId));
+    }
+
+    // ---- Composite: projection is authoritative and never falls through to tenant ----
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ProjectionSource_Denies_AndNeverFallsBackToTenant(bool tenantRegisteredFirst)
+    {
+        var tenant = new FakeFirstMatchAdapter(TenantMember);
+        var projection = new FakeProjectionAdapter(ProjectionAccessMembershipResult.NotFound());
+
+        var composite = Build(tenantRegisteredFirst, tenant, projection);
+
+        Assert.Null(await composite.FindAsync(AccessScope.ForTenant(Guid.NewGuid()), Guid.NewGuid()));
+        Assert.Equal(0, tenant.Calls);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task UntrustedProjection_Denies_AndNeverFallsBackToTenant(
+        ProjectionAccessMembershipError error, bool tenantRegisteredFirst)
+    {
+        var tenant = new FakeFirstMatchAdapter(TenantMember);
+        var projection = new FakeProjectionAdapter(ProjectionAccessMembershipResult.Failure(error));
+
+        var composite = Build(tenantRegisteredFirst, tenant, projection);
+
+        Assert.Null(await composite.FindAsync(AccessScope.ForTenant(Guid.NewGuid()), Guid.NewGuid()));
+        Assert.Equal(0, tenant.Calls);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ProjectionFound_IsReturned_AndTenantIsNotConsulted(bool tenantRegisteredFirst)
+    {
+        var tenant = new FakeFirstMatchAdapter(TenantMember);
+        var projection = new FakeProjectionAdapter(ProjectionAccessMembershipResult.Found(ProjectedMember));
+
+        var composite = Build(tenantRegisteredFirst, tenant, projection);
+
+        Assert.Equal(ProjectedMember, await composite.FindAsync(AccessScope.ForTenant(Guid.NewGuid()), Guid.NewGuid()));
+        Assert.Equal(0, tenant.Calls);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task NonAuthoritativeProjection_FallsThroughToTheTenantSource(bool tenantRegisteredFirst)
+    {
+        var tenant = new FakeFirstMatchAdapter(TenantMember);
+        var projection = new FakeProjectionAdapter(ProjectionAccessMembershipResult.NotAuthoritative());
+
+        var composite = Build(tenantRegisteredFirst, tenant, projection);
+
+        Assert.Equal(TenantMember, await composite.FindAsync(AccessScope.ForTenant(Guid.NewGuid()), Guid.NewGuid()));
+        Assert.Equal(1, tenant.Calls);
+    }
+
+    [Fact]
+    public async Task NonAuthoritativeProjection_AndNoTenantMember_Denies()
+    {
+        var tenant = new FakeFirstMatchAdapter(null);
+        var projection = new FakeProjectionAdapter(ProjectionAccessMembershipResult.NotAuthoritative());
+
+        var composite = Build(tenantRegisteredFirst: false, tenant, projection);
+
+        Assert.Null(await composite.FindAsync(AccessScope.ForTenant(Guid.NewGuid()), Guid.NewGuid()));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task PlatformMembership_DoesNotDependOnTheTenantProjection(bool projectionRegisteredFirst)
+    {
+        var platform = new FakeFirstMatchAdapter(PlatformMember);
+        var projection = new FakeProjectionAdapter(ProjectionAccessMembershipResult.NotAuthoritative());
+
+        var composite = Build(tenantRegisteredFirst: false, platform, projection);
+
+        Assert.Equal(PlatformMember, await composite.FindAsync(
+            AccessScope.ForPlatform(AccessScope.PlatformId), Guid.NewGuid()));
+    }
+
+    private static CompositeAccessMembership Build(
+        bool tenantRegisteredFirst, FakeFirstMatchAdapter tenant, FakeProjectionAdapter projection)
+        => new(tenantRegisteredFirst
+            ? new IAccessMembershipAdapter[] { tenant, projection }
+            : new IAccessMembershipAdapter[] { projection, tenant });
+
+    private static readonly AccessMember TenantMember = new(false, 99);
+    private static readonly AccessMember PlatformMember = new(false, 3);
+
+    private sealed class FakeFirstMatchAdapter : IAccessMembershipAdapter
+    {
+        private readonly AccessMember? _member;
+
+        public FakeFirstMatchAdapter(AccessMember? member) => _member = member;
+
+        public int Calls { get; private set; }
+
+        public Task<AccessMember?> FindAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
+        {
+            Calls++;
+            return Task.FromResult(_member);
+        }
+    }
+
+    private sealed class FakeProjectionAdapter : IProjectionMembershipAdapter
+    {
+        private readonly ProjectionAccessMembershipResult _result;
+
+        public FakeProjectionAdapter(ProjectionAccessMembershipResult result) => _result = result;
+
+        public Task<ProjectionAccessMembershipResult> TryFindAsync(
+            AccessScope scope, Guid userId, CancellationToken ct = default)
+            => Task.FromResult(_result);
+
+        public Task<AccessMember?> FindAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
+            => Task.FromResult(_result.IsFound ? _result.Member : null);
     }
 
     // ---- Private test environment ----
@@ -195,7 +334,7 @@ public sealed class ProjectionSourceSafetyTests
             Projections = new FakeProjectionRepository { Projection = Projection };
             TenantStates = new FakeTenantStateRepository { State = TenantState };
 
-            Projection = new ProjectionAccessMembership(
+            Membership = new ProjectionAccessMembership(
                 Freshness,
                 Projections,
                 TenantStates,
@@ -217,10 +356,10 @@ public sealed class ProjectionSourceSafetyTests
         public FakeProjectionRepository Projections { get; }
         public FakeTenantStateRepository TenantStates { get; }
 
-        public ProjectionAccessMembership Projection { get; }
+        public ProjectionAccessMembership Membership { get; }
 
-        public async Task<AccessMember?> Lookup(Guid? userId = null)
-            => await Projection.FindAsync(Scope, userId ?? UserId, CancellationToken.None);
+        public async Task<ProjectionAccessMembershipResult> Lookup(Guid? userId = null)
+            => await Membership.TryFindAsync(Scope, userId ?? UserId, CancellationToken.None);
     }
 
     private sealed class FakeFreshnessRepository : IAccessMembershipFreshnessRepository

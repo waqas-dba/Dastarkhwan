@@ -100,6 +100,7 @@ public static class ServiceCollectionExtensions
 
         // Focused collaborators.
         services.AddScoped<IAdministratorGuard, AdministratorGuard>();
+        services.AddScoped<IIdentityAdminAuthorizer, AccessBackedIdentityAdminAuthorizer>();
         services.AddScoped<ISessionIssuer, SessionIssuer>();
         services.AddSingleton<ITokenService, TokenService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();

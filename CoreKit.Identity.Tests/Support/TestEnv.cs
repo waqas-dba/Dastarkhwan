@@ -134,8 +134,8 @@ internal sealed class TestEnv : IDisposable
         CurrentUser = new FakeCurrentUserService();
 
         UserService = new UserService(
-            UserRepository, PermissionChecker, AccessService, Maintenance,
-            AdministratorGuard, Hasher, CurrentUser, Time);
+            UserRepository, new AccessBackedIdentityAdminAuthorizer(PermissionChecker),
+            AccessService, Maintenance, AdministratorGuard, Hasher, CurrentUser, Time);
 
         var emailOptions = Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false });
         AuthService = new AuthService(

@@ -21,7 +21,7 @@ public sealed class UserService : IUserService
     private static readonly AccessScope PlatformScope = AccessScope.ForPlatform(AccessScope.PlatformId);
 
     private readonly IUserRepository _userRepository;
-    private readonly IPermissionChecker _permissions;
+    private readonly IIdentityAdminAuthorizer _authorizer;
     private readonly IAccessService _access;
     private readonly IAccessMaintenance _maintenance;
     private readonly IAdministratorGuard _administratorGuard;
@@ -31,7 +31,7 @@ public sealed class UserService : IUserService
 
     public UserService(
         IUserRepository userRepository,
-        IPermissionChecker permissions,
+        IIdentityAdminAuthorizer authorizer,
         IAccessService access,
         IAccessMaintenance maintenance,
         IAdministratorGuard administratorGuard,
@@ -40,7 +40,7 @@ public sealed class UserService : IUserService
         TimeProvider time)
     {
         _userRepository = userRepository;
-        _permissions = permissions;
+        _authorizer = authorizer;
         _access = access;
         _maintenance = maintenance;
         _administratorGuard = administratorGuard;
@@ -51,7 +51,7 @@ public sealed class UserService : IUserService
 
     public async Task<IdentityResult<PagedResult<UserDto>>> ListAsync(UserListQuery query, CancellationToken ct = default)
     {
-        if (!await _permissions.HasPlatformPermissionAsync(IdentityAccessPermissionNames.UsersRead, ct))
+        if (!await _authorizer.IsAllowedAsync(IdentityAdminOperation.ReadUsers, ct))
             return IdentityErrors.AccessDenied("You cannot view users.");
 
         var page = Math.Max(query.Page, 1);
@@ -70,7 +70,7 @@ public sealed class UserService : IUserService
 
     public async Task<IdentityResult<UserDto>> GetAsync(Guid id, CancellationToken ct = default)
     {
-        if (!await _permissions.HasPlatformPermissionAsync(IdentityAccessPermissionNames.UsersRead, ct))
+        if (!await _authorizer.IsAllowedAsync(IdentityAdminOperation.ReadUsers, ct))
             return IdentityErrors.AccessDenied("You cannot view users.");
 
         return await LoadDtoAsync(id, ct);
@@ -95,7 +95,7 @@ public sealed class UserService : IUserService
 
     public async Task<IdentityResult<UserDto>> CreateAsync(CreateUserRequest request, CancellationToken ct = default)
     {
-        if (!await _permissions.HasPlatformPermissionAsync(IdentityAccessPermissionNames.UsersCreate, ct))
+        if (!await _authorizer.IsAllowedAsync(IdentityAdminOperation.CreateUsers, ct))
             return IdentityErrors.AccessDenied("You cannot create users.");
 
         var email = request.Email?.Trim() ?? string.Empty;
@@ -168,7 +168,7 @@ public sealed class UserService : IUserService
 
     public async Task<IdentityResult<UserDto>> UpdateAsync(Guid id, UpdateUserRequest request, CancellationToken ct = default)
     {
-        if (!await _permissions.HasPlatformPermissionAsync(IdentityAccessPermissionNames.UsersUpdate, ct))
+        if (!await _authorizer.IsAllowedAsync(IdentityAdminOperation.UpdateUsers, ct))
             return IdentityErrors.AccessDenied("You cannot update users.");
 
         if (_currentUser.UserId is not { } actorId)
@@ -290,7 +290,7 @@ public sealed class UserService : IUserService
 
     public async Task<Common.IdentityResult> DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        if (!await _permissions.HasPlatformPermissionAsync(IdentityAccessPermissionNames.UsersDelete, ct))
+        if (!await _authorizer.IsAllowedAsync(IdentityAdminOperation.DeleteUsers, ct))
             return IdentityErrors.AccessDenied("You cannot delete users.");
 
         if (_currentUser.UserId == id)
@@ -314,7 +314,7 @@ public sealed class UserService : IUserService
 
     public async Task<IdentityResult<UserDto>> SetRolesAsync(Guid id, SetUserRolesRequest request, CancellationToken ct = default)
     {
-        if (!await _permissions.HasPlatformPermissionAsync(IdentityAccessPermissionNames.UsersUpdate, ct))
+        if (!await _authorizer.IsAllowedAsync(IdentityAdminOperation.UpdateUsers, ct))
             return IdentityErrors.AccessDenied("You cannot update user roles.");
 
         if (_currentUser.UserId is not { } actorId)

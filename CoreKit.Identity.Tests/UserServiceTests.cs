@@ -967,7 +967,7 @@ public sealed class UserServiceTests : IDisposable
     public async Task Login_CorrectPassword_WhenConcurrentFailureLocksFirst_DoesNotIssueSession()
     {
         var atTransition = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        var releaseTransition = new TaskCompletionSource(TaskCompletionOptions.RunContinuationsAsynchronously);
+        var releaseTransition = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var gatedRepo = new GatedUserRepository(
             new UserRepository(_env.NewContext()),
             async () =>

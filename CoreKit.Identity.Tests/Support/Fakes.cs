@@ -17,8 +17,6 @@ public sealed class FakeCurrentUserService : ICurrentUserService
 {
     public Guid? UserId { get; set; }
     public string? Email { get; set; }
-    public IReadOnlyCollection<string> Roles { get; set; } = new List<string>();
-    public IReadOnlyCollection<string> Permissions { get; set; } = new List<string>();
 
     public bool IsAuthenticated => UserId is not null;
 }

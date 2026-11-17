@@ -27,11 +27,11 @@ builder.Services.AddSingleton<IIdentityEmailSender, ConsoleEmailSender>();
 builder.Services.AddIdentity(builder.Configuration);
 
 // Identity's admin-authorization port: the host decides what each operation means.
-// Here we map identity.* operations to the matching permission claim on the current user.
+// Here we map identity.* operations to platform permissions checked through Access.
 builder.Services.AddScoped<IIdentityAdminAuthorizer>(sp =>
 {
-    var currentUser = sp.GetRequiredService<ICurrentUserService>();
-    return new PermissionBasedIdentityAdminAuthorizer(currentUser);
+    var permissionChecker = sp.GetRequiredService<CoreKit.Access.Abstractions.IPermissionChecker>();
+    return new PermissionBasedIdentityAdminAuthorizer(permissionChecker);
 });
 builder.Services.AddIdentitySeeding(builder.Configuration);
 builder.Services.AddTenant(builder.Configuration);   // after AddIdentity: it plugs into Identity's token claims
@@ -51,6 +51,13 @@ builder.Services.AddAccessPermissions(p =>
         AccessPermissionNames.RolesRead, AccessPermissionNames.AssignmentsRead, AccessPermissionNames.AssignmentsManage);
 
     p.AddRoleTemplate("Cashier", "Rings up sales", "sales.create", "products.view");
+
+    // Identity user-management permissions, checked at platform scope by the host's
+    // IIdentityAdminAuthorizer implementation.
+    p.Add("identity.users.read", "View users");
+    p.Add("identity.users.create", "Create users");
+    p.Add("identity.users.update", "Edit users");
+    p.Add("identity.users.delete", "Delete users");
 });
 
 var app = builder.Build();
@@ -114,11 +121,14 @@ app.Run();
 
 public sealed class PermissionBasedIdentityAdminAuthorizer : IIdentityAdminAuthorizer
 {
-    private readonly ICurrentUserService _currentUser;
+    private readonly CoreKit.Access.Abstractions.IPermissionChecker _permissionChecker;
 
-    public PermissionBasedIdentityAdminAuthorizer(ICurrentUserService currentUser) => _currentUser = currentUser;
+    public PermissionBasedIdentityAdminAuthorizer(CoreKit.Access.Abstractions.IPermissionChecker permissionChecker)
+    {
+        _permissionChecker = permissionChecker;
+    }
 
-    public Task<bool> IsAllowedAsync(IdentityAdminOperation operation, CancellationToken ct = default)
+    public async Task<bool> IsAllowedAsync(IdentityAdminOperation operation, CancellationToken ct = default)
     {
         var permission = operation switch
         {
@@ -129,7 +139,6 @@ public sealed class PermissionBasedIdentityAdminAuthorizer : IIdentityAdminAutho
             _ => null
         };
 
-        return Task.FromResult(
-            permission is not null && _currentUser.Permissions is { } perms && perms.Contains(permission));
+        return permission is not null && await _permissionChecker.HasPlatformPermissionAsync(permission, ct);
     }
 }

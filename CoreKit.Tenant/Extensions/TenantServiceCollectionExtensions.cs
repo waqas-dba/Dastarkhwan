@@ -1,8 +1,5 @@
-using CoreKit.Access.Abstractions;
-using CoreKit.Access.Extensions;
 using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Constants;
-using CoreKit.Tenant.Integration;
 
 namespace CoreKit.Tenant.Extensions;
 
@@ -11,9 +8,8 @@ public static class TenantServiceCollectionExtensions
     public const string ConnectionStringName = "Tenant";
 
     /// <summary>
-    /// Registers everything Tenant needs: database, repositories, services, tenant resolution and the
-    /// Identity integration (a tenant claim in the access token). Reads "ConnectionStrings:Tenant" and "Tenant".
-    /// Call after AddIdentity.
+    /// Registers everything Tenant needs: database, repositories, services, tenant resolution.
+    /// Reads "ConnectionStrings:Tenant" and "Tenant".
     /// </summary>
     /// <param name="configureDatabase">
     /// Optional. Replaces the PostgreSQL setup, which is how tests plug in another database.
@@ -57,13 +53,6 @@ public static class TenantServiceCollectionExtensions
         services.TryAddSingleton(TimeProvider.System);
         services.AddMemoryCache();
 
-        // Declare Tenant's permissions in the Access catalog so Access can grant them to tenant roles.
-        services.AddAccessPermissions(p =>
-        {
-            foreach (var permission in TenantPermissionNames.All)
-                p.Add(permission.Name, permission.Description);
-        });
-
         // Persistence
         services.AddScoped<ITenantUnitOfWork, TenantUnitOfWork>();
         services.AddScoped<ITenantRepository, TenantRepository>();
@@ -100,18 +89,6 @@ public static class TenantServiceCollectionExtensions
         // Resolution strategies. Other modules add theirs the same way.
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITenantResolutionStrategy, ClaimTenantResolutionStrategy>());
         services.TryAddEnumerable(ServiceDescriptor.Scoped<ITenantResolutionStrategy, HeaderTenantResolutionStrategy>());
-
-        // Tenant adds its tenant claim to every access token Identity issues.
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAccessTokenClaimsContributor, TenantClaimsContributor>());
-
-        // Expose Tenant membership to Access through the public adapter contract. Access composes it
-        // with the platform (and default) adapter behind a single CompositeAccessMembership.
-        services.AddScoped<IAccessMembershipAdapter, TenantAccessMembership>();
-
-        // When a person leaves a tenant, clear their effective-authorization state in Access so a
-        // cached tenant-scoped permission set cannot outlive the membership. The handler runs
-        // in-process after the Tenant change is saved and uses the unguarded IAccessMaintenance.
-        services.AddScoped<IEventHandler<TenantMemberRemoved>, TenantMemberRemovedToAccessMaintenance>();
 
         return services;
     }

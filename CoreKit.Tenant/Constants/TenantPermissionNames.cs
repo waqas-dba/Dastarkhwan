@@ -1,6 +1,4 @@
-﻿using CoreKit.Access.Catalog;
-
-namespace CoreKit.Tenant.Constants;
+﻿namespace CoreKit.Tenant.Constants;
 
 /// <summary>
 /// Permission names for tenant management. Identity roles are global, so a tenant-bound user can only ever
@@ -22,7 +20,7 @@ public static class TenantPermissionNames
     /// <summary>Act across all tenants. Hold this only for platform staff.</summary>
     public const string Platform = "tenants.platform";
 
-    public static IReadOnlyList<AccessPermissionDefinition> All { get; } = new List<AccessPermissionDefinition>
+    public static IReadOnlyList<TenantPermissionDefinition> All { get; } = new List<TenantPermissionDefinition>
     {
         new(Read, "View tenants"),
         new(Create, "Create tenants"),

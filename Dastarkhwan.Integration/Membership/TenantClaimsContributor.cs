@@ -1,10 +1,9 @@
-﻿using CoreKit.Access.Abstractions;
+using CoreKit.Access.Abstractions;
+using CoreKit.Tenant.Constants;
+using CoreKit.Tenant.Persistence;
 using System.Security.Claims;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace CoreKit.Tenant.Integration;
+namespace Dastarkhwan.Integration.Membership;
 
 /// <summary>
 /// Adds the user's tenant to the access token Identity issues, so every later request carries it in a signed claim.

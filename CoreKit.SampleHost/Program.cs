@@ -11,10 +11,9 @@ using CoreKit.Identity.Persistence;
 using CoreKit.Identity.Seeding;
 using CoreKit.Identity.Services;
 using CoreKit.Tenant.Abstractions;
-using CoreKit.Tenant.Endpoints;
 using CoreKit.Tenant.Extensions;
-using CoreKit.Tenant.Integration;
 using CoreKit.Tenant.Persistence;
+using Dastarkhwan.Integration.Endpoints;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -34,8 +33,11 @@ builder.Services.AddScoped<IIdentityAdminAuthorizer>(sp =>
     return new PermissionBasedIdentityAdminAuthorizer(permissionChecker);
 });
 builder.Services.AddIdentitySeeding(builder.Configuration);
-builder.Services.AddTenant(builder.Configuration);   // after AddIdentity: it plugs into Identity's token claims
-builder.Services.AddAccess(builder.Configuration);   // reads the user, tenant and membership through the shared kernel
+builder.Services.AddTenant(builder.Configuration);
+builder.Services.AddAccess(builder.Configuration);
+
+// Register the Dastarkhwan integration (cross-module wiring)
+builder.Services.AddDastarkhwanIntegration();
 
 // The application declares what can be allowed, and the roles every new tenant starts with.
 builder.Services.AddAccessPermissions(p =>

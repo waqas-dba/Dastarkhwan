@@ -1,7 +1,7 @@
 using System.Net;
 using System.Security.Claims;
 using System.Text.Json;
-using CoreKit.Access.Abstractions;
+using CoreKit.Tenant.Resolution;
 
 namespace CoreKit.Tenant.Resolution;
 
@@ -29,7 +29,7 @@ public sealed class TenantResolutionMiddleware
         ITenantInfoProvider provider,
         ITenantContextSetter setter)
     {
-        context.Items.Remove(AccessScopeContextItemKeys.TenantId);
+        context.Items.Remove(TenantContextItemKeys.TenantId);
 
         var ct = context.RequestAborted;
         var identifiers = new List<TenantIdentifier>();
@@ -102,7 +102,7 @@ public sealed class TenantResolutionMiddleware
             }
 
             setter.Set(tenant.Id);
-            context.Items[AccessScopeContextItemKeys.TenantId] = tenant.Id;
+            context.Items[TenantContextItemKeys.TenantId] = tenant.Id;
 
             await _next(context);
             return;

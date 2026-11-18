@@ -26,6 +26,7 @@ internal static class ModuleBoundaryMatrix
             ["CoreKit.Identity"] = Array.Empty<string>(),
             ["CoreKit.Access"] = Array.Empty<string>(),
             ["CoreKit.Tenant"] = new[] { "CoreKit.Access" },
+            ["Dastarkhwan.Integration"] = new[] { "CoreKit.Identity", "CoreKit.Access", "CoreKit.Tenant" },
         };
 
     /// <summary>
@@ -41,11 +42,18 @@ internal static class ModuleBoundaryMatrix
             {
                 "CoreKit.Access/CoreKit.Access.csproj",
             },
+            ["Dastarkhwan.Integration/Dastarkhwan.Integration.csproj"] = new[]
+            {
+                "CoreKit.Identity/CoreKit.Identity.csproj",
+                "CoreKit.Access/CoreKit.Access.csproj",
+                "CoreKit.Tenant/CoreKit.Tenant.csproj",
+            },
             ["CoreKit.SampleHost/CoreKit.SampleHost.csproj"] = new[]
             {
                 "CoreKit.Access/CoreKit.Access.csproj",
                 "CoreKit.Identity/CoreKit.Identity.csproj",
                 "CoreKit.Tenant/CoreKit.Tenant.csproj",
+                "Dastarkhwan.Integration/Dastarkhwan.Integration.csproj",
             },
         };
 
@@ -61,7 +69,7 @@ internal static class ModuleBoundaryMatrix
 
     /// <summary>All production module names (evaluated assembly names).</summary>
     public static readonly IReadOnlyList<string> ProductionModules =
-        new[] { "CoreKit.Identity", "CoreKit.Access", "CoreKit.Tenant" };
+        new[] { "CoreKit.Identity", "CoreKit.Access", "CoreKit.Tenant", "Dastarkhwan.Integration" };
 
     /// <summary>All production module project paths, solution-relative forward-slash.</summary>
     /// <remarks>Sourced from SolutionInventory (canonical classification) to prevent drift.</remarks>

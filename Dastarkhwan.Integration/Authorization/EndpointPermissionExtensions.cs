@@ -1,6 +1,8 @@
 using CoreKit.Access.Endpoints;
+using CoreKit.Tenant.Constants;
+using Microsoft.AspNetCore.Builder;
 
-namespace CoreKit.Tenant.Authorization;
+namespace Dastarkhwan.Integration.Authorization;
 
 /// <summary>
 /// Protects a Tenant endpoint with an Access permission, evaluated in the current tenant scope.

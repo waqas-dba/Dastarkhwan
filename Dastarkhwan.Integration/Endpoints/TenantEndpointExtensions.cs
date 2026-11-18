@@ -1,15 +1,24 @@
-﻿using CoreKit.Access.Common;
-using CoreKit.Tenant.Authorization;
+using CoreKit.Access.Common;
+using CoreKit.Access.Endpoints;
+using CoreKit.Tenant.Abstractions;
+using CoreKit.Tenant.Common;
+using CoreKit.Tenant.Constants;
+using CoreKit.Tenant.Entities;
+using CoreKit.Tenant.Endpoints;
+using CoreKit.Tenant.Models;
+using Dastarkhwan.Integration.Authorization;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 
-namespace CoreKit.Tenant.Endpoints;
+namespace Dastarkhwan.Integration.Endpoints;
 
+/// <summary>
+/// Maps the tenant HTTP API under a prefix (default "/tenants"). Optional: an app that wants its own
+/// routes can skip this and call the services directly.
+/// </summary>
 public static class TenantEndpointExtensions
 {
-    /// <summary>
-    /// Maps the tenant HTTP API under a prefix (default "/tenants"). Optional: an app that wants its own
-    /// routes can skip this and call the services directly.
-    /// </summary>
     public static IEndpointRouteBuilder MapTenants(this IEndpointRouteBuilder app, string prefix = "/tenants")
     {
         prefix = EndpointRoutes.NormalizePrefix(prefix);

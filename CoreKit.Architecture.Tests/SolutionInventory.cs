@@ -26,6 +26,7 @@ internal static class SolutionInventory
         "CoreKit.Identity/CoreKit.Identity.csproj",
         "CoreKit.Access/CoreKit.Access.csproj",
         "CoreKit.Tenant/CoreKit.Tenant.csproj",
+        "Dastarkhwan.Integration/Dastarkhwan.Integration.csproj",
     };
 
     /// <summary>Composition root project paths.</summary>
@@ -41,6 +42,7 @@ internal static class SolutionInventory
         "CoreKit.Access.Tests/CoreKit.Access.Tests.csproj",
         "CoreKit.Tenant.Tests/CoreKit.Tenant.Tests.csproj",
         "CoreKit.Identity.Tests/CoreKit.Identity.Tests.csproj",
+        "Dastarkhwan.Integration.Tests/Dastarkhwan.Integration.Tests.csproj",
     };
 
     /// <summary>
@@ -54,6 +56,7 @@ internal static class SolutionInventory
             ["CoreKit.Access.Tests/CoreKit.Access.Tests.csproj"] = "CoreKit.Access.Tests",
             ["CoreKit.Tenant.Tests/CoreKit.Tenant.Tests.csproj"] = "CoreKit.Tenant.Tests",
             ["CoreKit.Identity.Tests/CoreKit.Identity.Tests.csproj"] = "CoreKit.Identity.Tests",
+            ["Dastarkhwan.Integration.Tests/Dastarkhwan.Integration.Tests.csproj"] = "Dastarkhwan.Integration.Tests",
         };
 
     /// <summary>
@@ -66,6 +69,7 @@ internal static class SolutionInventory
             ["CoreKit.Identity/CoreKit.Identity.csproj"] = "CoreKit.Identity",
             ["CoreKit.Access/CoreKit.Access.csproj"] = "CoreKit.Access",
             ["CoreKit.Tenant/CoreKit.Tenant.csproj"] = "CoreKit.Tenant",
+            ["Dastarkhwan.Integration/Dastarkhwan.Integration.csproj"] = "Dastarkhwan.Integration",
         };
 
     /// <summary>Duplicate normalized project paths found in Dastarkhwan.slnx.</summary>

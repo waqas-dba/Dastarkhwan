@@ -25,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\CoreKit.Tenant\CoreKit.Tenant.csproj" />
     <ProjectReference Include="..\CoreKit.Access\CoreKit.Access.csproj" />
+    <ProjectReference Include="..\Dastarkhwan.Integration\Dastarkhwan.Integration.csproj" />
   </ItemGroup>
 
 </Project>

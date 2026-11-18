@@ -9,6 +9,7 @@ using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Entities;
 using CoreKit.Tenant.Extensions;
 using CoreKit.Tenant.Resolution;
+using Dastarkhwan.Integration;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -51,6 +52,7 @@ public sealed class Pr2VerificationIntegrationTests : IDisposable
         services.AddLogging();
         services.AddTenant(config, options => options.UseSqlite(_tenantConnection));
         services.AddAccess(config, options => options.UseSqlite(_accessConnection));
+        services.AddDastarkhwanIntegration();
 
         _provider = services.BuildServiceProvider(validateScopes: true);
 

@@ -1,19 +1,17 @@
-using CoreKit.Access.Abstractions;
+using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Constants;
 
 namespace CoreKit.Tenant.Abstractions;
 
 /// <summary>
-/// Who is acting. The user comes from the signed-in token; the platform flag is answered by Access,
-/// which is the authority for permissions. Tokens carry no permission claims, so reading them here
-/// would always answer false.
+/// Who is acting. The IAM integration provides this from the signed-in user.
 /// </summary>
 public sealed class TenantActor : ITenantActor
 {
-    private readonly ICurrentUser? _currentUser;
-    private readonly IPermissionChecker? _permissions;
+    private readonly ITenantCurrentUser? _currentUser;
+    private readonly ITenantPermissionChecker? _permissions;
 
-    public TenantActor(ICurrentUser? currentUser = null, IPermissionChecker? permissions = null)
+    public TenantActor(ITenantCurrentUser? currentUser = null, ITenantPermissionChecker? permissions = null)
     {
         _currentUser = currentUser;
         _permissions = permissions;

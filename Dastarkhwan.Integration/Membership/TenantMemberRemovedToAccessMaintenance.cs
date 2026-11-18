@@ -2,7 +2,7 @@ using CoreKit.Access.Abstractions;
 using CoreKit.Access.Extensions;
 using CoreKit.Tenant.Events;
 
-namespace CoreKit.Tenant.Integration;
+namespace Dastarkhwan.Integration.Membership;
 
 /// <summary>
 /// Reacts to the shared-kernel <see cref="TenantMemberRemoved"/> integration event and clears the

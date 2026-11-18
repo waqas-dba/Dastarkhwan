@@ -20,6 +20,10 @@
     <Project Path="CoreKit.Tenant.Tests/CoreKit.Tenant.Tests.csproj" />
     <Project Path="CoreKit.Tenant/CoreKit.Tenant.csproj" Id="e0d47be8-fd8d-4032-98ab-e5e8ba6480a3" />
   </Folder>
+  <Folder Name="/Dastarkhwan/">
+    <Project Path="Dastarkhwan.Integration/Dastarkhwan.Integration.csproj" />
+    <Project Path="Dastarkhwan.Integration.Tests/Dastarkhwan.Integration.Tests.csproj" />
+  </Folder>
   <Folder Name="/docs/">
     <File Path="AGENTS.md" />
     <File Path="ai-tasks.md" />

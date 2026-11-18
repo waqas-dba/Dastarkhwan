@@ -1,6 +1,7 @@
 using CoreKit.Access.Abstractions;
+using CoreKit.Tenant.Abstractions;
 
-namespace CoreKit.Tenant.Integration;
+namespace Dastarkhwan.Integration.Membership;
 
 /// <summary>
 /// Exposes Tenant membership to Access through the public <see cref="IAccessMembership"/> contract.

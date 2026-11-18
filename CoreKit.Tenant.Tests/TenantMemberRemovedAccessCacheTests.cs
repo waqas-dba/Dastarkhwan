@@ -1,5 +1,6 @@
 using CoreKit.Access.Extensions;
 using CoreKit.Tenant.Extensions;
+using Dastarkhwan.Integration;
 using System;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -52,6 +53,7 @@ public sealed class TenantMemberRemovedAccessCacheTests : IDisposable
         services.AddLogging();
         services.AddTenant(config, options => options.UseSqlite(_tenantConnection));
         services.AddAccess(config, options => options.UseSqlite(_accessConnection));
+        services.AddDastarkhwanIntegration();
         _provider = services.BuildServiceProvider(validateScopes: true);
     }
 

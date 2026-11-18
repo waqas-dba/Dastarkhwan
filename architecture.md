@@ -26,13 +26,13 @@ These are responsibilities, not a requirement to create every project immediatel
 | Market configuration | Country/currency/address/tax/payment settings and adapters | Duplicated core business logic |
 | Notifications | Workflow message delivery/preferences when justified | Owning the triggering transaction |
 
-**SharedKernel:** The `CoreKit.SharedKernel/` folder exists in the repository but contains no `.csproj`, no source files, and is referenced by no project. It is an empty historical artifact, not an active architectural component. Cross-module contracts live in module-owned `Abstractions` namespaces (e.g. `CoreKit.Access.Abstractions`, `CoreKit.Tenant.Abstractions`). Do not introduce or populate SharedKernel.
+**SharedKernel:** No active `CoreKit.SharedKernel` project, source files or project references are present in the committed repository. SharedKernel is not part of the approved architecture. Cross-module contracts remain owned by their respective modules. Do not introduce or populate SharedKernel.
 
 A capability may remain inside a well-defined module until splitting provides real value. Do not create all planned modules up front.
 
 ## 3. Dependency rules
 1. **No CoreKit module references another CoreKit module.** `CoreKit.Identity`, `CoreKit.Access` and `CoreKit.Tenant` are independently reusable class libraries with zero direct CoreKit project references.
-2. **Cross modules only through documented public contracts or documented events.** `CoreKit.Integration` references and coordinates the three modules through their public contracts; it is the only assembly that composes them.
+2. **Cross modules only through documented public contracts or documented events.** `Dastarkhwan.Integration` references and coordinates the three modules through their public contracts; it is the only assembly that composes them.
 3. Never access another module's private `DbContext`, tables, repositories, or internal classes.
 4. Avoid circular dependencies; redesign around stable contracts or orchestration when necessary.
 5. Keep shared contracts small, stable, and genuinely shared, owned in module-owned `Abstractions` namespaces. Do not turn any shared-contract location into a dumping ground. Do not introduce SharedKernel.
@@ -61,22 +61,36 @@ A capability may remain inside a well-defined module until splitting provides re
 - Add tenant-safe unique constraints and indexes where required by the actual data model. Avoid assuming every table is tenant-owned.
 
 ## 6. Tenant–Access integration (Option B — approved target architecture)
-- **Dependency direction:** `CoreKit.Integration` → `CoreKit.Identity`, `CoreKit.Access`, `CoreKit.Tenant`. No CoreKit module references another CoreKit module.
+- **Dependency direction:** `Dastarkhwan.Integration` → `CoreKit.Identity`, `CoreKit.Access`, `CoreKit.Tenant`. No CoreKit module references another CoreKit module.
 - Tenant owns tenant lifecycle, membership, tenant context and tenant-specific business rules. Access owns roles, permissions, assignments and authorization decisions.
 - Tenant membership changes reach Access through the durable Tenant outbox (`TenantOutboxMessage` staged in the same `SaveChanges` as the membership change) and Access's `AccessMembershipEventConsumer`, which applies the event to `AccessMembershipProjection` and `AccessTenantState` atomically. There is no direct Tenant-to-Access runtime membership lookup.
 - Access uses its own membership projection (`AccessMembershipProjection`) as the authoritative Tenant membership source. Missing, stale, quarantined, unknown or inactive projection data fails closed (denies authorization).
 - `ITenantMembershipReader` lives in `CoreKit.Tenant.Abstractions` (module-owned, not SharedKernel).
 - Access must not reference Tenant's private services, repositories, `DbContext` or tables. Tenant must not reference Identity private internals.
 - Platform scope is distinct from tenant scope and needs an explicit authorization design.
-- `ITenantOutboxTransport` (Tenant-owned port) is implemented in `CoreKit.Integration` and wires the outbox to the Access consumer. `ITenantProjectionGateway` (Access-owned port for snapshot installation/reconciliation) is implemented in `CoreKit.Integration` using Access's public snapshot installer and projection reader.
+- `ITenantOutboxTransport` (Tenant-owned port) is implemented in `Dastarkhwan.Integration` and wires the outbox to the Access consumer. `ITenantProjectionGateway` (Access-owned port for snapshot installation/reconciliation) is implemented in `Dastarkhwan.Integration` using Access's public snapshot installer and projection reader.
 - Tenant owner-to-Access owner mapping must be explicitly validated because Access owner semantics may grant broad permissions. Tenant ownership does NOT imply Access ownership (`AccessMember(false)` is always returned for tenant scope).
 - Tenant permission enforcement across individual protected operations remains implementation work.
 
-**Current evidence note (latest verified baseline `e2ca8c1`, 2026-11-18):** `CoreKit.SharedKernel` does not exist (no `.csproj`, no source, not referenced by any project). `CoreKit.Identity`, `CoreKit.Access` and `CoreKit.Tenant` have no direct CoreKit project references; `Dastarkhwan.Integration` references and composes all three modules through their public contracts. `TenantActor` (`CoreKit.Tenant/Abstractions/TenantActor.cs`) consumes Tenant-owned `ITenantCurrentUser` and `ITenantPermissionChecker`; no `ICurrentUser`/`.Permissions` reference remains in `CoreKit.Tenant`. Tenant owner does not map to Access owner. PR-5/6/7/8 Access-side membership projection implementation and migration `20261116043029_AddAccessMembershipStreamAndFreshness` are committed at this baseline. Platform authorization and per-operation Tenant permission enforcement remain implementation work. D-03 (JWT revocation / `SecurityVersion` validation) and D-18 (rate limiting on tenant and access write endpoints) remain unresolved Project Owner decisions. No SharedKernel and no SampleHost-as-future-requirement.
+**Implementation status clarification:** The approved target architecture is the D-019 outbox/projection design. The old direct membership adapter is not an accepted integration design. `Dastarkhwan.Integration` still registers `TenantAccessMembership` as an `IAccessMembershipAdapter`, which reads Tenant membership directly through `ITenantMembershipReader`; this conflicts with the projection-authoritative requirement and must be investigated and resolved separately.
+
+**Current evidence note (source baseline `e2ca8c1`, documentation snapshot `c4afe1e`, 2026-11-18):**
+
+`CoreKit.Identity`, `CoreKit.Access` and `CoreKit.Tenant` are independently reusable modules. `CoreKit.Tenant.csproj` has no direct CoreKit project references. `Dastarkhwan.Integration` references the three modules and provides their composition.
+
+`TenantActor` (`CoreKit.Tenant/Abstractions/TenantActor.cs`) consumes Tenant-owned `ITenantCurrentUser` and `ITenantPermissionChecker`. No `ICurrentUser` or `.Permissions` reference remains in `CoreKit.Tenant` at the inspected source baseline.
+
+Tenant membership events are designed to reach Access through the durable Tenant outbox and Access membership-event consumer. Access uses its own membership projection as the authoritative membership source.
+
+**Implementation discrepancy:** `Dastarkhwan.Integration/IntegrationServiceCollectionExtensions.cs` still registers `TenantAccessMembership` as an `IAccessMembershipAdapter`. This adapter reads Tenant membership directly through `ITenantMembershipReader`. Its registration must be investigated against D-019 before claiming that projection-only authorization is fully implemented.
+
+Tenant owner does not automatically become Access owner. Platform authorization and per-operation Tenant permission enforcement remain separate implementation concerns.
+
+The Access membership projection migration `20261116043029_AddAccessMembershipStreamAndFreshness` is committed. Its database application and runtime behavior are not established by source inspection alone.
 
 Preserve the modular monolith architecture and existing approved module ownership boundaries.
 
-## 7. Integration layer (`CoreKit.Integration`)
+## 7. Integration layer (`Dastarkhwan.Integration`)
 - References `CoreKit.Identity`, `CoreKit.Access` and `CoreKit.Tenant`; coordinates them through their public contracts.
 - Implements `ITenantOutboxTransport` (Tenant-owned port) — durable delivery of Tenant outbox messages to the Access membership-event consumer.
 - Implements `ITenantProjectionGateway` (Access-owned port) — snapshot installation and reconciliation through Access's public installer and reader.

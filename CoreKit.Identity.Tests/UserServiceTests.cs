@@ -592,7 +592,8 @@ public sealed class UserServiceTests : IDisposable
     {
         var user = _env.StaffUserId;
 
-        for (int i = 0; i < 5; i++)
+        // First 4 failed attempts return InvalidCredentials
+        for (int i = 0; i < 4; i++)
         {
             var result = await _env.AuthService.LoginAsync(new LoginRequest
             {
@@ -602,6 +603,15 @@ public sealed class UserServiceTests : IDisposable
 
             ResultAssert.Fails(result, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
         }
+
+        // 5th failed attempt locks the account and returns AccountLocked
+        var result5 = await _env.AuthService.LoginAsync(new LoginRequest
+        {
+            Email = "staff@example.com",
+            Password = "wrong-password"
+        }, CancellationToken.None);
+
+        ResultAssert.Fails(result5, IdentityErrorKind.Forbidden, "auth.account_locked");
 
         using var db = _env.NewContext();
         var lockedUser = await db.Users.FirstOrDefaultAsync(u => u.Id == user);
@@ -613,7 +623,7 @@ public sealed class UserServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Login_WhileLockedOut_Rejected()
+    public async Task Login_WhileLockedOut_ReturnsAccountLocked()
     {
         var user = _env.StaffUserId;
 
@@ -632,11 +642,11 @@ public sealed class UserServiceTests : IDisposable
             Password = "wrong-password"
         }, CancellationToken.None);
 
-        ResultAssert.Fails(result, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
+        ResultAssert.Fails(result, IdentityErrorKind.Forbidden, "auth.account_locked");
     }
 
     [Fact]
-    public async Task Login_ValidCredentialsDuringLockout_Rejected()
+    public async Task Login_ValidCredentialsDuringLockout_ReturnsAccountLocked()
     {
         var user = _env.StaffUserId;
 
@@ -661,12 +671,14 @@ public sealed class UserServiceTests : IDisposable
             Password = "StaffPass123!"
         }, CancellationToken.None);
 
-        ResultAssert.Fails(result, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
+        ResultAssert.Fails(result, IdentityErrorKind.Forbidden, "auth.account_locked");
 
         using var db = _env.NewContext();
         var userAfter = await db.Users.FirstOrDefaultAsync(u => u.Id == user);
         Assert.NotNull(userAfter);
-        Assert.Equal(6, userAfter.AccessFailedCount);
+        // Correct password on locked account: TryCompleteSuccessfulLoginAsync returns Locked,
+        // we do NOT call RegisterFailedLoginAttemptAsync, so counter stays at 5
+        Assert.Equal(5, userAfter.AccessFailedCount);
         Assert.Equal(lockoutEnd, userAfter.LockoutEnd);
     }
 
@@ -705,7 +717,7 @@ public sealed class UserServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Login_LockedAttemptIncrementsCounterButDoesNotExtendLockout()
+    public async Task Login_LockedAttempt_ReturnsAccountLocked()
     {
         var user = _env.StaffUserId;
 
@@ -724,16 +736,19 @@ public sealed class UserServiceTests : IDisposable
         var originalLockoutEnd = lockedUser!.LockoutEnd;
         Assert.True(originalLockoutEnd.HasValue);
 
-        await _env.AuthService.LoginAsync(new LoginRequest
+        var result = await _env.AuthService.LoginAsync(new LoginRequest
         {
             Email = "staff@example.com",
             Password = "wrong-password"
         }, CancellationToken.None);
 
+        ResultAssert.Fails(result, IdentityErrorKind.Forbidden, "auth.account_locked");
+
         using var db = _env.NewContext();
         var userAfter = await db.Users.FirstOrDefaultAsync(u => u.Id == user);
         Assert.NotNull(userAfter);
-        Assert.Equal(6, userAfter.AccessFailedCount);
+        // Counter should NOT increment when account is already locked (early return)
+        Assert.Equal(5, userAfter.AccessFailedCount);
         Assert.Equal(originalLockoutEnd, userAfter.LockoutEnd);
     }
 
@@ -838,16 +853,23 @@ public sealed class UserServiceTests : IDisposable
 
         await Task.WhenAll(tasks);
 
+        // Each request may return InvalidCredentials (before lockout) or AccountLocked (after lockout established)
         foreach (var task in tasks)
         {
             var result = await task;
-            ResultAssert.Fails(result, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
+            Assert.True(result.IsFailure);
+            Assert.Contains(result.Error!.Kind, new[] { IdentityErrorKind.Unauthorized, IdentityErrorKind.Forbidden });
+            if (result.Error.Kind == IdentityErrorKind.Forbidden)
+                Assert.Equal("auth.account_locked", result.Error.Code);
+            else
+                Assert.Equal("auth.invalid_credentials", result.Error.Code);
         }
 
         using var db = _env.NewContext();
         var userAfter = await db.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == IdentityNormalizer.NormalizeEmail(email));
         Assert.NotNull(userAfter);
-        Assert.Equal(attemptCount, userAfter.AccessFailedCount);
+        // Only 5 increments: first 5 attempts before lockout; remaining 5 return AccountLocked early without incrementing
+        Assert.Equal(5, userAfter.AccessFailedCount);
         Assert.True(userAfter.LockoutEnd.HasValue);
     }
 
@@ -985,7 +1007,8 @@ public sealed class UserServiceTests : IDisposable
 
         await atTransition.Task;
 
-        for (var i = 0; i < 5; i++)
+        // First 4 failed attempts return InvalidCredentials
+        for (var i = 0; i < 4; i++)
         {
             ResultAssert.Fails(await CreateAuthService().LoginAsync(new LoginRequest
             {
@@ -994,15 +1017,24 @@ public sealed class UserServiceTests : IDisposable
             }, CancellationToken.None), IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
         }
 
+        // 5th failed attempt locks the account and returns AccountLocked
+        ResultAssert.Fails(await CreateAuthService().LoginAsync(new LoginRequest
+        {
+            Email = "staff@example.com",
+            Password = "wrong-password"
+        }, CancellationToken.None), IdentityErrorKind.Forbidden, "auth.account_locked");
+
         releaseTransition.SetResult();
 
-        ResultAssert.Fails(await loginTask, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
+        // The correct-password login should now fail with AccountLocked (not InvalidCredentials)
+        ResultAssert.Fails(await loginTask, IdentityErrorKind.Forbidden, "auth.account_locked");
 
         using var verify = _env.NewContext();
         var user = await verify.Users.AsNoTracking()
             .FirstOrDefaultAsync(u => u.NormalizedEmail == IdentityNormalizer.NormalizeEmail("staff@example.com"));
         Assert.NotNull(user);
-        Assert.Equal(6, user.AccessFailedCount);
+        // Counter should be 5 (the 5 failed attempts), not 6 (the locked attempt doesn't increment)
+        Assert.Equal(5, user.AccessFailedCount);
         Assert.NotNull(user.LockoutEnd);
     }
 

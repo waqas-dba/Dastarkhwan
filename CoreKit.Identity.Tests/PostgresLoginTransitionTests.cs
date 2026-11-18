@@ -46,8 +46,17 @@ public sealed class PostgresLoginTransitionTests
                 CancellationToken.None)).ToList();
             await Task.WhenAll(tasks);
 
+            // Each request may return InvalidCredentials (before lockout) or AccountLocked (after lockout established)
             foreach (var task in tasks)
-                ResultAssert.Fails(await task, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
+            {
+                var result = await task;
+                Assert.True(result.IsFailure);
+                Assert.Contains(result.Error!.Kind, new[] { IdentityErrorKind.Unauthorized, IdentityErrorKind.Forbidden });
+                if (result.Error.Kind == IdentityErrorKind.Forbidden)
+                    Assert.Equal("auth.account_locked", result.Error.Code);
+                else
+                    Assert.Equal("auth.invalid_credentials", result.Error.Code);
+            }
 
             await using var verify = CreateContext(scratch.ConnectionString);
             var user = await verify.Users.AsNoTracking().FirstAsync(u => u.Id == userId);
@@ -96,7 +105,8 @@ public sealed class PostgresLoginTransitionTests
             await atTransition.Task;
 
             // Concurrent failed requests lock the account first.
-            for (var i = 0; i < 5; i++)
+            // First 4 failed attempts return InvalidCredentials
+            for (var i = 0; i < 4; i++)
             {
                 ResultAssert.Fails(await CreateAuthService(scratch.ConnectionString).LoginAsync(new LoginRequest
                 {
@@ -105,15 +115,22 @@ public sealed class PostgresLoginTransitionTests
                 }, CancellationToken.None), IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
             }
 
+            // 5th failed attempt locks the account and returns AccountLocked
+            ResultAssert.Fails(await CreateAuthService(scratch.ConnectionString).LoginAsync(new LoginRequest
+            {
+                Email = TestEmail,
+                Password = "wrong-password"
+            }, CancellationToken.None), IdentityErrorKind.Forbidden, "auth.account_locked");
+
             releaseTransition.SetResult();
 
-            // The correct-password request loses the authoritative transition and is rejected.
-            ResultAssert.Fails(await loginTask, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
+            // The correct-password request loses the authoritative transition and is rejected with AccountLocked.
+            ResultAssert.Fails(await loginTask, IdentityErrorKind.Forbidden, "auth.account_locked");
 
             await using var verify = CreateContext(scratch.ConnectionString);
             var user = await verify.Users.AsNoTracking().FirstAsync(u => u.Id == userId);
-            // The rejected attempt is counted like any attempt during an active lockout.
-            Assert.Equal(6, user.AccessFailedCount);
+            // The rejected attempt does not increment the counter (account already locked).
+            Assert.Equal(5, user.AccessFailedCount);
             Assert.NotNull(user.LockoutEnd);
         }
     }

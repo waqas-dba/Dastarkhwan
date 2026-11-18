@@ -35,4 +35,7 @@ public static class IdentityErrors
 
     public static IdentityError Forbidden(string message)
         => new(IdentityErrorKind.Forbidden, "forbidden", message);
+
+    public static readonly IdentityError AccountLocked = new(
+        IdentityErrorKind.Forbidden, "auth.account_locked", "The account is temporarily locked due to too many failed attempts. Please try again later.");
 }

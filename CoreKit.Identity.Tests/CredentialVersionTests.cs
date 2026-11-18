@@ -609,12 +609,17 @@ public sealed class CredentialVersionTests : IDisposable
         await SeedActiveRefreshTokenAsync("raw-token-1");
 
         var loginService = CreateLoginService();
-        for (var i = 0; i < 5; i++)
+        for (var i = 0; i < 4; i++)
         {
             ResultAssert.Fails(
                 await loginService.LoginAsync(new LoginRequest { Email = StaffEmail, Password = "wrong-password" }, CancellationToken.None),
                 IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
         }
+
+        // 5th failed attempt locks the account and returns AccountLocked
+        ResultAssert.Fails(
+            await loginService.LoginAsync(new LoginRequest { Email = StaffEmail, Password = "wrong-password" }, CancellationToken.None),
+            IdentityErrorKind.Forbidden, "auth.account_locked");
 
         var locked = await ReadUserAsync();
         Assert.Equal(5, locked.AccessFailedCount);

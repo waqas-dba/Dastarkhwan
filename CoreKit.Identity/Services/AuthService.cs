@@ -67,13 +67,21 @@ public sealed class AuthService : IAuthService
             return IdentityErrors.InvalidCredentials;
         }
 
+        var now = Now();
+
+        // If account is locked, return immediately without further processing
+        if (user.LockoutEnd is { } lockoutEnd && lockoutEnd > now)
+        {
+            _logger.LogInformation("Login blocked for user {UserId}: account is locked until {LockoutEnd}.", user.Id, lockoutEnd);
+            return IdentityErrors.AccountLocked;
+        }
+
         // The lockout state, the failure counter and the credential version are transitioned by
         // atomic, database-side statements (see IUserRepository). A snapshot taken here is never
         // used to decide a transition: the SecurityVersion observed together with the password
         // hash is carried into the authoritative transition, so a password change or reset that
         // lands after the read makes the login fail with a version conflict instead of issuing a
         // session from stale credentials.
-        var now = Now();
         var check = _hasher.Verify(user.PasswordHash, password);
 
         if (check != PasswordCheckResult.Failed && user.IsActive)
@@ -119,10 +127,16 @@ public sealed class AuthService : IAuthService
                 return IdentityErrors.InvalidCredentials;
             }
 
-            // Inactive or locked: keep the approved lockout policy — the attempt counts.
+            // Inactive or locked: the account became inactive or locked after the credential read.
+            // The failed attempts that caused the lockout already incremented the counter.
+            // Do NOT increment again here.
+            _logger.LogInformation("Login failed for user {UserId}: account inactive or locked.", user.Id);
+            if (completion == LoginCompletion.Locked)
+                return IdentityErrors.AccountLocked;
+
+            // For inactive accounts, record the failed attempt (per lockout policy).
             await _userRepository.RegisterFailedLoginAttemptAsync(
                 user.Id, now, lockoutEnd: now.AddMinutes(15), threshold: 5, ct);
-            _logger.LogInformation("Login failed for user {UserId}.", user.Id);
             return IdentityErrors.InvalidCredentials;
         }
 
@@ -132,6 +146,12 @@ public sealed class AuthService : IAuthService
             user.Id, now, lockoutEnd: now.AddMinutes(15), threshold: 5, ct);
 
         _logger.LogInformation("Login failed for user {UserId}.", user.Id);
+
+        // After recording the failed attempt, check if the account is now locked
+        var updatedUser = await _userRepository.FindByIdAsync(user.Id, ct);
+        if (updatedUser is not null && updatedUser.LockoutEnd is { } newLockoutEnd && newLockoutEnd > now)
+            return IdentityErrors.AccountLocked;
+
         return IdentityErrors.InvalidCredentials;
     }
 

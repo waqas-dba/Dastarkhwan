@@ -37,5 +37,10 @@ public sealed class TenantAccessGuard
 
     /// <summary>For data about one user: the user themselves, or platform access.</summary>
     public async Task<TenantError?> EnsureSelfOrPlatformAsync(Guid userId, CancellationToken ct = default)
-        => _actor.UserId == userId || await _platform.IsGrantedAsync(ct) ? null : TenantErrors.CrossTenantAccess;
+    {
+        if (_actor.IsAuthenticated && _actor.UserId == userId)
+            return null;
+
+        return await _platform.IsGrantedAsync(ct) ? null : TenantErrors.CrossTenantAccess;
+    }
 }

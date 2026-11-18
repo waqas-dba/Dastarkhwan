@@ -19,6 +19,8 @@ public sealed class TenantActor : ITenantActor
 
     public Guid? UserId => _currentUser?.UserId;
 
+    public bool IsAuthenticated => _currentUser?.IsAuthenticated ?? false;
+
     public Task<bool> IsPlatformAdminAsync(CancellationToken ct = default)
         => _permissions is null
             ? Task.FromResult(false)

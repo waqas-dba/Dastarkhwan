@@ -5,6 +5,8 @@ public interface ITenantActor
 {
     Guid? UserId { get; }
 
+    bool IsAuthenticated { get; }
+
     /// <summary>
     /// True when the caller may act across all tenants. Answered by Access (the authority for
     /// permissions), never from token claims, because tokens do not carry permission claims.

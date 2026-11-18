@@ -18,6 +18,8 @@ public sealed class FakeTenantActor : ITenantActor
 {
     public Guid? UserId { get; set; }
 
+    public bool IsAuthenticated { get; set; } = true;
+
     public bool IsPlatformAdmin { get; set; }
 
     public Task<bool> IsPlatformAdminAsync(CancellationToken ct = default) => Task.FromResult(IsPlatformAdmin);

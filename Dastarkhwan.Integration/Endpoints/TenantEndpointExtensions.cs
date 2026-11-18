@@ -48,7 +48,7 @@ public static class TenantEndpointExtensions
                 Page = page ?? 1,
                 PageSize = pageSize ?? 20
             }, ct)).ToHttpResult())
-            .RequireAccessPermission(TenantPermissionNames.Read);
+            .RequireAccessPermission(TenantPermissionNames.Platform);
 
         // The tenant of the current request. Any signed-in member may read it.
         tenants.MapGet("/current", async (ITenantService s, CancellationToken ct) =>

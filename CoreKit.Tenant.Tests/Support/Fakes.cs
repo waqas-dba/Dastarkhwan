@@ -1,4 +1,7 @@
-﻿namespace CoreKit.Tenant.Tests.Support;
+﻿using CoreKit.Tenant.Abstractions;
+using CoreKit.Access.Abstractions;
+
+namespace CoreKit.Tenant.Tests.Support;
 
 public sealed class FixedTimeProvider : TimeProvider
 {
@@ -20,11 +23,28 @@ public sealed class FakeTenantActor : ITenantActor
     public Task<bool> IsPlatformAdminAsync(CancellationToken ct = default) => Task.FromResult(IsPlatformAdmin);
 }
 
-public sealed class FakePermissionChecker : CoreKit.Access.Abstractions.IPermissionChecker
+public sealed class FakePermissionChecker : IPermissionChecker
 {
     private readonly ISet<string> _permissions = new HashSet<string>(StringComparer.Ordinal);
 
     public FakePermissionChecker(params string[] permissions)
+    {
+        foreach (var permission in permissions)
+            _permissions.Add(permission);
+    }
+
+    public Task<bool> HasPermissionAsync(string permission, CancellationToken ct = default)
+        => Task.FromResult(_permissions.Contains(permission));
+
+    public Task<bool> HasPlatformPermissionAsync(string permission, CancellationToken ct = default)
+        => Task.FromResult(_permissions.Contains(permission));
+}
+
+public sealed class FakeTenantPermissionChecker : ITenantPermissionChecker
+{
+    private readonly ISet<string> _permissions = new HashSet<string>(StringComparer.Ordinal);
+
+    public FakeTenantPermissionChecker(params string[] permissions)
     {
         foreach (var permission in permissions)
             _permissions.Add(permission);

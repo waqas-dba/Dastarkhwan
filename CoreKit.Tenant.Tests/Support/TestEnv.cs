@@ -1,4 +1,6 @@
-﻿using Microsoft.Extensions.Caching.Memory;
+﻿using CoreKit.Tenant.Abstractions;
+using CoreKit.Tenant.Services;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CoreKit.Tenant.Tests.Support;
@@ -33,6 +35,7 @@ public sealed class TestEnv : IDisposable
         CurrentTenant = new CurrentTenant();
         PlatformAccess = new TenantPlatformAccess(Actor);
         Guard = new TenantAccessGuard(CurrentTenant, PlatformAccess, Actor);
+        Permissions = new FakeTenantPermissionChecker(TenantPermissionNames.All.Select(p => p.Name).ToArray());
 
         Tenants = new TenantRepository(Db);
         Settings = new TenantSettingRepository(Db);
@@ -70,6 +73,8 @@ public sealed class TestEnv : IDisposable
 
     public TenantAccessGuard Guard { get; }
 
+    public FakeTenantPermissionChecker Permissions { get; }
+
     public TenantRepository Tenants { get; }
 
     public TenantSettingRepository Settings { get; }
@@ -97,17 +102,17 @@ public sealed class TestEnv : IDisposable
     public List<T> EventsOf<T>() where T : ITenantEvent => Published.OfType<T>().ToList();
 
     public TenantService CreateTenantService() => new(
-        Tenants, Members, Audit, UnitOfWork, Publisher, InfoProvider, Guard, Options.Create(Config), Time,
+        Tenants, Members, Audit, UnitOfWork, Publisher, InfoProvider, Guard, Permissions, Options.Create(Config), Time,
         new TenantOutbox(Db));
 
     public TenantSettingsService CreateSettingsService() => new(
-        Tenants, Settings, Audit, UnitOfWork, Publisher, Guard, Options.Create(Config), Time);
+        Tenants, Settings, Audit, UnitOfWork, Publisher, Guard, Permissions, Options.Create(Config), Time);
 
     public TenantMembershipService CreateMembershipService() => new(
-        Tenants, Members, Audit, UnitOfWork, Publisher, Guard, PlatformAccess, Actor, Time, MembershipReader,
+        Tenants, Members, Audit, UnitOfWork, Publisher, Guard, PlatformAccess, Actor, Permissions, Time, MembershipReader,
         new TenantOutbox(Db));
 
-    public TenantAuditLog CreateAuditLog() => new(AuditEntries, Guard);
+    public TenantAuditLog CreateAuditLog() => new(AuditEntries, Guard, Permissions);
 
     // Direct database access: seed with one context, read back with another, so nothing is served from a tracker.
 

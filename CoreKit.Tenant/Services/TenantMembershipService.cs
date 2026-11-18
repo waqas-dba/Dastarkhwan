@@ -1,4 +1,5 @@
 ﻿using CoreKit.Tenant.Abstractions;
+using CoreKit.Tenant.Constants;
 using CoreKit.Tenant.Entities;
 using CoreKit.Tenant.Events;
 using CoreKit.Tenant.Persistence;
@@ -15,6 +16,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
     private readonly TenantAccessGuard _guard;
     private readonly ITenantPlatformAccess _platform;
     private readonly ITenantActor _actor;
+    private readonly ITenantPermissionChecker _permissions;
     private readonly TimeProvider _time;
     private readonly ITenantMembershipCache _membershipCache;
     private readonly ITenantOutbox _outbox;
@@ -28,6 +30,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
         TenantAccessGuard guard,
         ITenantPlatformAccess platform,
         ITenantActor actor,
+        ITenantPermissionChecker permissions,
         TimeProvider time,
         ITenantMembershipCache membershipCache,
         ITenantOutbox outbox)
@@ -40,6 +43,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
         _guard = guard;
         _platform = platform;
         _actor = actor;
+        _permissions = permissions;
         _time = time;
         _membershipCache = membershipCache;
         _outbox = outbox;
@@ -49,6 +53,9 @@ public sealed class TenantMembershipService : ITenantMembershipService
     {
         if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
+
+        if (!await _permissions.HasPermissionAsync(TenantPermissionNames.MembersRead, ct))
+            return TenantErrors.Forbidden(TenantPermissionNames.MembersRead);
 
         if (await _tenants.FindByIdAsync(tenantId, ct) is null)
             return TenantErrors.NotFound("Tenant");
@@ -63,6 +70,9 @@ public sealed class TenantMembershipService : ITenantMembershipService
     {
         if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
+
+        if (!await _permissions.HasPermissionAsync(TenantPermissionNames.MembersManage, ct))
+            return TenantErrors.Forbidden(TenantPermissionNames.MembersManage);
 
         // F1: Require an identified actor for ownership assignment.
         // F2: Prevent self-promotion to owner.
@@ -149,6 +159,9 @@ public sealed class TenantMembershipService : ITenantMembershipService
         if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
 
+        if (!await _permissions.HasPermissionAsync(TenantPermissionNames.MembersManage, ct))
+            return TenantErrors.Forbidden(TenantPermissionNames.MembersManage);
+
         // F3: Load and track the tenant BEFORE reading the membership state, so the
         // concurrency stamp is captured before any ownership decision is made.
         var trackedTenant = await _tenants.FindForUpdateAsync(tenantId, ct);
@@ -212,6 +225,9 @@ public sealed class TenantMembershipService : ITenantMembershipService
     {
         if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
+
+        if (!await _permissions.HasPermissionAsync(TenantPermissionNames.MembersManage, ct))
+            return TenantErrors.Forbidden(TenantPermissionNames.MembersManage);
 
         // F3: Load and track the tenant BEFORE the owner-count decision, so the
         // concurrency stamp is captured before any ownership decision is made.

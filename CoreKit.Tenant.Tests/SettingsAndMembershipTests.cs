@@ -846,7 +846,7 @@ public sealed class TenantMembershipServiceTests : IDisposable
 
         return new TenantMembershipService(
             tenantRepo, memberRepo, auditRecorder, unitOfWork, publisher,
-            _env.Guard, _env.PlatformAccess, _env.Actor, _env.Time, _env.MembershipReader, new TenantOutbox(db));
+            _env.Guard, _env.PlatformAccess, _env.Actor, _env.Permissions, _env.Time, _env.MembershipReader, new TenantOutbox(db));
     }
 
     private TenantMembershipService CreateMembershipServiceWithDecoratedUow(TenantDbContext db, ITenantUnitOfWork decoratedUow)
@@ -860,7 +860,7 @@ public sealed class TenantMembershipServiceTests : IDisposable
 
         return new TenantMembershipService(
             tenantRepo, memberRepo, auditRecorder, decoratedUow, publisher,
-            _env.Guard, _env.PlatformAccess, _env.Actor, _env.Time, _env.MembershipReader, new TenantOutbox(db));
+            _env.Guard, _env.PlatformAccess, _env.Actor, _env.Permissions, _env.Time, _env.MembershipReader, new TenantOutbox(db));
     }
 
     private sealed class PendingSaveUnitOfWorkDecorator : ITenantUnitOfWork

@@ -1,4 +1,6 @@
-﻿using System.Text.RegularExpressions;
+﻿using CoreKit.Tenant.Abstractions;
+using CoreKit.Tenant.Constants;
+using System.Text.RegularExpressions;
 
 namespace CoreKit.Tenant.Services;
 
@@ -13,6 +15,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
     private readonly ITenantUnitOfWork _unitOfWork;
     private readonly ITenantEventPublisher _events;
     private readonly TenantAccessGuard _guard;
+    private readonly ITenantPermissionChecker _permissions;
     private readonly TenantOptions _options;
     private readonly TimeProvider _time;
 
@@ -23,6 +26,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         ITenantUnitOfWork unitOfWork,
         ITenantEventPublisher events,
         TenantAccessGuard guard,
+        ITenantPermissionChecker permissions,
         IOptions<TenantOptions> options,
         TimeProvider time)
     {
@@ -32,6 +36,7 @@ public sealed class TenantSettingsService : ITenantSettingsService
         _unitOfWork = unitOfWork;
         _events = events;
         _guard = guard;
+        _permissions = permissions;
         _options = options.Value;
         _time = time;
     }
@@ -40,6 +45,9 @@ public sealed class TenantSettingsService : ITenantSettingsService
     {
         if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
+
+        if (!await _permissions.HasPermissionAsync(TenantPermissionNames.SettingsRead, ct))
+            return TenantErrors.Forbidden(TenantPermissionNames.SettingsRead);
 
         if (await _tenants.FindByIdAsync(tenantId, ct) is null)
             return TenantErrors.NotFound("Tenant");
@@ -54,6 +62,9 @@ public sealed class TenantSettingsService : ITenantSettingsService
     {
         if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
+
+        if (!await _permissions.HasPermissionAsync(TenantPermissionNames.SettingsRead, ct))
+            return TenantErrors.Forbidden(TenantPermissionNames.SettingsRead);
 
         var keyError = ValidateKey(key, out var normalizedKey);
 
@@ -86,6 +97,9 @@ public sealed class TenantSettingsService : ITenantSettingsService
     {
         if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
+
+        if (!await _permissions.HasPermissionAsync(TenantPermissionNames.SettingsUpdate, ct))
+            return TenantErrors.Forbidden(TenantPermissionNames.SettingsUpdate);
 
         if (request.Values is null || request.Values.Count == 0)
             return TenantErrors.Validation("At least one setting is required.");
@@ -159,6 +173,9 @@ public sealed class TenantSettingsService : ITenantSettingsService
     {
         if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
+
+        if (!await _permissions.HasPermissionAsync(TenantPermissionNames.SettingsUpdate, ct))
+            return TenantErrors.Forbidden(TenantPermissionNames.SettingsUpdate);
 
         var keyError = ValidateKey(key, out var normalizedKey);
 

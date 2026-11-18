@@ -1,14 +1,19 @@
-﻿namespace CoreKit.Tenant.Services;
+﻿using CoreKit.Tenant.Abstractions;
+using CoreKit.Tenant.Constants;
+
+namespace CoreKit.Tenant.Services;
 
 public sealed class TenantAuditLog : ITenantAuditLog
 {
     private readonly ITenantAuditRepository _audit;
     private readonly TenantAccessGuard _guard;
+    private readonly ITenantPermissionChecker _permissions;
 
-    public TenantAuditLog(ITenantAuditRepository audit, TenantAccessGuard guard)
+    public TenantAuditLog(ITenantAuditRepository audit, TenantAccessGuard guard, ITenantPermissionChecker permissions)
     {
         _audit = audit;
         _guard = guard;
+        _permissions = permissions;
     }
 
     public async Task<TenantResult<TenantPagedResult<TenantAuditEntryDto>>> ListAsync(
@@ -16,6 +21,9 @@ public sealed class TenantAuditLog : ITenantAuditLog
     {
         if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
+
+        if (!await _permissions.HasPermissionAsync(TenantPermissionNames.AuditRead, ct))
+            return TenantErrors.Forbidden(TenantPermissionNames.AuditRead);
 
         var page = Math.Max(query.Page, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 200);

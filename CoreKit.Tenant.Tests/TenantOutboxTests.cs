@@ -99,7 +99,7 @@ public sealed class TenantOutboxTests : IDisposable
         var service = new TenantMembershipService(
             new TenantRepository(db), new TenantMemberRepository(db),
             new TenantAuditRecorder(new TenantAuditRepository(db), _env.Actor, _env.Time),
-            racing, _env.Publisher, _env.Guard, _env.PlatformAccess, _env.Actor, _env.Time,
+            racing, _env.Publisher, _env.Guard, _env.PlatformAccess, _env.Actor, _env.Permissions, _env.Time,
             _env.MembershipReader, new TenantOutbox(db));
 
         ResultAssert.Fails(

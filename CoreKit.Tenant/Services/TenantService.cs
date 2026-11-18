@@ -1,4 +1,11 @@
-﻿namespace CoreKit.Tenant.Services;
+﻿using CoreKit.Tenant.Abstractions;
+using CoreKit.Tenant.Constants;
+using CoreKit.Tenant.Entities;
+using CoreKit.Tenant.Events;
+using CoreKit.Tenant.Persistence;
+using CoreKit.Tenant.Services;
+
+namespace CoreKit.Tenant.Services;
 
 public sealed class TenantService : ITenantService
 {
@@ -9,6 +16,7 @@ public sealed class TenantService : ITenantService
     private readonly ITenantEventPublisher _events;
     private readonly ITenantInfoCache _cache;
     private readonly TenantAccessGuard _guard;
+    private readonly ITenantPermissionChecker _permissions;
     private readonly TenantOptions _options;
     private readonly TimeProvider _time;
     private readonly ITenantOutbox _outbox;
@@ -21,6 +29,7 @@ public sealed class TenantService : ITenantService
         ITenantEventPublisher events,
         ITenantInfoCache cache,
         TenantAccessGuard guard,
+        ITenantPermissionChecker permissions,
         IOptions<TenantOptions> options,
         TimeProvider time,
         ITenantOutbox outbox)
@@ -32,6 +41,7 @@ public sealed class TenantService : ITenantService
         _events = events;
         _cache = cache;
         _guard = guard;
+        _permissions = permissions;
         _options = options.Value;
         _time = time;
         _outbox = outbox;
@@ -42,6 +52,9 @@ public sealed class TenantService : ITenantService
     {
         if (await _guard.EnsurePlatformScopeAsync(ct) is { } denied)
             return denied;
+
+        if (!await _permissions.HasPlatformPermissionAsync(TenantPermissionNames.Platform, ct))
+            return TenantErrors.Forbidden(TenantPermissionNames.Platform);
 
         var page = Math.Max(query.Page, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
@@ -62,6 +75,9 @@ public sealed class TenantService : ITenantService
         if (await _guard.EnsureCanAccessAsync(id, ct) is { } denied)
             return denied;
 
+        if (!await _permissions.HasPermissionAsync(TenantPermissionNames.Read, ct))
+            return TenantErrors.Forbidden(TenantPermissionNames.Read);
+
         var tenant = await _tenants.FindByIdAsync(id, ct);
 
         return tenant is null
@@ -81,6 +97,9 @@ public sealed class TenantService : ITenantService
     {
         if (await _guard.EnsurePlatformScopeAsync(ct) is { } denied)
             return denied;
+
+        if (!await _permissions.HasPlatformPermissionAsync(TenantPermissionNames.Create, ct))
+            return TenantErrors.Forbidden(TenantPermissionNames.Create);
 
         var nameError = TenantValidation.ValidateName(request.Name, out var name);
 
@@ -169,6 +188,9 @@ public sealed class TenantService : ITenantService
         if (await _guard.EnsureCanAccessAsync(id, ct) is { } denied)
             return denied;
 
+        if (!await _permissions.HasPermissionAsync(TenantPermissionNames.Update, ct))
+            return TenantErrors.Forbidden(TenantPermissionNames.Update);
+
         // Validate everything first, then change anything, so a refused request leaves nothing half-done.
         string? newName = null;
 
@@ -186,6 +208,9 @@ public sealed class TenantService : ITenantService
         {
             if (await _guard.EnsurePlatformScopeAsync(ct) is { } slugDenied)
                 return slugDenied;
+
+            if (!await _permissions.HasPlatformPermissionAsync(TenantPermissionNames.Update, ct))
+                return TenantErrors.Forbidden(TenantPermissionNames.Update);
 
             newSlug = TenantSlug.Normalize(request.Slug);
 
@@ -260,6 +285,9 @@ public sealed class TenantService : ITenantService
         if (await _guard.EnsurePlatformScopeAsync(ct) is { } denied)
             return denied;
 
+        if (!await _permissions.HasPlatformPermissionAsync(TenantPermissionNames.Delete, ct))
+            return TenantErrors.Forbidden(TenantPermissionNames.Delete);
+
         var tenant = await _tenants.FindForUpdateAsync(id, ct);
 
         if (tenant is null)
@@ -295,6 +323,9 @@ public sealed class TenantService : ITenantService
     {
         if (await _guard.EnsurePlatformScopeAsync(ct) is { } denied)
             return denied;
+
+        if (!await _permissions.HasPlatformPermissionAsync(TenantPermissionNames.ManageStatus, ct))
+            return TenantErrors.Forbidden(TenantPermissionNames.ManageStatus);
 
         var reasonError = TenantValidation.ValidateReason(reason, out var cleanReason);
 

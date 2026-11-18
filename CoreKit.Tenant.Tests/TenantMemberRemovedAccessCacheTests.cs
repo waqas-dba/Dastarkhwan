@@ -1,15 +1,15 @@
+using CoreKit.Access.Abstractions;
 using CoreKit.Access.Extensions;
+using CoreKit.Tenant.Abstractions;
+using CoreKit.Tenant.Constants;
 using CoreKit.Tenant.Extensions;
 using Dastarkhwan.Integration;
-using System;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using CoreKit.Access.Abstractions;
 using CoreKit.Access.Entities;
 using CoreKit.Access.Persistence;
-using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Entities;
 using CoreKit.Tenant.Persistence;
 using Xunit;
@@ -54,6 +54,11 @@ public sealed class TenantMemberRemovedAccessCacheTests : IDisposable
         services.AddTenant(config, options => options.UseSqlite(_tenantConnection));
         services.AddAccess(config, options => options.UseSqlite(_accessConnection));
         services.AddDastarkhwanIntegration();
+
+        // Override the permission checker for tests to grant all permissions to the test user
+        services.AddScoped<ITenantPermissionChecker>(sp => new FakeTenantPermissionChecker(
+            TenantPermissionNames.All.Select(p => p.Name).ToArray()));
+
         _provider = services.BuildServiceProvider(validateScopes: true);
     }
 
@@ -205,5 +210,22 @@ public sealed class TenantMemberRemovedAccessCacheTests : IDisposable
         var access = GetFreshAccess(tenantId, member);
         Assert.False(access.IsMember);
         Assert.False(access.Has("sales.create"));
+    }
+
+    private sealed class FakeTenantPermissionChecker : ITenantPermissionChecker
+    {
+        private readonly ISet<string> _permissions = new HashSet<string>(StringComparer.Ordinal);
+
+        public FakeTenantPermissionChecker(params string[] permissions)
+        {
+            foreach (var permission in permissions)
+                _permissions.Add(permission);
+        }
+
+        public Task<bool> HasPermissionAsync(string permission, CancellationToken ct = default)
+            => Task.FromResult(_permissions.Contains(permission));
+
+        public Task<bool> HasPlatformPermissionAsync(string permission, CancellationToken ct = default)
+            => Task.FromResult(_permissions.Contains(permission));
     }
 }

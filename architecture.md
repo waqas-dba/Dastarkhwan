@@ -31,13 +31,16 @@ These are responsibilities, not a requirement to create every project immediatel
 A capability may remain inside a well-defined module until splitting provides real value. Do not create all planned modules up front.
 
 ## 3. Dependency rules
-1. Cross modules only through documented public contracts or documented events.
-2. Never access another module's private `DbContext`, tables, repositories, or internal classes.
-3. Avoid circular dependencies; redesign around stable contracts or orchestration when necessary.
-4. Keep shared contracts small, stable, and genuinely shared, owned in module-owned `Abstractions` namespaces. Do not turn any shared-contract location into a dumping ground. Do not introduce SharedKernel.
-5. Keep endpoints thin and provider SDKs behind adapters.
-6. Do not add event sourcing, distributed messaging, or microservices without a concrete need.
-7. The module that owns a business rule owns its implementation and persistence.
+1. **No CoreKit module references another CoreKit module.** `CoreKit.Identity`, `CoreKit.Access` and `CoreKit.Tenant` are independently reusable class libraries with zero direct CoreKit project references.
+2. **Cross modules only through documented public contracts or documented events.** `CoreKit.Integration` references and coordinates the three modules through their public contracts; it is the only assembly that composes them.
+3. Never access another module's private `DbContext`, tables, repositories, or internal classes.
+4. Avoid circular dependencies; redesign around stable contracts or orchestration when necessary.
+5. Keep shared contracts small, stable, and genuinely shared, owned in module-owned `Abstractions` namespaces. Do not turn any shared-contract location into a dumping ground. Do not introduce SharedKernel.
+6. Keep endpoints thin and provider SDKs behind adapters.
+7. Do not add event sourcing, distributed messaging, or microservices without a concrete need.
+8. The module that owns a business rule owns its implementation and persistence.
+9. Tenant membership changes reach Access through the durable Tenant outbox and Access membership-event consumer + projection, not through a direct Tenant-to-Access runtime membership lookup.
+10. Access uses its own membership projection as the authoritative Tenant membership source. Missing, stale, quarantined or untrusted projection data fails closed (denies authorization).
 
 ## 4. Identity and Access boundary
 - Identity authenticates a person/service and manages credentials, account state, sessions/tokens, lockout, and recovery.
@@ -57,30 +60,37 @@ A capability may remain inside a well-defined module until splitting provides re
 - Scope reads, writes, exports, reports, background jobs, webhooks, and platform/admin actions according to an explicit authorization policy.
 - Add tenant-safe unique constraints and indexes where required by the actual data model. Avoid assuming every table is tenant-owned.
 
-## 6. Tenant–Access integration (Option B)
-- Tenant requires Access for authorization of protected Tenant operations.
-- Tenant owns tenant lifecycle, membership, tenant context and tenant-specific business rules.
-- Access owns effective permissions and authorization decisions.
-- An adapter-based Tenant→Access integration implementation exists at commit `aee85c2` (`TenantAccessScopeContext`, `TenantAccessMembership` registered via `AddScoped` in `TenantServiceCollectionExtensions`), but this adapter-based integration is architecturally unresolved under the Owner-approved direction rejecting cross-module adopter/interface patterns. It is existing implementation, not the approved target architecture. Redesign and Owner approval are outstanding.
-- `ITenantMembershipReader` lives in `CoreKit.Tenant.Abstractions` (module-owned, not SharedKernel) and is the contract Access uses to query Tenant membership.
-- Access must not reference Tenant's private services, repositories, `DbContext` or tables.
-- Tenant must not reference Identity private internals.
-- Missing or invalid tenant scope, membership or authorization must fail closed.
-- Tenant owner-to-Access owner mapping must be explicitly validated because Access owner semantics may grant broad permissions.
+## 6. Tenant–Access integration (Option B — approved target architecture)
+- **Dependency direction:** `CoreKit.Integration` → `CoreKit.Identity`, `CoreKit.Access`, `CoreKit.Tenant`. No CoreKit module references another CoreKit module.
+- Tenant owns tenant lifecycle, membership, tenant context and tenant-specific business rules. Access owns roles, permissions, assignments and authorization decisions.
+- Tenant membership changes reach Access through the durable Tenant outbox (`TenantOutboxMessage` staged in the same `SaveChanges` as the membership change) and Access's `AccessMembershipEventConsumer`, which applies the event to `AccessMembershipProjection` and `AccessTenantState` atomically. There is no direct Tenant-to-Access runtime membership lookup.
+- Access uses its own membership projection (`AccessMembershipProjection`) as the authoritative Tenant membership source. Missing, stale, quarantined, unknown or inactive projection data fails closed (denies authorization).
+- `ITenantMembershipReader` lives in `CoreKit.Tenant.Abstractions` (module-owned, not SharedKernel).
+- Access must not reference Tenant's private services, repositories, `DbContext` or tables. Tenant must not reference Identity private internals.
 - Platform scope is distinct from tenant scope and needs an explicit authorization design.
-- Tenant permission enforcement across individual operations remains implementation work, not an already completed capability.
+- `ITenantOutboxTransport` (Tenant-owned port) is implemented in `CoreKit.Integration` and wires the outbox to the Access consumer. `ITenantProjectionGateway` (Access-owned port for snapshot installation/reconciliation) is implemented in `CoreKit.Integration` using Access's public snapshot installer and projection reader.
+- Tenant owner-to-Access owner mapping must be explicitly validated because Access owner semantics may grant broad permissions. Tenant ownership does NOT imply Access ownership (`AccessMember(false)` is always returned for tenant scope).
+- Tenant permission enforcement across individual protected operations remains implementation work.
 
 **Current evidence note (latest verified baseline `c9dbbe12`, 2026-11-15):** `CoreKit.SharedKernel` is empty (no `.csproj`, no source, not referenced by any project). `CoreKit.Tenant` and `CoreKit.Identity` each reference only `CoreKit.Access`; `CoreKit.Access` is a leaf module with no project references. Tenant–Access authorization adapter implementation exists at commit `aee85c2` but is architecturally unresolved under the Owner-approved direction rejecting cross-module adopter/interface patterns; Tenant owner does not map to Access owner. Platform authorization and per-operation Tenant permission enforcement remain pending. D-03 (JWT revocation / `SecurityVersion` validation) and D-18 (rate limiting on tenant and access write endpoints) remain unresolved Project Owner decisions. No SharedKernel and no SampleHost-as-future-requirement.
 
 Preserve the modular monolith architecture and existing approved module ownership boundaries.
 
-## 7. SaaS and standalone composition
+## 7. Integration layer (`CoreKit.Integration`)
+- References `CoreKit.Identity`, `CoreKit.Access` and `CoreKit.Tenant`; coordinates them through their public contracts.
+- Implements `ITenantOutboxTransport` (Tenant-owned port) — durable delivery of Tenant outbox messages to the Access membership-event consumer.
+- Implements `ITenantProjectionGateway` (Access-owned port) — snapshot installation and reconciliation through Access's public installer and reader.
+- Registers Tenant permission definitions in the Access catalog without Tenant referencing Access.
+- Composes module services into the host (e.g. `CoreKit.SampleHost` during transition). Does not own business rules.
+- No SharedKernel. No cross-module adopter/plugin implementation pattern.
+
+## 8. SaaS and standalone composition
 - **SaaS:** compose Tenant, Identity, and Access, plus the application modules required by the product. All applicable operations enforce tenant/store scope.
 - **Standalone:** Tenant infrastructure is not required. Identity/Access may be optional only when a secure alternative is explicitly configured for protected operations.
 - Keep host-specific composition at clear boundaries; do not scatter SaaS/standalone conditionals throughout unrelated modules.
 - Create a separate `StandaloneStore` only if lifecycle/business rules materially differ. If only configuration differs, reuse Store with explicit host configuration.
 
-## 8. Tenant, store, market, and currency
+## 9. Tenant, store, market, and currency
 These are distinct concepts:
 - Tenant: SaaS account boundary.
 - Store: merchant business.
@@ -90,7 +100,7 @@ These are distinct concepts:
 
 Pakistan is the initial market. Future UK support should use market settings/adapters for address/postcode, payments, tax/invoicing, and locale. Verify current legal requirements before implementation. Persist explicit currency codes and appropriate decimal money values. Snapshot item prices, discounts, taxes, fees, and currency on orders; historical totals must not change when catalog settings change.
 
-## 9. Authentication and session security
+## 10. Authentication and session security
 - Use short-lived JWT access tokens and rotating refresh tokens as accepted in `decisions.md`.
 - Detect refresh-token reuse and revoke the affected token family/session according to the approved implementation design.
 - Do not store plaintext refresh tokens; protect stored token material and revoke sessions securely.
@@ -98,7 +108,7 @@ Pakistan is the initial market. Future UK support should use market settings/ada
 - Avoid leaking whether a particular account exists through login and recovery responses.
 - Keep token contents minimal and avoid placing secrets or sensitive personal data in JWT claims.
 
-## 10. Data and workflows
+## 11. Data and workflows
 - Each module owns its schema and persistence mapping.
 - Use database constraints and short transactions for important invariants.
 - Do not hold a transaction open during slow external network calls.
@@ -108,12 +118,12 @@ Pakistan is the initial market. Future UK support should use market settings/ada
 - Plan migrations and backward compatibility before destructive schema changes. Review migration contents before applying them.
 - Do not execute or apply migrations without explicit user authorization.
 
-## 11. API and application design
+## 12. API and application design
 Conceptual request path: `HTTP endpoint → authentication → authorization/context resolution → application use case → owning module/persistence → response`.
 
 Use validation at boundaries, clear error contracts, bounded pagination, projections, async I/O, safe logging, and parameterized queries. Add layers only where they serve a real responsibility. Validate client-controlled prices, discounts, IDs, ownership, and state transitions on the server.
 
-## 12. Security and operational controls
+## 13. Security and operational controls
 - Authorize every protected server operation and verify resource ownership.
 - Enforce scope in list/detail/create/update/delete/export/report/job/webhook/admin paths.
 - Validate webhook signatures and make handlers safe to retry.
@@ -122,8 +132,8 @@ Use validation at boundaries, clear error contracts, bounded pagination, project
 - Use safe errors; do not leak stack traces or internal details to clients.
 - Use rate limits for abuse-prone endpoints and understand cache invalidation/scope.
 
-## 13. Performance
+## 14. Performance
 Use async I/O, projections, bounded pagination, indexes based on real query patterns, and avoid N+1 queries/unbounded loads. Measure before caching or architectural changes. Cache keys/results must be user-, tenant-, and store-safe with clear invalidation. Use background processing for suitable long tasks, with retries and idempotency.
 
-## 14. Decisions and evidence
+## 15. Decisions and evidence
 Accepted decisions and open questions are in `decisions.md`. Current implementation status is in `current-state.md`. Roadmap milestones are not evidence of implementation. Verify the latest repository commit before each task and update architecture only when a decision or verified structure changes.

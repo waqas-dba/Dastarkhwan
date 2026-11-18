@@ -32,14 +32,14 @@ A status must describe the evidence available, not the intended architecture or 
 
 | Field | Value |
 |---|---|
-| Baseline commit | `c9dbbe12e4611883ad4374f84067efc99b03ff29` |
-| Commit date | 2026-11-15 16:01:53 +0500 |
-| Latest commit message | `update the current sate and road map` |
+| Baseline commit | `4bbb68ec59a181606515b66bce056b6a82dca715` |
+| Commit date | 2026-11-17T15:23:29+05:00 |
+| Latest commit message | `feat(identity): introduce identity-owned admin authorization port` |
 | Branch | `master` |
-| Remote HEAD | `c9dbbe12e4611883ad4374f84067efc99b03ff29` (`origin/master`, matches local HEAD) |
-| Evidence basis (commit metadata) | Local Git inspection at HEAD (`git rev-parse HEAD`, `git log -1`) and remote query (`git ls-remote origin master`) on 2026-11-15. Both local HEAD and remote `origin/master` are `c9dbbe12e4611883ad4374f84067efc99b03ff29`, matching the required task baseline. |
-| Local working-tree evidence | `git status --short` shows: modified `CoreKit.Tenant.Tests/TenantMemberRemovedAccessCacheTests.cs` (out of scope for this documentation task; left untouched), and two untracked reports (`DK-FULL-APPLICATION-ARCHITECTURE-AUDIT-01-REPORT.md`, `DK-FULL-APPLICATION-REMEDIATION-01-REPORT.md`) that are not source code and not part of this task. Neither local HEAD nor remote HEAD was changed by this task. |
-| Scope | Point-in-time record of the current remote HEAD verified at task time; does not assert source inspection results beyond this baseline. No builds, tests, migrations, or database operations were performed as part of this documentation-only task. |
+| Remote HEAD | Not separately verified (no remote query performed) |
+| Evidence basis (commit metadata) | Local Git inspection at HEAD (`git rev-parse HEAD`, `git log -1`, `git status --short`). Local HEAD is `4bbb68ec59a181606515b66bce056b6a82dca715`. Working tree is clean. |
+| Local working-tree evidence | `git status --short` shows: clean (no modified, staged, untracked, or conflicted files). |
+| Scope | Point-in-time record of the current local HEAD verified at task time. No builds, tests, migrations, or database operations were performed as part of this documentation-only task. |
 
 The previous remote HEAD `7ed4c61fca8b06f35a0e2f1ce5f806ae22ad0043` (2026-11-13 19:53:27 +0500, `docs(governance): accept D-017 automation and align agent guidance`) and the FIX1 baseline `f09f236bcbc162387b572e0ed8cee4d29949a816` are preserved as historical baselines. The historical audit baseline `1c832de` (2026-11-15 13:57:49 +0500, `Fix Tenant membership revocation -> Access cache consistency`) addressed audit finding D-02 (Tenant–Access cache-invalidation handler + DI registration committed). D-01 (test rewrite of `CoreKit.Tenant.Tests/TenantMemberRemovedAccessCacheTests.cs`) existed as an uncommitted working-tree change at `1c832de` and is committed at `7115b14`; it is not build-verified or test-verified, and cache-invalidated regression coverage is not confirmed until its assertions are independently reviewed. Baseline `7115b14` (2026-11-15 15:07:48 +0500, `docs(governance): synchronize core documents with baseline 1c832de`) is the documentation-sync commit that reconciled all six core documents with `1c832de`. The current baseline `c9dbbe12` (2026-11-15 16:01:53 +0500, `update the current sate and road map`) is the task baseline for DK-DOCUMENTATION-FINALIZE-06.
 

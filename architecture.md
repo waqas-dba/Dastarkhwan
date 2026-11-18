@@ -95,7 +95,7 @@ Preserve the modular monolith architecture and existing approved module ownershi
 - Implements `ITenantOutboxTransport` (Tenant-owned port) — durable delivery of Tenant outbox messages to the Access membership-event consumer.
 - Implements `ITenantProjectionGateway` (Access-owned port) — snapshot installation and reconciliation through Access's public installer and reader.
 - Registers Tenant permission definitions in the Access catalog without Tenant referencing Access.
-- Composes module services into the host (e.g. `CoreKit.SampleHost` during transition). Does not own business rules.
+- Composes module services into the application host without owning module business rules. The future web-related host is a separate application project. SampleHost is not required and is not part of the approved architecture, including during transition.
 - No SharedKernel. No cross-module adopter/plugin implementation pattern.
 
 ## 8. SaaS and standalone composition

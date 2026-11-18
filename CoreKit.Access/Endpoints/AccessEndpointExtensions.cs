@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Routing;
+﻿using CoreKit.Access.Abstractions;
+using CoreKit.Access.Models;
+using Microsoft.AspNetCore.Routing;
 
 namespace CoreKit.Access.Endpoints;
 
@@ -55,6 +57,29 @@ public static class AccessEndpointExtensions
 
         access.MapGet("/audit", async (int? page, int? pageSize, IAccessAuditLog s, CancellationToken ct) =>
             (await s.ListAsync(page ?? 1, pageSize ?? 50, ct)).ToHttpResult());
+
+        // Platform membership management (fixed platform scope, never ambient tenant scope)
+        var platform = access.MapGroup("/platform/members").WithTags("Access.Platform.Members");
+
+        platform.MapPost("", async (AddPlatformMemberRequest req, IPlatformMembershipService s, CancellationToken ct) =>
+        {
+            var result = await s.AddMemberAsync(req.UserId, ct);
+            return result.IsSuccess
+                ? Results.Created($"{basePath}/platform/members/{req.UserId}", result)
+                : result.ToHttpResult();
+        });
+
+        platform.MapGet("/{userId:guid}", async (Guid userId, IPlatformMembershipService s, CancellationToken ct) =>
+        {
+            var isMember = await s.IsMemberAsync(userId, ct);
+            return isMember ? Results.Ok(new { userId, isMember = true }) : Results.NotFound(new { userId, isMember = false });
+        });
+
+        platform.MapDelete("/{userId:guid}", async (Guid userId, IPlatformMembershipService s, CancellationToken ct) =>
+        {
+            var result = await s.RevokeMemberAsync(userId, ct);
+            return result.IsSuccess ? Results.Ok(result) : result.ToHttpResult();
+        });
 
         return app;
     }

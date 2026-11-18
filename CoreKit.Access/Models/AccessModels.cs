@@ -86,3 +86,21 @@ public sealed class AccessPagedResult<T>
 
     public int TotalPages => PageSize <= 0 ? 0 : (int)Math.Ceiling(TotalCount / (double)PageSize);
 }
+
+public sealed class AddPlatformMemberRequest
+{
+    public Guid UserId { get; set; }
+}
+
+public sealed class PlatformMemberDto
+{
+    public Guid UserId { get; set; }
+
+    public Guid PlatformId { get; set; }
+
+    public long MembershipGeneration { get; set; }
+
+    public DateTime JoinedAt { get; set; }
+
+    public DateTime? RevokedAt { get; set; }
+}

@@ -32,14 +32,15 @@ A status must describe the evidence available, not the intended architecture or 
 
 | Field | Value |
 |---|---|
-| Latest inspected commit | `c4afe1eb1fa58fd8badd1bc794efda861ded5e37` |
-| Parent commit | `e2ca8c1dd8e45c0f7e525ddb79fa5054f763794c` |
-| Latest commit message | `docs: reconcile TenantActor wording and baseline facts (Phase 0D)` |
+| Latest inspected commit | `99642fe34d7b84266285657e4cdadef5773b901d` |
+| Parent commit | `c4afe1eb1fa58fd8badd1bc794efda861ded5e37` |
+| Latest commit message | `docs: apply Phase 0D documentation corrections (02)` |
 | Repository evidence | Read-only inspection of committed GitHub files |
 | Local HEAD | Not independently verified |
 | Local working-tree status | Not independently verified |
 | Source inspection baseline | `e2ca8c1` |
-| Documentation snapshot | `c4afe1e` |
+| Prior documentation snapshot | `c4afe1e` |
+| Documentation snapshot | `99642fe` |
 | Scope | Committed source and documentation inspection only. No build, test, migration or database verification is claimed. |
 
 The previous remote HEAD `7ed4c61fca8b06f35a0e2f1ce5f806ae22ad0043` (2026-11-13 19:53:27 +0500, `docs(governance): accept D-017 automation and align agent guidance`) and the FIX1 baseline `f09f236bcbc162387b572e0ed8cee4d29949a816` are preserved as historical baselines. The historical audit baseline `1c832de` (2026-11-15 13:57:49 +0500, `Fix Tenant membership revocation -> Access cache consistency`) addressed audit finding D-02 (Tenant–Access cache-invalidation handler + DI registration committed). D-01 (test rewrite of `CoreKit.Tenant.Tests/TenantMemberRemovedAccessCacheTests.cs`) existed as an uncommitted working-tree change at `1c832de` and is committed at `7115b14`; it is not build-verified or test-verified, and cache-invalidated regression coverage is not confirmed until its assertions are independently reviewed. Baseline `7115b14` (2026-11-15 15:07:48 +0500, `docs(governance): synchronize core documents with baseline 1c832de`) is the documentation-sync commit that reconciled all six core documents with `1c832de`. The current baseline `c9dbbe12` (2026-11-15 16:01:53 +0500, `update the current sate and road map`) is the task baseline for DK-DOCUMENTATION-FINALIZE-06.

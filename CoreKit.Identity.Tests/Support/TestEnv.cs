@@ -1,5 +1,3 @@
-using CoreKit.Access.Abstractions;
-using CoreKit.Access.Models;
 using CoreKit.Identity.Constants;
 using CoreKit.Identity.Repositories;
 using CoreKit.Identity.Security;
@@ -17,14 +15,12 @@ namespace CoreKit.Identity.Tests.Support;
 /// One real object graph on an in-memory SQLite database, built like a single request.
 /// Repositories are created from one context and read back from another, so nothing is
 /// served from a tracker. Users are seeded directly into the database so tests start from a
-/// known state. Roles and permissions are owned by Access, not Identity, so the platform access
-/// of each user is configured on the in-memory <see cref="FakeAccessState"/> instead of in the
-/// Identity schema.
+/// known state. Platform roles and membership are owned by Access, so Identity tests no longer
+/// configure platform access — authorization is exercised through the fake
+/// <see cref="FakeIdentityAdminAuthorizer"/> instead.
 /// </summary>
 internal sealed class TestEnv : IDisposable
 {
-    public const string StaffRoleName = "Staff";
-
     private readonly string _databasePath;
     private readonly List<SqliteConnection> _connections = new();
 
@@ -42,24 +38,6 @@ internal sealed class TestEnv : IDisposable
         Db = NewContext();
         Time = new FixedTimeProvider(new DateTimeOffset(2026, 10, 9, 12, 0, 0, TimeSpan.Zero));
         Hasher = new PasswordHasher();
-
-        AdministratorRoleId = Guid.NewGuid();
-        StaffRoleId = Guid.NewGuid();
-
-        // ---- Access platform state (roles + per-user access) ----
-        AccessState = new FakeAccessState();
-        AccessState.PlatformRoles.Add(new AccessRoleDto
-        {
-            Id = AdministratorRoleId,
-            Name = IdentityRoleNames.Administrator,
-            Description = "Full access."
-        });
-        AccessState.PlatformRoles.Add(new AccessRoleDto
-        {
-            Id = StaffRoleId,
-            Name = StaffRoleName,
-            Description = "Basic read access."
-        });
 
         // ---- seed users (no role tables: Access owns roles) ----
         OwnerUserId = Guid.NewGuid();
@@ -110,38 +88,23 @@ internal sealed class TestEnv : IDisposable
         Db.Users.AddRange(owner, staff, inactive);
         Db.SaveChanges();
 
-        // Owner is an administrator (platform member holding the Administrator role).
-        AccessState.SetAccess(OwnerUserId, isMember: true, isOwner: false,
-            IdentityAccessPermissionNames.All.Select(p => p.Name), new[] { IdentityRoleNames.Administrator });
-
-        // Staff holds users.read and the Staff role.
-        AccessState.SetAccess(StaffUserId, isMember: true, isOwner: false,
-            new[] { IdentityAccessPermissionNames.UsersRead }, new[] { StaffRoleName });
-
-        // The inactive user has the same platform access as staff (only their Identity account is off).
-        AccessState.SetAccess(InactiveUserId, isMember: true, isOwner: false,
-            new[] { IdentityAccessPermissionNames.UsersRead }, new[] { StaffRoleName });
-
-        // ---- Access fakes (backed by the state above) ----
-        PermissionChecker = new FakePermissionChecker(AccessState);
-        AccessService = new FakeAccessService(AccessState);
-        Maintenance = new FakeAccessMaintenance(AccessState);
-
         // ---- services ----
+        Authorizer = new FakeIdentityAdminAuthorizer();
+        Authorizer.AllowAll();
+
         UserRepository = new UserRepository(Db);
         RefreshTokenRepository = new RefreshTokenRepository(Db);
-        AdministratorGuard = new AdministratorGuard(AccessService);
+        AdministratorGuard = new AdministratorGuard(Array.Empty<Guid>());
         CurrentUser = new FakeCurrentUserService();
 
         UserService = new UserService(
-            UserRepository, new AccessBackedIdentityAdminAuthorizer(PermissionChecker),
-            AccessService, Maintenance, AdministratorGuard, Hasher, CurrentUser, Time);
+            UserRepository, Authorizer, AdministratorGuard, Hasher, CurrentUser, Time);
 
         var emailOptions = Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false });
         AuthService = new AuthService(
             UserRepository, RefreshTokenRepository, Hasher,
             new FakeTokenService(), new FakeSessionIssuer(),
-            AccessService, CurrentUser, emailOptions, Time,
+            CurrentUser, emailOptions, Time,
             NullLogger<AuthService>.Instance);
     }
 
@@ -153,13 +116,7 @@ internal sealed class TestEnv : IDisposable
 
     public FakeCurrentUserService CurrentUser { get; }
 
-    public FakeAccessState AccessState { get; }
-
-    public CoreKit.Access.Abstractions.IPermissionChecker PermissionChecker { get; }
-
-    public IAccessService AccessService { get; }
-
-    public IAccessMaintenance Maintenance { get; }
+    public FakeIdentityAdminAuthorizer Authorizer { get; }
 
     public IUserRepository UserRepository { get; }
 
@@ -177,10 +134,6 @@ internal sealed class TestEnv : IDisposable
 
     public Guid InactiveUserId { get; }
 
-    public Guid AdministratorRoleId { get; }
-
-    public Guid StaffRoleId { get; }
-
     public IdentityDbContext NewContext()
     {
         var connection = new SqliteConnection($"Data Source={_databasePath};Foreign Keys=True");
@@ -195,36 +148,24 @@ internal sealed class TestEnv : IDisposable
     {
         CurrentUser.UserId = OwnerUserId;
         CurrentUser.Email = "owner@example.com";
-        AccessState.CurrentUserId = OwnerUserId;
     }
 
     public void SignInStaff()
     {
         CurrentUser.UserId = StaffUserId;
         CurrentUser.Email = "staff@example.com";
-        AccessState.CurrentUserId = StaffUserId;
     }
 
-    /// <summary>
-    /// Signs in a seeded user with an exact permission set. Tests use this when the point is a
-    /// caller who holds one permission (for example create) but not a neighbouring one (read).
-    /// Membership and roles stay as configured for that user; only the platform permissions change.
-    /// </summary>
-    public void SignInWith(Guid userId, params string[] permissions)
+    public void SignInWith(Guid userId, string? email = null)
     {
         CurrentUser.UserId = userId;
-        CurrentUser.Email = null;
-        AccessState.CurrentUserId = userId;
-
-        var current = AccessState.Get(userId);
-        AccessState.SetAccess(userId, current.IsMember, current.IsOwner, permissions, current.Roles);
+        CurrentUser.Email = email;
     }
 
     public void SignOut()
     {
         CurrentUser.UserId = null;
         CurrentUser.Email = null;
-        AccessState.CurrentUserId = null;
     }
 
     public void Dispose()

@@ -23,7 +23,7 @@ internal static class ModuleBoundaryMatrix
     public static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> CompiledAssemblyAllowlist =
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
         {
-            ["CoreKit.Identity"] = new[] { "CoreKit.Access" },
+            ["CoreKit.Identity"] = Array.Empty<string>(),
             ["CoreKit.Access"] = Array.Empty<string>(),
             ["CoreKit.Tenant"] = new[] { "CoreKit.Access" },
         };
@@ -36,10 +36,7 @@ internal static class ModuleBoundaryMatrix
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
         {
             ["CoreKit.Access/CoreKit.Access.csproj"] = Array.Empty<string>(),
-            ["CoreKit.Identity/CoreKit.Identity.csproj"] = new[]
-            {
-                "CoreKit.Access/CoreKit.Access.csproj",
-            },
+            ["CoreKit.Identity/CoreKit.Identity.csproj"] = Array.Empty<string>(),
             ["CoreKit.Tenant/CoreKit.Tenant.csproj"] = new[]
             {
                 "CoreKit.Access/CoreKit.Access.csproj",

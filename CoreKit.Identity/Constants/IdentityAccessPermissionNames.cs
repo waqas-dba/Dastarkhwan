@@ -1,12 +1,8 @@
-using CoreKit.Access.Catalog;
-
 namespace CoreKit.Identity.Constants;
 
 /// <summary>
-/// The identity user-management permissions declared in the Access catalog. These are the only
-/// permissions Identity itself needs; role and permission management now lives in Access
-/// (access.roles.*, access.assignments.*). Identity checks them through IPermissionChecker
-/// against the fixed platform scope, never from JWT claims.
+/// The identity user-management permission names. These are the only permissions Identity itself
+/// declares; the host maps them to authorization decisions through IIdentityAdminAuthorizer.
 /// </summary>
 public static class IdentityAccessPermissionNames
 {
@@ -15,11 +11,13 @@ public static class IdentityAccessPermissionNames
     public const string UsersUpdate = "identity.users.update";
     public const string UsersDelete = "identity.users.delete";
 
-    public static IReadOnlyList<AccessPermissionDefinition> All { get; } = new List<AccessPermissionDefinition>
-    {
+    public sealed record PermissionDefinition(string Name, string Description);
+
+    public static IReadOnlyList<PermissionDefinition> All { get; } =
+    [
         new(UsersRead, "View users"),
         new(UsersCreate, "Create users"),
         new(UsersUpdate, "Edit users"),
         new(UsersDelete, "Delete users")
-    };
+    ];
 }

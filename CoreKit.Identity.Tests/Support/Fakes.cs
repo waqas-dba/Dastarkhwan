@@ -17,16 +17,36 @@ public sealed class FakeCurrentUserService : ICurrentUserService
 {
     public Guid? UserId { get; set; }
     public string? Email { get; set; }
-    public IReadOnlyCollection<string> Roles { get; set; } = new List<string>();
-    public IReadOnlyCollection<string> Permissions { get; set; } = new List<string>();
 
     public bool IsAuthenticated => UserId is not null;
 }
 
 /// <summary>
-/// Controllable hasher for tests that must steer verification or rehash behaviour: every Verify
-/// call returns the configured result, and every Hash call returns a deterministic marker.
+/// Fake authorization port for tests. Configure which operations are allowed; everything else is denied.
 /// </summary>
+public sealed class FakeIdentityAdminAuthorizer : IIdentityAdminAuthorizer
+{
+    private readonly HashSet<IdentityAdminOperation> _allowed = new();
+
+    public void Allow(IdentityAdminOperation operation) => _allowed.Add(operation);
+
+    public void Deny(IdentityAdminOperation operation) => _allowed.Remove(operation);
+
+    public void AllowAll()
+    {
+        _allowed.Add(IdentityAdminOperation.ReadUsers);
+        _allowed.Add(IdentityAdminOperation.CreateUsers);
+        _allowed.Add(IdentityAdminOperation.UpdateUsers);
+        _allowed.Add(IdentityAdminOperation.DeleteUsers);
+    }
+
+    public void DenyAll() => _allowed.Clear();
+
+    public Task<bool> IsAllowedAsync(IdentityAdminOperation operation, CancellationToken ct = default)
+        => Task.FromResult(_allowed.Contains(operation));
+}
+
+/// <summary>
 public sealed class StubHasher : IPasswordHasher
 {
     private readonly PasswordCheckResult _verifyResult;

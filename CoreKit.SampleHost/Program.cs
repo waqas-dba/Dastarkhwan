@@ -9,6 +9,7 @@ using CoreKit.Identity.Extensions;
 using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Persistence;
 using CoreKit.Identity.Seeding;
+using CoreKit.Identity.Services;
 using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Endpoints;
 using CoreKit.Tenant.Extensions;
@@ -24,6 +25,14 @@ builder.Services.AddSingleton<DevEmailInbox>();
 builder.Services.AddSingleton<IIdentityEmailSender, ConsoleEmailSender>();
 
 builder.Services.AddIdentity(builder.Configuration);
+
+// Identity's admin-authorization port: the host decides what each operation means.
+// Here we map identity.* operations to platform permissions checked through Access.
+builder.Services.AddScoped<IIdentityAdminAuthorizer>(sp =>
+{
+    var permissionChecker = sp.GetRequiredService<CoreKit.Access.Abstractions.IPermissionChecker>();
+    return new PermissionBasedIdentityAdminAuthorizer(permissionChecker);
+});
 builder.Services.AddIdentitySeeding(builder.Configuration);
 builder.Services.AddTenant(builder.Configuration);   // after AddIdentity: it plugs into Identity's token claims
 builder.Services.AddAccess(builder.Configuration);   // reads the user, tenant and membership through the shared kernel
@@ -42,6 +51,13 @@ builder.Services.AddAccessPermissions(p =>
         AccessPermissionNames.RolesRead, AccessPermissionNames.AssignmentsRead, AccessPermissionNames.AssignmentsManage);
 
     p.AddRoleTemplate("Cashier", "Rings up sales", "sales.create", "products.view");
+
+    // Identity user-management permissions, checked at platform scope by the host's
+    // IIdentityAdminAuthorizer implementation.
+    p.Add("identity.users.read", "View users");
+    p.Add("identity.users.create", "Create users");
+    p.Add("identity.users.update", "Edit users");
+    p.Add("identity.users.delete", "Delete users");
 });
 
 var app = builder.Build();
@@ -102,3 +118,27 @@ if (app.Environment.IsDevelopment())
 }
 
 app.Run();
+
+public sealed class PermissionBasedIdentityAdminAuthorizer : IIdentityAdminAuthorizer
+{
+    private readonly CoreKit.Access.Abstractions.IPermissionChecker _permissionChecker;
+
+    public PermissionBasedIdentityAdminAuthorizer(CoreKit.Access.Abstractions.IPermissionChecker permissionChecker)
+    {
+        _permissionChecker = permissionChecker;
+    }
+
+    public async Task<bool> IsAllowedAsync(IdentityAdminOperation operation, CancellationToken ct = default)
+    {
+        var permission = operation switch
+        {
+            IdentityAdminOperation.ReadUsers => "identity.users.read",
+            IdentityAdminOperation.CreateUsers => "identity.users.create",
+            IdentityAdminOperation.UpdateUsers => "identity.users.update",
+            IdentityAdminOperation.DeleteUsers => "identity.users.delete",
+            _ => null
+        };
+
+        return permission is not null && await _permissionChecker.HasPlatformPermissionAsync(permission, ct);
+    }
+}

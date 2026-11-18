@@ -3,15 +3,11 @@ using CoreKit.Identity.Repositories;
 namespace CoreKit.Identity.Tests;
 
 /// <summary>
-/// What this protects: creating, changing and removing users, and assigning roles to them --
-/// including the administrator protections that prevent locking everyone out.
-/// Why it matters: if an ordinary user could promote themselves to Administrator, or if the last
-/// administrator could be deleted, the system would be compromised or bricked.
-/// The rule under test (see UserService): only a caller holding the identity.* platform permission
-/// can manage users; role changes cannot strip the last active administrator; a user cannot
-/// deactivate or delete themselves; Administrator role assignment and removal are guarded.
-/// Permissions and roles are owned by Access, so these tests configure the caller's platform
-/// access on the in-memory Access fakes rather than in the Identity schema.
+/// What this protects: creating, changing and removing users -- including the administrator
+/// protections that prevent locking everybody out. Authorization is exercised through the host's
+/// <see cref="IIdentityAdminAuthorizer"/> port (faked in <see cref="TestEnv"/>) rather than Access
+/// permissions. Platform roles and membership are owned by Access and are no longer part of
+/// Identity's user-management surface.
 /// </summary>
 public sealed class UserServiceTests : IDisposable
 {
@@ -37,7 +33,7 @@ public sealed class UserServiceTests : IDisposable
             Password = "NewUserPass123!",
             Mobile = "+15551000010",
             DisplayName = "New User",
-            RoleIds = new List<Guid> { _env.StaffRoleId }
+            IsActive = true
         });
 
         var dto = ResultAssert.Ok(result);
@@ -45,7 +41,6 @@ public sealed class UserServiceTests : IDisposable
         Assert.Equal("+15551000010", dto.Mobile);
         Assert.Equal("New User", dto.DisplayName);
         Assert.True(dto.IsActive);
-        Assert.Contains(TestEnv.StaffRoleName, dto.Roles);
     }
 
     [Fact]
@@ -109,22 +104,6 @@ public sealed class UserServiceTests : IDisposable
         ResultAssert.Fails(result, IdentityErrorKind.Validation, "validation.failed");
     }
 
-    [Fact]
-    public async Task CreateUser_WithNonExistentRole_Fails()
-    {
-        _env.SignInOwner();
-
-        var result = await _env.UserService.CreateAsync(new CreateUserRequest
-        {
-            Email = "norele@example.com",
-            Password = "NoRolePass123!",
-            Mobile = "+15551000015",
-            RoleIds = new List<Guid> { Guid.NewGuid() }
-        });
-
-        ResultAssert.Fails(result, IdentityErrorKind.Validation, "validation.failed");
-    }
-
     // ---- Mobile validation on create ----
 
     [Fact]
@@ -161,7 +140,6 @@ public sealed class UserServiceTests : IDisposable
     {
         _env.SignInOwner();
 
-        // Staff user already has mobile +15551000002
         var result = await _env.UserService.CreateAsync(new CreateUserRequest
         {
             Email = "dup-mobile@example.com",
@@ -175,8 +153,6 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task UserRepository_DuplicateMobile_ReturnsFalseWithoutThrowing()
     {
-        // Use the repository directly to simulate a concurrent duplicate mobile
-        // submission that bypasses UserService's MobileExistsAsync pre-check.
         using var db = _env.NewContext();
         var repo = new UserRepository(db);
 
@@ -206,18 +182,12 @@ public sealed class UserServiceTests : IDisposable
             CreatedAt = _env.Time.GetUtcNow().UtcDateTime
         };
 
-        // The second create hits the unique index. TrySaveAsync catches
-        // DbUpdateException, confirms the conflict via MobileExistsAsync, and
-        // returns false instead of propagating an unhandled exception.
         Assert.False(await repo.CreateAsync(userB, CancellationToken.None));
     }
 
     [Fact]
     public async Task UserRepository_DuplicateEmail_ReturnsFalseWithoutThrowing()
     {
-        // Same scenario as the mobile fallback test, but with a duplicate email:
-        // bypasses UserService's pre-check and exercises the repository's
-        // DbUpdateException recovery path directly.
         using var db = _env.NewContext();
         var repo = new UserRepository(db);
 
@@ -280,12 +250,13 @@ public sealed class UserServiceTests : IDisposable
         ResultAssert.Fails(result, IdentityErrorKind.Validation, "validation.failed");
     }
 
+    // ---- Update ----
+
     [Fact]
     public async Task UpdateUser_WithOwnMobile_Succeeds()
     {
         _env.SignInOwner();
 
-        // Setting mobile to the same value is a no-op — the change block is skipped.
         var result = await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
         {
             Mobile = "+15551000002"
@@ -300,14 +271,12 @@ public sealed class UserServiceTests : IDisposable
     {
         _env.SignInOwner();
 
-        // Same digits, different formatting → normalizes to the same canonical value → no change.
         var result = await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
         {
             Mobile = "+1 555 100 0002"
         });
 
         var dto = ResultAssert.Ok(result);
-        // Mobile stores the trimmed original input; NormalizedMobile holds the canonical form.
         Assert.Equal("+1 555 100 0002", dto.Mobile);
 
         using var db = _env.NewContext();
@@ -326,7 +295,6 @@ public sealed class UserServiceTests : IDisposable
         var dto = ResultAssert.Ok(await _env.UserService.GetAsync(_env.StaffUserId));
 
         Assert.Equal("staff@example.com", dto.Email);
-        Assert.Contains(TestEnv.StaffRoleName, dto.Roles);
     }
 
     [Fact]
@@ -345,7 +313,6 @@ public sealed class UserServiceTests : IDisposable
     {
         _env.SignInOwner();
 
-        // The email address is established at account creation and is immutable afterwards.
         var result = await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
         {
             Email = "newstaff@example.com"
@@ -353,8 +320,6 @@ public sealed class UserServiceTests : IDisposable
 
         ResultAssert.Fails(result, IdentityErrorKind.Validation, "validation.failed");
 
-        // Nothing changed in the database: not the address, not the normalized copy, not the
-        // confirmed flag.
         using var db = _env.NewContext();
         var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == _env.StaffUserId);
         Assert.NotNull(user);
@@ -368,8 +333,6 @@ public sealed class UserServiceTests : IDisposable
     {
         _env.SignInOwner();
 
-        // A casing-only "change" normalizes to the same address but is still an email change
-        // request, so it is rejected like any other.
         ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
         {
             Email = "STAFF@example.com"
@@ -386,7 +349,6 @@ public sealed class UserServiceTests : IDisposable
     {
         _env.SignInOwner();
 
-        // Even a byte-identical value is an email change request and is rejected outright.
         ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
         {
             Email = "staff@example.com"
@@ -398,7 +360,6 @@ public sealed class UserServiceTests : IDisposable
     {
         _env.SignInOwner();
 
-        // The whole update is refused when it carries an email change: no field is partially saved.
         var result = await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
         {
             Email = "newstaff@example.com",
@@ -439,7 +400,6 @@ public sealed class UserServiceTests : IDisposable
 
         ResultAssert.Ok(result);
 
-        // Password hash should have changed in the database.
         using var db = _env.NewContext();
         var user = await db.Users.FindAsync(_env.StaffUserId);
         Assert.NotNull(user);
@@ -482,7 +442,6 @@ public sealed class UserServiceTests : IDisposable
     {
         _env.SignInOwner();
 
-        // Owner already has mobile +15551000001
         ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
         {
             Mobile = "+15551000001"
@@ -494,9 +453,6 @@ public sealed class UserServiceTests : IDisposable
     {
         _env.SignInOwner();
 
-        // The duplicate-email conflict path for updates no longer exists: every non-null email
-        // is rejected as an immutable-field violation, whatever its value (the owner's address
-        // here would previously have produced a duplicate conflict).
         ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
         {
             Email = "owner@example.com"
@@ -513,7 +469,6 @@ public sealed class UserServiceTests : IDisposable
     {
         _env.SignInOwner();
 
-        // Empty string is not a valid mobile number
         ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
         {
             Mobile = string.Empty
@@ -546,20 +501,6 @@ public sealed class UserServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task UpdateUser_DeactivateLastActiveAdministrator_Fails()
-    {
-        // The owner is the only active administrator. Sign in as someone else who holds the
-        // update permission, so the permission check and self-modification check are passed and
-        // the administrator guard is what refuses the change.
-        _env.SignInWith(_env.StaffUserId, IdentityAccessPermissionNames.UsersUpdate);
-
-        ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.OwnerUserId, new UpdateUserRequest
-        {
-            IsActive = false
-        }), IdentityErrorKind.Conflict, "conflict");
-    }
-
-    [Fact]
     public async Task UpdateUser_DeleteYourself_Fails()
     {
         _env.SignInOwner();
@@ -568,63 +509,12 @@ public sealed class UserServiceTests : IDisposable
             IdentityErrorKind.Forbidden, "forbidden");
     }
 
-    [Fact]
-    public async Task UpdateUser_DeleteLastActiveAdministrator_Fails()
-    {
-        // Sign in as someone else who holds the delete permission, so the permission check and
-        // self-modification check are passed and the administrator guard is what refuses the delete.
-        _env.SignInWith(_env.StaffUserId, IdentityAccessPermissionNames.UsersDelete);
-
-        ResultAssert.Fails(await _env.UserService.DeleteAsync(_env.OwnerUserId),
-            IdentityErrorKind.Conflict, "conflict");
-    }
-
-    // ---- SetRoles ----
-
-    [Fact]
-    public async Task SetRoles_AssignsRoles_Succeeds()
-    {
-        _env.SignInOwner();
-
-        var result = await _env.UserService.SetRolesAsync(_env.StaffUserId, new SetUserRolesRequest
-        {
-            RoleIds = new List<Guid> { _env.AdministratorRoleId, _env.StaffRoleId }
-        });
-
-        var dto = ResultAssert.Ok(result);
-        Assert.Contains(IdentityRoleNames.Administrator, dto.Roles);
-        Assert.Contains(TestEnv.StaffRoleName, dto.Roles);
-    }
-
-    [Fact]
-    public async Task SetRoles_RemoveLastActiveAdministratorRole_Fails()
-    {
-        // Owner is the only active administrator. Another user who holds the update permission
-        // tries to remove Administrator from owner, so the administrator guard is what refuses it.
-        _env.SignInWith(_env.StaffUserId, IdentityAccessPermissionNames.UsersUpdate);
-
-        ResultAssert.Fails(await _env.UserService.SetRolesAsync(_env.OwnerUserId, new SetUserRolesRequest
-        {
-            RoleIds = new List<Guid> { _env.StaffRoleId }
-        }), IdentityErrorKind.Conflict, "conflict");
-    }
-
-    [Fact]
-    public async Task SetRoles_WithNonExistentRole_Fails()
-    {
-        _env.SignInOwner();
-
-        ResultAssert.Fails(await _env.UserService.SetRolesAsync(_env.StaffUserId, new SetUserRolesRequest
-        {
-            RoleIds = new List<Guid> { Guid.NewGuid() }
-        }), IdentityErrorKind.Validation, "validation.failed");
-    }
-
     // ---- Authorization ----
 
     [Fact]
     public async Task CreateUser_WithoutUsersCreatePermission_Fails()
     {
+        _env.Authorizer.Deny(IdentityAdminOperation.CreateUsers);
         _env.SignInStaff();
 
         ResultAssert.Fails(await _env.UserService.CreateAsync(new CreateUserRequest
@@ -638,8 +528,8 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task GetUser_WithoutUsersReadPermission_Fails()
     {
-        // Staff normally holds users.read, so sign this actor in with no permissions at all.
-        _env.SignInWith(_env.StaffUserId);
+        _env.Authorizer.Deny(IdentityAdminOperation.ReadUsers);
+        _env.SignInStaff();
 
         ResultAssert.Fails(await _env.UserService.GetAsync(_env.StaffUserId),
             IdentityErrorKind.Forbidden, "access.denied");
@@ -648,9 +538,8 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task ListUsers_WithoutUsersReadPermission_Fails()
     {
-        // Listing must be guarded at the service, not only at the endpoint, so a caller that
-        // reaches the service another way still cannot enumerate users.
-        _env.SignInWith(_env.StaffUserId);
+        _env.Authorizer.Deny(IdentityAdminOperation.ReadUsers);
+        _env.SignInStaff();
 
         ResultAssert.Fails(await _env.UserService.ListAsync(new UserListQuery()),
             IdentityErrorKind.Forbidden, "access.denied");
@@ -659,26 +548,25 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task CreateUser_WithOnlyCreatePermission_Succeeds()
     {
-        // A write must not depend on a read permission: the caller may create users without
-        // being allowed to browse them, and still needs the created record back.
-        _env.SignInWith(_env.StaffUserId, IdentityAccessPermissionNames.UsersCreate);
+        _env.Authorizer.Deny(IdentityAdminOperation.ReadUsers);
+        _env.Authorizer.Allow(IdentityAdminOperation.CreateUsers);
+        _env.SignInStaff();
 
         var dto = ResultAssert.Ok(await _env.UserService.CreateAsync(new CreateUserRequest
         {
             Email = "createonly@example.com",
             Password = "CreateOnlyPass123!",
             Mobile = "+15551000017",
-            DisplayName = "Create Only",
-            RoleIds = new List<Guid> { _env.StaffRoleId }
+            DisplayName = "Create Only"
         }));
 
         Assert.Equal("createonly@example.com", dto.Email);
-        Assert.Contains(TestEnv.StaffRoleName, dto.Roles);
     }
 
     [Fact]
     public async Task UpdateUser_WithoutUsersUpdatePermission_Fails()
     {
+        _env.Authorizer.Deny(IdentityAdminOperation.UpdateUsers);
         _env.SignInStaff();
 
         ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.StaffUserId, new UpdateUserRequest
@@ -690,63 +578,11 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task DeleteUser_WithoutUsersDeletePermission_Fails()
     {
+        _env.Authorizer.Deny(IdentityAdminOperation.DeleteUsers);
         _env.SignInStaff();
 
         ResultAssert.Fails(await _env.UserService.DeleteAsync(_env.StaffUserId),
             IdentityErrorKind.Forbidden, "access.denied");
-    }
-
-    [Fact]
-    public async Task CreateUser_NonAdmin_CannotGrantAdministrator_Fails()
-    {
-        // Staff holds the create permission but is not an administrator, so granting the
-        // Administrator role must be refused by the admin-grant guard, not the create permission.
-        _env.SignInWith(_env.StaffUserId, IdentityAccessPermissionNames.UsersCreate);
-
-        ResultAssert.Fails(await _env.UserService.CreateAsync(new CreateUserRequest
-        {
-            Email = "newadmin@example.com",
-            Password = "NewAdminPass123!",
-            Mobile = "+15551000018",
-            RoleIds = new List<Guid> { _env.AdministratorRoleId }
-        }), IdentityErrorKind.Forbidden, "access.denied");
-    }
-
-    [Fact]
-    public async Task SetRoles_NonAdmin_CannotGrantAdministrator_Fails()
-    {
-        // Staff holds the update permission but is not an administrator, so granting the
-        // Administrator role must be refused by the admin-grant guard.
-        _env.SignInWith(_env.StaffUserId, IdentityAccessPermissionNames.UsersUpdate);
-
-        ResultAssert.Fails(await _env.UserService.SetRolesAsync(_env.StaffUserId, new SetUserRolesRequest
-        {
-            RoleIds = new List<Guid> { _env.AdministratorRoleId }
-        }), IdentityErrorKind.Forbidden, "access.denied");
-    }
-
-    [Fact]
-    public async Task UpdateUser_NonAdmin_CannotChangeAnotherAdminEmail_Fails()
-    {
-        // Staff holds the update permission but is not an administrator, so changing another
-        // administrator's credentials must be refused by the admin-protection guard.
-        _env.SignInWith(_env.StaffUserId, IdentityAccessPermissionNames.UsersUpdate);
-
-        ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.OwnerUserId, new UpdateUserRequest
-        {
-            Email = "newemail@example.com"
-        }), IdentityErrorKind.Forbidden, "access.denied");
-    }
-
-    [Fact]
-    public async Task UpdateUser_NonAdmin_CannotChangeAnotherAdminPassword_Fails()
-    {
-        _env.SignInWith(_env.StaffUserId, IdentityAccessPermissionNames.UsersUpdate);
-
-        ResultAssert.Fails(await _env.UserService.UpdateAsync(_env.OwnerUserId, new UpdateUserRequest
-        {
-            Password = "NewAdminPass456!"
-        }), IdentityErrorKind.Forbidden, "access.denied");
     }
 
     // ---- Account lockout ----
@@ -756,7 +592,6 @@ public sealed class UserServiceTests : IDisposable
     {
         var user = _env.StaffUserId;
 
-        // 5 failed login attempts
         for (int i = 0; i < 5; i++)
         {
             var result = await _env.AuthService.LoginAsync(new LoginRequest
@@ -768,15 +603,11 @@ public sealed class UserServiceTests : IDisposable
             ResultAssert.Fails(result, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
         }
 
-        // Verify account is locked out in the database
         using var db = _env.NewContext();
         var lockedUser = await db.Users.FirstOrDefaultAsync(u => u.Id == user);
         Assert.NotNull(lockedUser);
         Assert.Equal(5, lockedUser.AccessFailedCount);
         Assert.True(lockedUser.LockoutEnd.HasValue);
-        // LockoutEnd is stored as DateTime (Kind=Unspecified from SQLite); compare as DateTime to avoid
-        // local-timezone reinterpretation when converting DateTime -> DateTimeOffset. With the fixed
-        // clock the fifth failure locks the account for exactly fifteen minutes.
         var expectedLockoutEnd = _env.Time.GetUtcNow().UtcDateTime.AddMinutes(15);
         Assert.Equal(expectedLockoutEnd.Ticks, lockedUser.LockoutEnd.Value.Ticks);
     }
@@ -786,7 +617,6 @@ public sealed class UserServiceTests : IDisposable
     {
         var user = _env.StaffUserId;
 
-        // Lock the account by failing 5 times
         for (int i = 0; i < 5; i++)
         {
             await _env.AuthService.LoginAsync(new LoginRequest
@@ -796,7 +626,6 @@ public sealed class UserServiceTests : IDisposable
             }, CancellationToken.None);
         }
 
-        // 6th attempt should still fail (account locked)
         var result = await _env.AuthService.LoginAsync(new LoginRequest
         {
             Email = "staff@example.com",
@@ -811,7 +640,6 @@ public sealed class UserServiceTests : IDisposable
     {
         var user = _env.StaffUserId;
 
-        // Lock the account by failing 5 times
         for (int i = 0; i < 5; i++)
         {
             await _env.AuthService.LoginAsync(new LoginRequest
@@ -821,15 +649,12 @@ public sealed class UserServiceTests : IDisposable
             }, CancellationToken.None);
         }
 
-        // Capture the lockout end set by the 5th failure
         using var lockedDb = _env.NewContext();
         var lockedUser = await lockedDb.Users.FirstOrDefaultAsync(u => u.Id == user);
         Assert.NotNull(lockedUser);
         var lockoutEnd = lockedUser!.LockoutEnd;
         Assert.True(lockoutEnd.HasValue);
 
-        // Correct password during lockout must still be rejected (generic failure,
-        // no account-enumeration leakage), and the counter increments on the locked branch.
         var result = await _env.AuthService.LoginAsync(new LoginRequest
         {
             Email = "staff@example.com",
@@ -842,7 +667,7 @@ public sealed class UserServiceTests : IDisposable
         var userAfter = await db.Users.FirstOrDefaultAsync(u => u.Id == user);
         Assert.NotNull(userAfter);
         Assert.Equal(6, userAfter.AccessFailedCount);
-        Assert.Equal(lockoutEnd, userAfter.LockoutEnd); // lockout not extended or reset
+        Assert.Equal(lockoutEnd, userAfter.LockoutEnd);
     }
 
     [Fact]
@@ -850,7 +675,6 @@ public sealed class UserServiceTests : IDisposable
     {
         var user = _env.StaffUserId;
 
-        // 4 failed attempts: no lockout yet
         for (int i = 0; i < 4; i++)
         {
             await _env.AuthService.LoginAsync(new LoginRequest
@@ -866,7 +690,6 @@ public sealed class UserServiceTests : IDisposable
         Assert.Equal(4, user4.AccessFailedCount);
         Assert.Null(user4.LockoutEnd);
 
-        // 5th failure locks the account for 15 minutes
         await _env.AuthService.LoginAsync(new LoginRequest
         {
             Email = "staff@example.com",
@@ -886,7 +709,6 @@ public sealed class UserServiceTests : IDisposable
     {
         var user = _env.StaffUserId;
 
-        // Lock the account by failing 5 times
         for (int i = 0; i < 5; i++)
         {
             await _env.AuthService.LoginAsync(new LoginRequest
@@ -902,7 +724,6 @@ public sealed class UserServiceTests : IDisposable
         var originalLockoutEnd = lockedUser!.LockoutEnd;
         Assert.True(originalLockoutEnd.HasValue);
 
-        // Another failed attempt while locked increments the counter but leaves LockoutEnd unchanged
         await _env.AuthService.LoginAsync(new LoginRequest
         {
             Email = "staff@example.com",
@@ -921,7 +742,6 @@ public sealed class UserServiceTests : IDisposable
     {
         var user = _env.StaffUserId;
 
-        // Lock the account
         for (int i = 0; i < 5; i++)
         {
             await _env.AuthService.LoginAsync(new LoginRequest
@@ -931,10 +751,8 @@ public sealed class UserServiceTests : IDisposable
             }, CancellationToken.None);
         }
 
-        // Advance time past lockout (15 minutes)
         _env.Time.Advance(TimeSpan.FromMinutes(16));
 
-        // Successful login should reset the counter
         var result = await _env.AuthService.LoginAsync(new LoginRequest
         {
             Email = "staff@example.com",
@@ -955,7 +773,6 @@ public sealed class UserServiceTests : IDisposable
     {
         var user = _env.StaffUserId;
 
-        // Lock the account.
         for (int i = 0; i < 5; i++)
         {
             await _env.AuthService.LoginAsync(new LoginRequest
@@ -967,7 +784,6 @@ public sealed class UserServiceTests : IDisposable
 
         _env.Time.Advance(TimeSpan.FromMinutes(16));
 
-        // The first mistake after expiry must not immediately re-lock the account.
         ResultAssert.Fails(await _env.AuthService.LoginAsync(new LoginRequest
         {
             Email = "staff@example.com",
@@ -980,7 +796,6 @@ public sealed class UserServiceTests : IDisposable
         Assert.Equal(1, userAfterFailure.AccessFailedCount);
         Assert.Null(userAfterFailure.LockoutEnd);
 
-        // A correct password still works right after that single failure.
         ResultAssert.Ok(await _env.AuthService.LoginAsync(new LoginRequest
         {
             Email = "staff@example.com",
@@ -1013,31 +828,27 @@ public sealed class UserServiceTests : IDisposable
         var wrongPassword = "wrong-password";
         var attemptCount = 10;
 
-        // Create independent AuthService instances, each with its own DbContext.
         var services = Enumerable.Range(0, attemptCount)
             .Select(_ => CreateAuthService())
             .ToList();
 
-        // Launch concurrent failed logins.
         var tasks = services.Select(s => s.LoginAsync(
             new LoginRequest { Email = email, Password = wrongPassword },
             CancellationToken.None)).ToList();
 
         await Task.WhenAll(tasks);
 
-        // Every attempt must fail with invalid credentials.
         foreach (var task in tasks)
         {
             var result = await task;
             ResultAssert.Fails(result, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
         }
 
-        // Read back from a fresh context: no increments may be lost.
         using var db = _env.NewContext();
         var userAfter = await db.Users.FirstOrDefaultAsync(u => u.NormalizedEmail == IdentityNormalizer.NormalizeEmail(email));
         Assert.NotNull(userAfter);
         Assert.Equal(attemptCount, userAfter.AccessFailedCount);
-        Assert.True(userAfter.LockoutEnd.HasValue); // 10 >= 5, so locked
+        Assert.True(userAfter.LockoutEnd.HasValue);
     }
 
     [Fact]
@@ -1066,7 +877,6 @@ public sealed class UserServiceTests : IDisposable
         var repo = new UserRepository(db);
         var now = _env.Time.GetUtcNow().UtcDateTime;
 
-        // Bring the account to a known failure state first: three failed attempts, no lockout.
         for (var i = 0; i < 3; i++)
             Assert.True(await repo.RegisterFailedLoginAttemptAsync(
                 _env.StaffUserId, now, now.AddMinutes(15), 5));
@@ -1077,7 +887,6 @@ public sealed class UserServiceTests : IDisposable
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
             () => repo.TryCompleteSuccessfulLoginAsync(_env.StaffUserId, 0, now, cts.Token));
 
-        // Cancellation must not leave a partially applied transition: the counter stays at 3.
         using var verify = _env.NewContext();
         var user = await verify.Users.FirstOrDefaultAsync(u => u.Id == _env.StaffUserId);
         Assert.NotNull(user);
@@ -1088,10 +897,6 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task FailedLoginTransition_StaleExpiredLockoutRequest_CannotClearNewerLockout()
     {
-        // A failed-login request captured its clock while the previous lockout was already
-        // expired. Before its transition runs, concurrent failures re-establish a lockout at a
-        // later clock. The stale request's transition must preserve the newer lockout (it can
-        // only ever see an active lockout, because a stale "now" is never ahead of the row).
         using var db = _env.NewContext();
         var repo = new UserRepository(db);
         var userId = _env.StaffUserId;
@@ -1099,27 +904,22 @@ public sealed class UserServiceTests : IDisposable
         var staleNow = _env.Time.GetUtcNow().UtcDateTime;
         var newerNow = staleNow.AddMinutes(1);
 
-        // Seed: a lockout that is already expired as of the stale request's clock.
         await db.Users
             .Where(u => u.Id == userId)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(u => u.AccessFailedCount, 5)
                 .SetProperty(u => u.LockoutEnd, (DateTime?)staleNow.AddMinutes(-1)));
 
-        // Concurrent failed attempts run at the newer clock and establish a fresh lockout.
         for (var i = 0; i < 5; i++)
             Assert.True(await repo.RegisterFailedLoginAttemptAsync(
                 userId, newerNow, newerNow.AddMinutes(15), 5));
 
-        // The stale request's transition now executes with its old clock.
         Assert.True(await repo.RegisterFailedLoginAttemptAsync(
             userId, staleNow, staleNow.AddMinutes(15), 5));
 
         using var verify = _env.NewContext();
         var user = await verify.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == userId);
         Assert.NotNull(user);
-        // The newer lockout survives; the stale attempt is counted on top, not treated as a
-        // fresh budget (a stale request can never reset a newer lockout back to one).
         Assert.Equal(newerNow.AddMinutes(15).Ticks, user.LockoutEnd!.Value.Ticks);
         Assert.Equal(6, user.AccessFailedCount);
     }
@@ -1127,9 +927,6 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task SuccessfulLoginTransition_StaleRequest_CannotClearNewerActiveLockout()
     {
-        // A successful-login request captured its clock before a concurrent failed request
-        // established a lockout. Its authoritative transition executes afterwards with the
-        // stale clock and must be refused, leaving the newer lockout intact.
         using var db = _env.NewContext();
         var repo = new UserRepository(db);
         var userId = _env.StaffUserId;
@@ -1141,7 +938,6 @@ public sealed class UserServiceTests : IDisposable
             Assert.True(await repo.RegisterFailedLoginAttemptAsync(
                 userId, newerNow, newerNow.AddMinutes(15), 5));
 
-        // The stale transition is refused: the newer lockout is still active at the stale clock.
         Assert.Equal(LoginCompletion.Locked, await repo.TryCompleteSuccessfulLoginAsync(userId, 0, staleNow));
 
         using var verify = _env.NewContext();
@@ -1157,7 +953,6 @@ public sealed class UserServiceTests : IDisposable
         using var db = _env.NewContext();
         var repo = new UserRepository(db);
 
-        // The seeded inactive user is active=false with no failure state.
         Assert.Equal(LoginCompletion.Inactive, await repo.TryCompleteSuccessfulLoginAsync(
             _env.InactiveUserId, 0, _env.Time.GetUtcNow().UtcDateTime));
 
@@ -1171,13 +966,8 @@ public sealed class UserServiceTests : IDisposable
     [Fact]
     public async Task Login_CorrectPassword_WhenConcurrentFailureLocksFirst_DoesNotIssueSession()
     {
-        // Deterministic interleaving of the dangerous race: the successful request has read its
-        // snapshot and verified the password, then parks at the gate; concurrent failed
-        // requests establish a lockout; the gate releases and the authoritative transition
-        // must refuse, so the correct-password request is rejected and no session is issued.
         var atTransition = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseTransition = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-
         var gatedRepo = new GatedUserRepository(
             new UserRepository(_env.NewContext()),
             async () =>
@@ -1193,10 +983,8 @@ public sealed class UserServiceTests : IDisposable
             Password = "StaffPass123!"
         }, CancellationToken.None);
 
-        // The correct-password request is parked immediately before its transition.
         await atTransition.Task;
 
-        // Concurrent failed requests lock the account first.
         for (var i = 0; i < 5; i++)
         {
             ResultAssert.Fails(await CreateAuthService().LoginAsync(new LoginRequest
@@ -1208,10 +996,8 @@ public sealed class UserServiceTests : IDisposable
 
         releaseTransition.SetResult();
 
-        // The correct-password request loses the authoritative transition and is rejected.
         ResultAssert.Fails(await loginTask, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
 
-        // The rejected attempt is still counted like any attempt during an active lockout.
         using var verify = _env.NewContext();
         var user = await verify.Users.AsNoTracking()
             .FirstOrDefaultAsync(u => u.NormalizedEmail == IdentityNormalizer.NormalizeEmail("staff@example.com"));
@@ -1237,7 +1023,6 @@ public sealed class UserServiceTests : IDisposable
             _env.Hasher,
             new FakeTokenService(),
             new FakeSessionIssuer(),
-            _env.AccessService,
             currentUser,
             emailOptions,
             _env.Time,

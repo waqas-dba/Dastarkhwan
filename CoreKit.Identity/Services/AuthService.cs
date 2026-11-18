@@ -1,5 +1,4 @@
-﻿using CoreKit.Access.Abstractions;
-using CoreKit.Identity.Common;
+﻿using CoreKit.Identity.Common;
 using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Models;
 using CoreKit.Identity.Normalization;
@@ -15,14 +14,11 @@ public sealed class AuthService : IAuthService
     // Longer input is never a real login, and hashing huge strings would be an easy way to slow the server down.
     private const int MaxEmailLength = 320;
 
-    private static readonly AccessScope PlatformScope = AccessScope.ForPlatform(AccessScope.PlatformId);
-
     private readonly IUserRepository _userRepository;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IPasswordHasher _hasher;
     private readonly ITokenService _tokens;
     private readonly ISessionIssuer _sessions;
-    private readonly IAccessService _access;
     private readonly ICurrentUserService _currentUser;
     private readonly IdentityEmailVerificationOptions _emailOptions;
     private readonly TimeProvider _time;
@@ -34,7 +30,6 @@ public sealed class AuthService : IAuthService
         IPasswordHasher hasher,
         ITokenService tokens,
         ISessionIssuer sessions,
-        IAccessService access,
         ICurrentUserService currentUser,
         IOptions<IdentityEmailVerificationOptions> emailOptions,
         TimeProvider time,
@@ -45,7 +40,6 @@ public sealed class AuthService : IAuthService
         _hasher = hasher;
         _tokens = tokens;
         _sessions = sessions;
-        _access = access;
         _currentUser = currentUser;
         _emailOptions = emailOptions.Value;
         _time = time;
@@ -228,9 +222,7 @@ public sealed class AuthService : IAuthService
         if (user is null || !user.IsActive)
             return IdentityErrors.NotAuthenticated;
 
-        var access = await _access.GetAccessAsync(userId, PlatformScope, ct);
-
-        return Common.IdentityResult.Success(IdentityMapper.ToDto(user, access.Roles, access.Permissions));
+        return Common.IdentityResult.Success(IdentityMapper.ToDto(user));
     }
 
     public async Task<Common.IdentityResult> ChangePasswordAsync(ChangePasswordRequest request, CancellationToken ct = default)

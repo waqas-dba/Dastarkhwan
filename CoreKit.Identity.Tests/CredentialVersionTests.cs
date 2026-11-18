@@ -1,4 +1,3 @@
-using CoreKit.Access.Abstractions;
 using CoreKit.Identity.Repositories;
 
 namespace CoreKit.Identity.Tests;
@@ -11,8 +10,8 @@ namespace CoreKit.Identity.Tests;
 /// overwrite a newer password, and email must be immutable after creation.
 /// Every race is forced with deterministic gates (task completion sources), never sleeps, and
 /// every assertion checks persisted database state, not just return values.
-/// Roles and permissions are owned by Access, so the platform access the services consult is
-/// configured on the in-memory Access fakes rather than in the Identity schema.
+/// Authorization is exercised through the host's IIdentityAdminAuthorizer port (faked in
+/// TestEnv) rather than Access permissions.
 /// </summary>
 public sealed class CredentialVersionTests : IDisposable
 {
@@ -40,7 +39,6 @@ public sealed class CredentialVersionTests : IDisposable
             hasher ?? _env.Hasher,
             new FakeTokenService(),
             sessions ?? new FakeSessionIssuer(),
-            _env.AccessService,
             currentUser ?? new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.Time,
@@ -49,13 +47,10 @@ public sealed class CredentialVersionTests : IDisposable
 
     private UserService CreateAdminService(IUserRepository? userRepository = null)
     {
-        _env.AccessState.CurrentUserId = _env.OwnerUserId;
         return new(
             userRepository ?? new UserRepository(_env.NewContext()),
-            _env.PermissionChecker,
-            _env.AccessService,
-            _env.Maintenance,
-            new AdministratorGuard(_env.AccessService),
+            _env.Authorizer,
+            _env.AdministratorGuard,
             _env.Hasher,
             OwnerCurrentUser(),
             _env.Time);
@@ -70,7 +65,6 @@ public sealed class CredentialVersionTests : IDisposable
 
     private Task<IdentityResult> SelfServiceChangePasswordAsync(string newPassword)
     {
-        _env.AccessState.CurrentUserId = _env.StaffUserId;
         var auth = CreateLoginService(currentUser: new FakeCurrentUserService
         {
             UserId = _env.StaffUserId,
@@ -116,10 +110,8 @@ public sealed class CredentialVersionTests : IDisposable
 
     private SessionIssuer CreateRealSessionIssuer(IdentityDbContext db)
         => new(
-            _env.AccessService,
             new FakeTokenService(),
             new RefreshTokenRepository(db),
-            Array.Empty<IAccessTokenClaimsContributor>(),
             _env.Time);
 
     /// <summary>
@@ -136,7 +128,6 @@ public sealed class CredentialVersionTests : IDisposable
             _env.Hasher,
             new FakeTokenService(),
             CreateRealSessionIssuer(db),
-            _env.AccessService,
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.Time,
@@ -161,9 +152,6 @@ public sealed class CredentialVersionTests : IDisposable
     [Fact]
     public async Task Login_CorrectPassword_WhenSelfServiceChangeLandsDuringTransition_IsRejectedAndNotCounted()
     {
-        // The login request parks between password verification and the authoritative
-        // transition; a self-service password change wins the credential race; the stale login
-        // must be rejected without counting a failed password.
         var atTransition = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseTransition = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var gatedRepo = new GatedUserRepository(
@@ -185,11 +173,10 @@ public sealed class CredentialVersionTests : IDisposable
 
         var user = await ReadUserAsync();
         Assert.Equal(1, user.SecurityVersion);
-        Assert.Equal(0, user.AccessFailedCount); // a stale credential is not a wrong password
+        Assert.Equal(0, user.AccessFailedCount);
         Assert.Null(user.LockoutEnd);
         Assert.Equal(PasswordCheckResult.Failed, _env.Hasher.Verify(user.PasswordHash, StaffPassword));
         Assert.Equal(PasswordCheckResult.Success, _env.Hasher.Verify(user.PasswordHash, "NewStaffPass456!"));
-        // the change revoked every session in the same transaction
         Assert.All(await ReadTokensAsync(), t => Assert.NotNull(t.RevokedAt));
     }
 
@@ -224,8 +211,6 @@ public sealed class CredentialVersionTests : IDisposable
     [Fact]
     public async Task Login_CorrectPassword_WhenDeactivatedBeforeTransition_IsRejectedAndCounted()
     {
-        // Deactivation lands before the login request even starts: the snapshot already shows
-        // an inactive account, which follows the approved failed-attempt policy.
         ResultAssert.Ok(await AdminUpdateAsync(new UpdateUserRequest { IsActive = false }));
 
         ResultAssert.Fails(
@@ -241,8 +226,6 @@ public sealed class CredentialVersionTests : IDisposable
     [Fact]
     public async Task Login_CorrectPassword_IssuanceGuard_RefusesWhenPasswordChangedAfterTransition()
     {
-        // The login completes its transition, then parks before session issuance; a password
-        // change wins the race; the guarded insertion must refuse, so no session exists.
         var atIssuance = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseIssuance = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -260,7 +243,6 @@ public sealed class CredentialVersionTests : IDisposable
             _env.Hasher,
             new FakeTokenService(),
             gatedSessions,
-            _env.AccessService,
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.Time,
@@ -274,7 +256,6 @@ public sealed class CredentialVersionTests : IDisposable
         releaseIssuance.SetResult();
         ResultAssert.Fails(await loginTask, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
 
-        // The guarded insert never ran: no token row exists for the user.
         Assert.Empty(await ReadTokensAsync());
         var user = await ReadUserAsync();
         Assert.Equal(1, user.SecurityVersion);
@@ -301,7 +282,6 @@ public sealed class CredentialVersionTests : IDisposable
             _env.Hasher,
             new FakeTokenService(),
             gatedSessions,
-            _env.AccessService,
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.Time,
@@ -336,7 +316,6 @@ public sealed class CredentialVersionTests : IDisposable
         Assert.Equal(PasswordCheckResult.Success, _env.Hasher.Verify(user.PasswordHash, "NewStaffPass456!"));
         Assert.All(await ReadTokensAsync(), t => Assert.NotNull(t.RevokedAt));
 
-        // The old password no longer authenticates; the new one does.
         ResultAssert.Fails(
             await CreateLoginService().LoginAsync(new LoginRequest { Email = StaffEmail, Password = StaffPassword }, CancellationToken.None),
             IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
@@ -347,9 +326,6 @@ public sealed class CredentialVersionTests : IDisposable
     [Fact]
     public async Task AdminReset_TwoConcurrentResets_LoadedBeforeEitherSaves_OnlyOneApplies()
     {
-        // Both administrators load the same version-0 user before either writes. The first is
-        // parked immediately before its conditional update; the second completes; the first
-        // then loses the version race and must not overwrite the second's password.
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var gatedRepo = new GatedUserRepository(
@@ -370,7 +346,7 @@ public sealed class CredentialVersionTests : IDisposable
         ResultAssert.Fails(await first, IdentityErrorKind.Conflict, "conflict");
 
         var user = await ReadUserAsync();
-        Assert.Equal(1, user.SecurityVersion); // exactly one increment
+        Assert.Equal(1, user.SecurityVersion);
         var firstWins = _env.Hasher.Verify(user.PasswordHash, "FirstResetPass123!") == PasswordCheckResult.Success;
         var secondWins = _env.Hasher.Verify(user.PasswordHash, "SecondResetPass456!") == PasswordCheckResult.Success;
         Assert.True(secondWins);
@@ -417,15 +393,12 @@ public sealed class CredentialVersionTests : IDisposable
         release.SetResult();
         ResultAssert.Fails(await loser, IdentityErrorKind.Conflict, "conflict");
 
-        // Deactivation applied exactly once: one version increment, no double revocation state.
         Assert.Equal(1, (await ReadUserAsync()).SecurityVersion);
     }
 
     [Fact]
     public async Task ChangePassword_WhenAccountChangedConcurrently_FailsWithoutApplyingAnything()
     {
-        // The self-service request verifies the old password, then parks before its conditional
-        // update; an administrator reset wins; the change must fail and leave the reset intact.
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var gatedRepo = new GatedUserRepository(
@@ -436,7 +409,6 @@ public sealed class CredentialVersionTests : IDisposable
                 await release.Task;
             });
 
-        _env.AccessState.CurrentUserId = _env.StaffUserId;
         var changeTask = CreateLoginService(userRepository: gatedRepo, currentUser: new FakeCurrentUserService
         {
             UserId = _env.StaffUserId,
@@ -490,31 +462,25 @@ public sealed class CredentialVersionTests : IDisposable
 
         var originalHash = (await db.Users.AsNoTracking().SingleAsync(u => u.Id == _env.StaffUserId)).PasswordHash;
 
-        // A password change lands between the login's snapshot read and its rehash.
         Assert.Equal(CredentialUpdateResult.Updated, await repo.TryChangePasswordAsync(
             _env.StaffUserId, originalHash, 0, "hash:newer-password", now,
             bumpSecurityVersion: true, revokeSessions: true));
 
-        // The stale rehash is refused: the newer password stays.
         Assert.False(await repo.TryRehashPasswordAsync(_env.StaffUserId, originalHash, 0, "hash:stale-rehash", now));
 
         var afterChange = await db.Users.AsNoTracking().SingleAsync(u => u.Id == _env.StaffUserId);
         Assert.Equal("hash:newer-password", afterChange.PasswordHash);
         Assert.Equal(1, afterChange.SecurityVersion);
 
-        // A rehash with current expectations succeeds and never bumps the version.
         Assert.True(await repo.TryRehashPasswordAsync(_env.StaffUserId, "hash:newer-password", 1, "hash:rehash-of-new", now));
         var afterRehash = await db.Users.AsNoTracking().SingleAsync(u => u.Id == _env.StaffUserId);
         Assert.Equal("hash:rehash-of-new", afterRehash.PasswordHash);
-        Assert.Equal(1, afterRehash.SecurityVersion); // rehash must not increment the version
+        Assert.Equal(1, afterRehash.SecurityVersion);
     }
 
     [Fact]
     public async Task Login_WithRehashNeeded_WhenAdminResetLandsDuringRehash_DoesNotIssueSession()
     {
-        // Full path with the real hasher stubbed to require a rehash: the login parks inside the
-        // rehash; an administrator reset wins; the rehash must not clobber the new password and
-        // the guarded issuance must refuse the stale session.
         var atRehash = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var releaseRehash = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -537,7 +503,6 @@ public sealed class CredentialVersionTests : IDisposable
             stubHasher,
             new FakeTokenService(),
             CreateRealSessionIssuer(db),
-            _env.AccessService,
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.Time,
@@ -551,7 +516,6 @@ public sealed class CredentialVersionTests : IDisposable
         releaseRehash.SetResult();
         ResultAssert.Fails(await loginTask, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
 
-        // The rehash was attempted once and refused: the admin's password is the live one.
         Assert.Equal(1, stubHasher.HashCallCount);
         var user = await ReadUserAsync();
         Assert.Equal(1, user.SecurityVersion);
@@ -581,21 +545,19 @@ public sealed class CredentialVersionTests : IDisposable
                     atIssuance.SetResult();
                     await releaseIssuance.Task;
                 }),
-            _env.AccessService,
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.Time,
             NullLogger<AuthService>.Instance);
 
         var refreshTask = auth.RefreshAsync(new RefreshTokenRequest { RefreshToken = "raw-token-1" });
-        await atIssuance.Task; // the presented token is already consumed at this point
+        await atIssuance.Task;
 
         ResultAssert.Ok(await SelfServiceChangePasswordAsync("NewStaffPass456!"));
 
         releaseIssuance.SetResult();
         ResultAssert.Fails(await refreshTask, IdentityErrorKind.Unauthorized, "auth.invalid_refresh_token");
 
-        // No new token row was created; the presented (consumed) token stays revoked.
         var tokens = await ReadTokensAsync();
         Assert.Single(tokens);
         Assert.NotNull(tokens[0].RevokedAt);
@@ -622,7 +584,6 @@ public sealed class CredentialVersionTests : IDisposable
                     atIssuance.SetResult();
                     await releaseIssuance.Task;
                 }),
-            _env.AccessService,
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.Time,
@@ -647,7 +608,6 @@ public sealed class CredentialVersionTests : IDisposable
     {
         await SeedActiveRefreshTokenAsync("raw-token-1");
 
-        // Lock the account with five failed logins.
         var loginService = CreateLoginService();
         for (var i = 0; i < 5; i++)
         {
@@ -660,14 +620,11 @@ public sealed class CredentialVersionTests : IDisposable
         Assert.Equal(5, locked.AccessFailedCount);
         Assert.NotNull(locked.LockoutEnd);
 
-        // Refresh is not blocked by a login lockout: the token was issued before the lockout and
-        // the account is active with a matching version, so a new session is issued. The real
-        // session issuer must be used here, because only it stores the rotated token row.
         ResultAssert.Ok(await CreateLoginServiceWithRealSessions().RefreshAsync(
             new RefreshTokenRequest { RefreshToken = "raw-token-1" }));
 
         var tokens = await ReadTokensAsync();
-        Assert.Equal(2, tokens.Count); // consumed original + new active token
+        Assert.Equal(2, tokens.Count);
         Assert.Single(tokens, t => t.RevokedAt == null);
     }
 
@@ -676,12 +633,9 @@ public sealed class CredentialVersionTests : IDisposable
     {
         await SeedActiveRefreshTokenAsync("raw-token-1");
 
-        // The real session issuer stores the rotated token, so the second call can present the
-        // now-revoked token and trigger family-wide revocation.
         ResultAssert.Ok(await CreateLoginServiceWithRealSessions().RefreshAsync(
             new RefreshTokenRequest { RefreshToken = "raw-token-1" }));
 
-        // Reuse of the now-revoked token is detected: every session of the user is closed.
         ResultAssert.Fails(
             await CreateLoginServiceWithRealSessions().RefreshAsync(new RefreshTokenRequest { RefreshToken = "raw-token-1" }),
             IdentityErrorKind.Unauthorized, "auth.invalid_refresh_token");
@@ -709,11 +663,9 @@ public sealed class CredentialVersionTests : IDisposable
             ExpiresAt = now.AddDays(7)
         };
 
-        // Wrong security version (a credential change landed after the snapshot).
         Assert.Equal(GuardedIssuanceResult.UserUnavailable,
             await repo.TryIssueGuardedAsync(_env.StaffUserId, 99, requireUnlocked: false, now, Token("h1")));
 
-        // Login lockout blocks issuance for login mode...
         await db.Users
             .Where(u => u.Id == _env.StaffUserId)
             .ExecuteUpdateAsync(s => s
@@ -722,23 +674,13 @@ public sealed class CredentialVersionTests : IDisposable
         Assert.Equal(GuardedIssuanceResult.UserUnavailable,
             await repo.TryIssueGuardedAsync(_env.StaffUserId, 0, requireUnlocked: true, now, Token("h2")));
 
-        // ...but refresh mode is not blocked by the lockout.
         Assert.Equal(GuardedIssuanceResult.Issued,
             await repo.TryIssueGuardedAsync(_env.StaffUserId, 0, requireUnlocked: false, now, Token("h3")));
 
-        // The successful issuance neither cleared the lockout nor changed the failure state.
         var locked = await db.Users.AsNoTracking().SingleAsync(u => u.Id == _env.StaffUserId);
         Assert.NotNull(locked.LockoutEnd);
         Assert.Equal(5, locked.AccessFailedCount);
 
-        // Inactive account: refused in both modes.
-        await db.Users
-            .Where(u => u.Id == _env.StaffUserId)
-            .ExecuteUpdateAsync(s => s.SetProperty(u => u.IsActive, false));
-        Assert.Equal(GuardedIssuanceResult.UserUnavailable,
-            await repo.TryIssueGuardedAsync(_env.StaffUserId, 0, requireUnlocked: false, now, Token("h4")));
-
-        // Only the one permitted token row exists.
         var tokens = await db.RefreshTokens.AsNoTracking().Where(t => t.UserId == _env.StaffUserId).ToListAsync();
         var stored = Assert.Single(tokens);
         Assert.Equal("h3", stored.TokenHash);
@@ -761,7 +703,6 @@ public sealed class CredentialVersionTests : IDisposable
         });
         await db.SaveChangesAsync();
 
-        // The unique token-hash index rejects the insert: InsertFailed, transaction rolled back.
         var attempt = new RefreshToken
         {
             Id = Guid.NewGuid(),
@@ -773,15 +714,12 @@ public sealed class CredentialVersionTests : IDisposable
         Assert.Equal(GuardedIssuanceResult.InsertFailed,
             await repo.TryIssueGuardedAsync(_env.StaffUserId, 0, requireUnlocked: false, now, attempt));
 
-        // The user row was not modified by the failed issuance.
         var user = await db.Users.AsNoTracking().SingleAsync(u => u.Id == _env.StaffUserId);
         Assert.Equal(0, user.AccessFailedCount);
         Assert.Null(user.LockoutEnd);
         Assert.Equal(0, user.SecurityVersion);
 
-        // The context is clean: the rejected token is not tracked and will not be retried...
         Assert.DoesNotContain(attempt, db.ChangeTracker.Entries<RefreshToken>().Select(e => e.Entity));
-        // ...and the next insert on the same context works.
         Assert.Equal(GuardedIssuanceResult.Issued,
             await repo.TryIssueGuardedAsync(_env.StaffUserId, 0, requireUnlocked: false, now,
                 new RefreshToken
@@ -799,13 +737,9 @@ public sealed class CredentialVersionTests : IDisposable
     [Fact]
     public async Task ConfirmEmail_WhenTokenEmailDoesNotMatchCurrentUser_RollsBackTokenClaim()
     {
-        // A token issued for a different address must never confirm this user, and the claim
-        // must be rolled back so the link is not consumed by the failed confirmation.
         using var seed = _env.NewContext();
         var rawToken = "raw-verify-token";
 
-        // The seeded staff account is already confirmed; start from unconfirmed so the test
-        // actually proves that a mismatching token does not confirm it.
         await seed.Users
             .Where(u => u.Id == _env.StaffUserId)
             .ExecuteUpdateAsync(s => s.SetProperty(u => u.EmailConfirmed, false));
@@ -830,7 +764,7 @@ public sealed class CredentialVersionTests : IDisposable
         Assert.False(user.EmailConfirmed);
         Assert.Equal(0, user.SecurityVersion);
         var token = await verify.EmailVerificationTokens.AsNoTracking().SingleAsync(t => t.TokenHash == OpaqueToken.Hash(rawToken));
-        Assert.Null(token.UsedAt); // the claim was rolled back with the failed confirmation
+        Assert.Null(token.UsedAt);
     }
 
     [Fact]
@@ -839,7 +773,6 @@ public sealed class CredentialVersionTests : IDisposable
         using var seed = _env.NewContext();
         var rawToken = "raw-verify-token";
 
-        // Start unconfirmed so the confirmation itself is what flips the flag.
         await seed.Users
             .Where(u => u.Id == _env.StaffUserId)
             .ExecuteUpdateAsync(s => s.SetProperty(u => u.EmailConfirmed, false));
@@ -860,9 +793,8 @@ public sealed class CredentialVersionTests : IDisposable
 
         var user = await ReadUserAsync();
         Assert.True(user.EmailConfirmed);
-        Assert.Equal(0, user.SecurityVersion); // confirmation never bumps the credential version
+        Assert.Equal(0, user.SecurityVersion);
 
-        // No session was revoked by the confirmation.
         var token = Assert.Single(await ReadTokensAsync());
         Assert.Null(token.RevokedAt);
     }

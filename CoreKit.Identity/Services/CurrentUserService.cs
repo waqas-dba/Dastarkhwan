@@ -1,9 +1,6 @@
-﻿using CoreKit.Identity.Constants;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 using System;
-using System.Collections.Generic;
 using System.Security.Claims;
-using System.Text;
 
 namespace CoreKit.Identity.Services;
 
@@ -30,13 +27,4 @@ public sealed class CurrentUserService : ICurrentUserService
 
     public string? Email
         => Principal?.FindFirst("email")?.Value ?? Principal?.FindFirst(ClaimTypes.Email)?.Value;
-
-    public IReadOnlyCollection<string> Roles => Values(IdentityClaimTypes.Role);
-
-    public IReadOnlyCollection<string> Permissions => Values(IdentityClaimTypes.Permission);
-
-    private IReadOnlyCollection<string> Values(string claimType)
-        => Principal is null
-            ? Array.Empty<string>()
-            : Principal.FindAll(claimType).Select(c => c.Value).Distinct().ToList();
 }

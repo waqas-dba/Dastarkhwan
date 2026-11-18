@@ -1,5 +1,4 @@
-﻿using CoreKit.Access.Common;
-using Microsoft.AspNetCore.Routing;
+﻿using Microsoft.AspNetCore.Routing;
 
 namespace CoreKit.Identity.Endpoints;
 
@@ -11,7 +10,7 @@ public static class IdentityEndpointExtensions
     /// </summary>
     public static IEndpointRouteBuilder MapIdentity(this IEndpointRouteBuilder app, string prefix = "/Identity")
     {
-        prefix = EndpointRoutes.NormalizePrefix(prefix);
+        prefix = NormalizePrefix(prefix);
 
         var Identity = app.MapGroup(prefix).WithTags("Identity");
 
@@ -62,7 +61,7 @@ public static class IdentityEndpointExtensions
     private static void MapUsers(RouteGroupBuilder users, string basePath)
     {
         // Every user-management route requires a signed-in user; the service enforces the specific
-        // identity.* permission through Access (platform scope).
+        // identity.* permission through the host's IIdentityAdminAuthorizer.
         users.RequireAuthorization();
 
         users.MapGet("/", async (
@@ -99,10 +98,18 @@ public static class IdentityEndpointExtensions
         users.MapPut("/{id:guid}", async (Guid id, UpdateUserRequest r, IUserService s, CancellationToken ct) =>
                 (await s.UpdateAsync(id, r, ct)).ToHttpResult());
 
-        users.MapPut("/{id:guid}/roles", async (Guid id, SetUserRolesRequest r, IUserService s, CancellationToken ct) =>
-                (await s.SetRolesAsync(id, r, ct)).ToHttpResult());
-
         users.MapDelete("/{id:guid}", async (Guid id, IUserService s, CancellationToken ct) =>
                 (await s.DeleteAsync(id, ct)).ToHttpResult());
+    }
+
+    /// <summary>
+    /// Normalises a route prefix: "Identity", "/Identity/" and "/Identity" all become "/Identity".
+    /// An empty prefix stays empty.
+    /// </summary>
+    private static string NormalizePrefix(string? prefix)
+    {
+        var trimmed = (prefix ?? string.Empty).Trim().TrimEnd('/');
+
+        return trimmed.Length == 0 || trimmed.StartsWith('/') ? trimmed : "/" + trimmed;
     }
 }

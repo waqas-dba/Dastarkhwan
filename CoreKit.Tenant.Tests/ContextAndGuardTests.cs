@@ -195,6 +195,7 @@ public sealed class TenantAccessGuardTests
     {
         var userId = Guid.NewGuid();
         _actor.UserId = userId;
+        _actor.IsAuthenticated = true;
 
         Assert.Null(await _guard.EnsureSelfOrPlatformAsync(userId));
         Assert.Equal(TenantErrors.CrossTenantAccess, await _guard.EnsureSelfOrPlatformAsync(Guid.NewGuid()));
@@ -211,6 +212,16 @@ public sealed class TenantAccessGuardTests
     [Fact]
     public async Task SelfOrPlatform_RefusesAnonymousCallers()
         => Assert.NotNull(await _guard.EnsureSelfOrPlatformAsync(Guid.NewGuid()));
+
+    [Fact]
+    public async Task SelfOrPlatform_RefusesUnauthenticatedSelfAccess()
+    {
+        var userId = Guid.NewGuid();
+        _actor.UserId = userId;
+        // IsAuthenticated deliberately remains false
+
+        Assert.Equal(TenantErrors.CrossTenantAccess, await _guard.EnsureSelfOrPlatformAsync(userId));
+    }
 
     [Fact]
     public async Task Exposes_TheCurrentTenant()

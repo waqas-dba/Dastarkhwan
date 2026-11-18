@@ -18,7 +18,7 @@ public sealed class FakeTenantActor : ITenantActor
 {
     public Guid? UserId { get; set; }
 
-    public bool IsAuthenticated { get; set; } = true;
+    public bool IsAuthenticated { get; set; } = false;
 
     public bool IsPlatformAdmin { get; set; }
 

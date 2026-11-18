@@ -439,6 +439,7 @@ public sealed class TenantMembershipServiceTests : IDisposable
         ResultAssert.Fails(await Svc.ListForUserAsync(user), TenantErrorKind.Forbidden);
 
         _env.Actor.UserId = user;
+        _env.Actor.IsAuthenticated = true;
         ResultAssert.Ok(await Svc.ListForUserAsync(user));
         ResultAssert.Fails(await Svc.ListForUserAsync(Guid.NewGuid()), TenantErrorKind.Forbidden);
     }

@@ -25,7 +25,7 @@ internal static class ModuleBoundaryMatrix
         {
             ["CoreKit.Identity"] = Array.Empty<string>(),
             ["CoreKit.Access"] = Array.Empty<string>(),
-            ["CoreKit.Tenant"] = new[] { "CoreKit.Access" },
+            ["CoreKit.Tenant"] = Array.Empty<string>(),
             ["Dastarkhwan.Integration"] = new[] { "CoreKit.Identity", "CoreKit.Access", "CoreKit.Tenant" },
         };
 
@@ -38,10 +38,7 @@ internal static class ModuleBoundaryMatrix
         {
             ["CoreKit.Access/CoreKit.Access.csproj"] = Array.Empty<string>(),
             ["CoreKit.Identity/CoreKit.Identity.csproj"] = Array.Empty<string>(),
-            ["CoreKit.Tenant/CoreKit.Tenant.csproj"] = new[]
-            {
-                "CoreKit.Access/CoreKit.Access.csproj",
-            },
+            ["CoreKit.Tenant/CoreKit.Tenant.csproj"] = Array.Empty<string>(),
             ["Dastarkhwan.Integration/Dastarkhwan.Integration.csproj"] = new[]
             {
                 "CoreKit.Identity/CoreKit.Identity.csproj",

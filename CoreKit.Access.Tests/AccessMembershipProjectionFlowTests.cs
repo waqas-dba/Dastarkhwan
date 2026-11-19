@@ -827,5 +827,11 @@ public sealed class CompositeAccessMembershipTests
     {
         public Task<AccessMember?> FindAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
             => Task.FromResult<AccessMember?>(new AccessMember(false, 1));
+
+        public Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default)
+            => Task.FromResult(0L);
+
+        public Task<long> GetLastAppliedSequenceAsync(Guid tenantId, CancellationToken ct = default)
+            => Task.FromResult(0L);
     }
 }

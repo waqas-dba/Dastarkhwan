@@ -25,4 +25,18 @@ public sealed class TenantAccessMembership : IAccessMembershipAdapter
         // AccessMember.IsOwner == true would grant every catalog permission; Tenant ownership must not trigger that.
         return member is null ? null : new AccessMember(false, member.MembershipGeneration);
     }
+
+    public async Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        if (tenantId == Guid.Empty)
+            return 0;
+
+        var tenant = await _membershipReader.GetLastEventSequenceAsync(tenantId, ct);
+        return tenant;
+    }
+
+    public async Task<long> GetLastAppliedSequenceAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        return 0;
+    }
 }

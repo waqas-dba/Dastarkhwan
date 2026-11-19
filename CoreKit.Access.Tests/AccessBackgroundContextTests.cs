@@ -525,6 +525,12 @@ public sealed class AccessBackgroundContextTests : IDisposable
                           && (_members.ContainsKey((scope.Id, userId)) || _everyone.ContainsKey(scope.Id));
             return Task.FromResult<AccessMember?>(allowed ? new AccessMember(true, 1) : null);
         }
+
+        public Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default)
+            => Task.FromResult(0L);
+
+        public Task<long> GetLastAppliedSequenceAsync(Guid tenantId, CancellationToken ct = default)
+            => Task.FromResult(0L);
     }
 
     private sealed class ManualTime : TimeProvider

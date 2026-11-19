@@ -282,6 +282,12 @@ public sealed class ProjectionSourceSafetyTests
             Calls++;
             return Task.FromResult(_member);
         }
+
+        public Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default)
+            => Task.FromResult(0L);
+
+        public Task<long> GetLastAppliedSequenceAsync(Guid tenantId, CancellationToken ct = default)
+            => Task.FromResult(0L);
     }
 
     private sealed class FakeProjectionAdapter : IProjectionMembershipAdapter
@@ -296,6 +302,12 @@ public sealed class ProjectionSourceSafetyTests
 
         public Task<AccessMember?> FindAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
             => Task.FromResult(_result.IsFound ? _result.Member : null);
+
+        public Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default)
+            => Task.FromResult(0L);
+
+        public Task<long> GetLastAppliedSequenceAsync(Guid tenantId, CancellationToken ct = default)
+            => Task.FromResult(0L);
     }
 
     // ---- Private test environment ----

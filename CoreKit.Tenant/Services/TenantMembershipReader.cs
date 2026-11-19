@@ -14,12 +14,14 @@ public sealed class TenantMembershipReader : ITenantMembershipReader, ITenantMem
     private const string KeyPrefix = "corekit.tenant:membership:";
 
     private readonly ITenantMemberRepository _members;
+    private readonly ITenantRepository _tenants;
     private readonly IMemoryCache _cache;
     private readonly TimeSpan _ttl;
 
-    public TenantMembershipReader(ITenantMemberRepository members, IMemoryCache cache, IOptions<TenantOptions> options)
+    public TenantMembershipReader(ITenantMemberRepository members, ITenantRepository tenants, IMemoryCache cache, IOptions<TenantOptions> options)
     {
         _members = members;
+        _tenants = tenants;
         _cache = cache;
         _ttl = TimeSpan.FromSeconds(Math.Max(options.Value.MembershipCacheSeconds, 0));
     }
@@ -47,6 +49,15 @@ public sealed class TenantMembershipReader : ITenantMembershipReader, ITenantMem
     public void Invalidate(Guid tenantId, Guid userId)
     {
         _cache.Remove(MakeKey(tenantId, userId));
+    }
+
+    public async Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        if (tenantId == Guid.Empty)
+            return 0;
+
+        var tenant = await _tenants.FindByIdAsync(tenantId, ct);
+        return tenant?.LastEventSequence ?? 0;
     }
 
     private static string MakeKey(Guid tenantId, Guid userId)

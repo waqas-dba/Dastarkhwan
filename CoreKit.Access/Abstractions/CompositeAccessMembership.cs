@@ -21,6 +21,15 @@ internal sealed class CompositeAccessMembership : IAccessMembership
 
     public async Task<AccessMember?> FindAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
     {
+        // Pass 0: gather the latest Tenant event sequence from any adapter that knows it
+        long? tenantSequence = null;
+        foreach (var adapter in _adapters)
+        {
+            var ts = await adapter.GetLastEventSequenceAsync(scope.Id, ct);
+            if (ts > 0 && (tenantSequence == null || ts > tenantSequence))
+                tenantSequence = ts;
+        }
+
         // Pass 1: authoritative adapters, regardless of where they sit in the registration order.
         foreach (var adapter in _adapters)
         {
@@ -30,7 +39,14 @@ internal sealed class CompositeAccessMembership : IAccessMembership
             var result = await authoritative.TryFindAsync(scope, userId, ct);
 
             if (result.IsAuthoritative)
+            {
+                var accessSequence = await adapter.GetLastAppliedSequenceAsync(scope.Id, ct);
+
+                if (tenantSequence > 0 && accessSequence > 0 && accessSequence < tenantSequence)
+                    return null; // Stale projection — deny
+
                 return result.IsFound ? result.Member : null;
+            }
         }
 
         // Pass 2: first-match adapters. Authoritative adapters that declined are not asked again.

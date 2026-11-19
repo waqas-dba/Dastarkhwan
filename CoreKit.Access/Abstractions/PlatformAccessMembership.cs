@@ -21,4 +21,10 @@ internal sealed class PlatformAccessMembership : IAccessMembershipAdapter
             .Select(m => new AccessMember(false, m.MembershipGeneration))
             .FirstOrDefaultAsync(ct);
     }
+
+    public Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default)
+        => Task.FromResult(0L);
+
+    public Task<long> GetLastAppliedSequenceAsync(Guid tenantId, CancellationToken ct = default)
+        => Task.FromResult(0L);
 }

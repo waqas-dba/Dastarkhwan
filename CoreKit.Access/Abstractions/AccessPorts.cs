@@ -26,4 +26,15 @@ public interface IAccessMembership
 /// A membership adapter registered alongside the composite router. The composite depends on
 /// IEnumerable<IAccessMembershipAdapter> so it never sees itself, avoiding a circular DI dependency.
 /// </summary>
-public interface IAccessMembershipAdapter : IAccessMembership { }
+public interface IAccessMembershipAdapter : IAccessMembership
+{
+    /// <summary>
+    /// Latest Tenant event sequence for the tenant. Zero when unknown.
+    /// </summary>
+    Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Latest Access projection cursor sequence for the tenant. Zero when unknown.
+    /// </summary>
+    Task<long> GetLastAppliedSequenceAsync(Guid tenantId, CancellationToken ct = default);
+}

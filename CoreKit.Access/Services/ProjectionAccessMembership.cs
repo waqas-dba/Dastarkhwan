@@ -109,6 +109,17 @@ internal sealed class ProjectionAccessMembership : IProjectionMembershipAdapter
         return result.IsFound ? result.Member : null;
     }
 
+    public async Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        return 0;
+    }
+
+    public async Task<long> GetLastAppliedSequenceAsync(Guid tenantId, CancellationToken ct = default)
+    {
+        var cursor = await _stream.FindCursorAsync(tenantId, ct);
+        return cursor?.LastAppliedSequence ?? 0;
+    }
+
     private static ProjectionAccessMembershipResult Untrusted(
         ProjectionAccessMembershipError error, string reason, Exception? exception = null)
     {

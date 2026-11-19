@@ -12,4 +12,10 @@ public interface ITenantMembershipReader
 {
     /// <summary>Null when the user is not a member of the tenant.</summary>
     Task<TenantMemberInfo?> FindAsync(Guid tenantId, Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// The latest event sequence committed by Tenant for this tenant. Used by Access to determine
+    /// whether its membership projection is current with Tenant's authoritative state.
+    /// </summary>
+    Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default);
 }

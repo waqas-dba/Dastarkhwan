@@ -49,4 +49,10 @@ internal sealed class DefaultAccessMembership : IAccessMembershipAdapter
 {
     public Task<AccessMember?> FindAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
         => Task.FromResult<AccessMember?>(null);
+
+    public Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default)
+        => Task.FromResult(0L);
+
+    public Task<long> GetLastAppliedSequenceAsync(Guid tenantId, CancellationToken ct = default)
+        => Task.FromResult(0L);
 }

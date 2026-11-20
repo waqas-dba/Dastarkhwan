@@ -84,11 +84,36 @@ var app = builder.Build();
 
 // Development convenience: create or update the databases, then seed them.
 // In production, run migrations as a separate deployment step instead.
-using (var scope = app.Services.CreateScope())
+if (app.Environment.IsDevelopment())
 {
-    await scope.ServiceProvider.GetRequiredService<IdentityDbContext>().Database.MigrateAsync();
-    await scope.ServiceProvider.GetRequiredService<TenantDbContext>().Database.MigrateAsync();
-    await scope.ServiceProvider.GetRequiredService<AccessDbContext>().Database.MigrateAsync();
+    using (var scope = app.Services.CreateScope())
+    {
+        await scope.ServiceProvider.GetRequiredService<IdentityDbContext>().Database.MigrateAsync();
+        await scope.ServiceProvider.GetRequiredService<TenantDbContext>().Database.MigrateAsync();
+        await scope.ServiceProvider.GetRequiredService<AccessDbContext>().Database.MigrateAsync();
+    }
+}
+else
+{
+    // Production must never auto-migrate. Verify connectivity so an incompatible or
+    // unreachable database fails safely with an actionable diagnostic.
+    using (var scope = app.Services.CreateScope())
+    {
+        var sp = scope.ServiceProvider;
+        foreach (var context in new DbContext[]
+        {
+            sp.GetRequiredService<IdentityDbContext>(),
+            sp.GetRequiredService<TenantDbContext>(),
+            sp.GetRequiredService<AccessDbContext>()
+        })
+        {
+            if (!await context.Database.CanConnectAsync())
+            {
+                throw new InvalidOperationException(
+                    $"Database for {context.GetType().Name} is not reachable. Apply migrations as a deployment step before starting the application.");
+            }
+        }
+    }
 }
 
 // Access owns roles and permissions; the seeder only ensures the first administrator exists.

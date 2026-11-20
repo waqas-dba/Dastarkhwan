@@ -21,8 +21,13 @@ public interface IAccessMaintenance
     /// </summary>
     Task AddPlatformMemberAsync(Guid userId, CancellationToken ct = default);
 
-    /// <summary>Revokes the user's platform membership (idempotent). Trusted system provisioning.</summary>
-    Task RemovePlatformMemberAsync(Guid userId, CancellationToken ct = default);
+/// <summary>
+/// Bootstraps the initial platform administrator (idempotent, trusted deployment operation).
+/// Creates/activates platform membership and adds the Administrator role without removing
+/// unrelated assignments. Refuses if an active platform administrator already exists for
+/// a different user. Trusted system provisioning — no permission check.
+/// </summary>
+Task BootstrapInitialPlatformAdminAsync(Guid userId, CancellationToken ct = default);
 
     /// <summary>
     /// Replaces the user's platform-scope role assignments with exactly these roles. Trusted system

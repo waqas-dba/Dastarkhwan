@@ -163,6 +163,80 @@ internal sealed class AccessMaintenance : IAccessMaintenance
         _cache.InvalidateUser(AccessScope.ForPlatform(AccessScope.PlatformId), userId);
     }
 
+    public async Task BootstrapInitialPlatformAdminAsync(Guid userId, CancellationToken ct = default)
+    {
+        if (userId == Guid.Empty)
+            throw new InvalidOperationException("A user id is required to bootstrap a platform administrator.");
+
+        var scope = AccessScope.ForPlatform(AccessScope.PlatformId);
+
+        var adminRoleId = await EnsurePlatformRoleAsync(
+            "Administrator",
+            "Initial platform administrator",
+            new[]
+            {
+                AccessPermissionNames.RolesRead,
+                AccessPermissionNames.RolesManage,
+                AccessPermissionNames.AssignmentsRead,
+                AccessPermissionNames.AssignmentsManage,
+                AccessPermissionNames.AuditRead,
+                AccessPermissionNames.PlatformMembersManage
+            },
+            ct);
+
+        var hasOtherAdmin = await _db.Assignments
+            .AnyAsync(a => a.RoleId == adminRoleId && a.UserId != userId, ct);
+        if (hasOtherAdmin)
+            throw new InvalidOperationException("An active platform administrator already exists.");
+
+        var userAssignments = await _assignments.ListForUserForUpdateAsync(scope, userId, ct);
+        var alreadyAdmin = userAssignments.Any(a => a.RoleId == adminRoleId);
+
+        var member = await _db.PlatformMembers
+            .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId, ct);
+
+        var now = _time.GetUtcNow().UtcDateTime;
+
+        if (member is null)
+        {
+            var generation = await NextGenerationAsync(ct);
+            member = new AccessPlatformMember
+            {
+                UserId = userId,
+                PlatformId = AccessScope.PlatformId,
+                MembershipGeneration = generation,
+                JoinedAt = now,
+                RevokedAt = null
+            };
+            _db.PlatformMembers.Add(member);
+        }
+        else if (member.RevokedAt is not null)
+        {
+            member.RevokedAt = null;
+            member.MembershipGeneration++;
+            member.JoinedAt = now;
+        }
+
+        if (!alreadyAdmin)
+        {
+            _assignments.Add(new AccessAssignment
+            {
+                RoleId = adminRoleId,
+                UserId = userId,
+                ScopeType = scope.Type,
+                ScopeId = scope.Id,
+                MembershipGeneration = member.MembershipGeneration,
+                AssignedAt = now
+            });
+        }
+
+        _audit.Record(scope, "platform.admin.bootstrap", $"user: {userId}");
+
+        EnsureSaved(await _unitOfWork.SaveAsync(ct), "platform admin bootstrap");
+
+        _cache.InvalidateUser(scope, userId);
+    }
+
     public async Task RemovePlatformMemberAsync(Guid userId, CancellationToken ct = default)
     {
         if (userId == Guid.Empty)

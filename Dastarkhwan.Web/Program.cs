@@ -26,8 +26,16 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Development only: prints the verification token and keeps it for the Postman tests.
 // In a real app, register a sender that emails the link.
-builder.Services.AddSingleton<DevEmailInbox>();
-builder.Services.AddSingleton<IIdentityEmailSender, ConsoleEmailSender>();
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddSingleton<DevEmailInbox>();
+    builder.Services.AddSingleton<IIdentityEmailSender, ConsoleEmailSender>();
+}
+else if (!builder.Services.Any(d => d.ServiceType == typeof(IIdentityEmailSender)))
+{
+    throw new InvalidOperationException(
+        "A production IIdentityEmailSender must be registered before starting in non-Development environments.");
+}
 
 builder.Services.AddIdentity(builder.Configuration);
 

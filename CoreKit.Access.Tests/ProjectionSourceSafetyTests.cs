@@ -354,10 +354,12 @@ public sealed class ProjectionSourceSafetyTests
             Freshness = new FakeFreshnessRepository { Watermark = Watermark };
             Projections = new FakeProjectionRepository { Projection = Projection };
             TenantStates = new FakeTenantStateRepository { State = TenantState };
+            Stream = new FakeStreamRepository();
 
             Membership = new ProjectionAccessMembership(
                 Freshness,
                 Projections,
+                Stream,
                 TenantStates,
                 Options.Create(Config),
                 Time);
@@ -376,6 +378,7 @@ public sealed class ProjectionSourceSafetyTests
         public FakeFreshnessRepository Freshness { get; }
         public FakeProjectionRepository Projections { get; }
         public FakeTenantStateRepository TenantStates { get; }
+        public FakeStreamRepository Stream { get; }
 
         public ProjectionAccessMembership Membership { get; }
 
@@ -456,5 +459,24 @@ public sealed class ProjectionSourceSafetyTests
             => Task.FromResult<IReadOnlyList<Guid>>(Array.Empty<Guid>());
 
         public void Add(AccessTenantState state) => State = state;
+    }
+
+    private sealed class FakeStreamRepository : IAccessMembershipStreamRepository
+    {
+        public AccessMembershipStreamCursor? Cursor { get; set; }
+
+        public Task<AccessMembershipStreamCursor?> FindCursorAsync(Guid tenantId, CancellationToken ct = default)
+            => Task.FromResult(Cursor);
+
+        public void AddCursor(AccessMembershipStreamCursor cursor) => Cursor = cursor;
+
+        public Task<AccessProcessedEvent?> FindProcessedAsync(Guid eventId, CancellationToken ct = default)
+            => Task.FromResult<AccessProcessedEvent?>(null);
+
+        public void AddProcessed(AccessProcessedEvent processed) { }
+
+        public Task<AccessProcessedEvent?> FindProcessedBySequenceAsync(
+            Guid tenantId, long sequence, CancellationToken ct = default)
+            => Task.FromResult<AccessProcessedEvent?>(null);
     }
 }

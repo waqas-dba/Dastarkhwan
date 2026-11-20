@@ -54,6 +54,12 @@ internal sealed class FakeTenantMembershipReader : ITenantMembershipReader
 {
     public Task<TenantMemberInfo?> FindAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
         => Task.FromResult<TenantMemberInfo?>(null);
+
+    public Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default)
+        => Task.FromResult(0L);
+
+    public Task<long> GetLastAppliedSequenceAsync(Guid tenantId, CancellationToken ct = default)
+        => Task.FromResult(0L);
 }
 
 internal sealed class FakeTenantMemberRepository : ITenantMemberRepository

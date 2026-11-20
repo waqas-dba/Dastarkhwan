@@ -44,7 +44,7 @@ public sealed class TestEnv : IDisposable
         UnitOfWork = new TenantUnitOfWork(Db, NullLogger<TenantUnitOfWork>.Instance);
         Audit = new TenantAuditRecorder(AuditEntries, Actor, Time);
         InfoProvider = new TenantInfoProvider(Tenants, _cache, Options.Create(Config));
-        MembershipReader = new TenantMembershipReader(Members, _cache, Options.Create(Config));
+        MembershipReader = new TenantMembershipReader(Members, Tenants, _cache, Options.Create(Config));
 
         var handlers = new ServiceCollection();
         Record<TenantCreatedEvent>(handlers);
@@ -189,4 +189,10 @@ public sealed class FakeTenantMembershipReader : ITenantMembershipReader
 
     public Task<TenantMemberInfo?> FindAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
         => Task.FromResult(Members.TryGetValue((tenantId, userId), out var info) ? info : null);
+
+    public Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default)
+        => Task.FromResult(0L);
+
+    public Task<long> GetLastAppliedSequenceAsync(Guid tenantId, CancellationToken ct = default)
+        => Task.FromResult(0L);
 }

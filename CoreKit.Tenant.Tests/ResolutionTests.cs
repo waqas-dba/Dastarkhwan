@@ -128,7 +128,7 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
                 nextCalled = true;
                 return Task.CompletedTask;
             });
-        var membership = new TenantMembershipReader(_env.Members, new MemoryCache(new MemoryCacheOptions()), Options.Create(_env.Config));
+        var membership = new TenantMembershipReader(_env.Members, _env.Tenants, new MemoryCache(new MemoryCacheOptions()), Options.Create(_env.Config));
 
         var options = Options.Create(_env.Config);
         var strategies = new ITenantResolutionStrategy[]
@@ -192,7 +192,7 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
         other.Config.Resolution.TrustHeader = true;
         var bySlugTenant = other.AddTenant("Shop", "shop");
         var middleware = new TenantResolutionMiddleware(_ => Task.CompletedTask);
-        var membership = new TenantMembershipReader(other.Members, new MemoryCache(new MemoryCacheOptions()), Options.Create(other.Config));
+        var membership = new TenantMembershipReader(other.Members, other.Tenants, new MemoryCache(new MemoryCacheOptions()), Options.Create(other.Config));
         var options = Options.Create(other.Config);
 
         await middleware.InvokeAsync(
@@ -516,6 +516,12 @@ internal sealed class NullMembershipReader : ITenantMembershipReader
 
     public Task<Guid?> FindPreferredTenantIdAsync(Guid userId, CancellationToken ct = default)
         => Task.FromResult<Guid?>(null);
+
+    public Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default)
+        => Task.FromResult(0L);
+
+    public Task<long> GetLastAppliedSequenceAsync(Guid tenantId, CancellationToken ct = default)
+        => Task.FromResult(0L);
 
     public void Add(TenantMember member) => throw new NotSupportedException();
 

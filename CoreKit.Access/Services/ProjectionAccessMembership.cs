@@ -20,6 +20,7 @@ internal sealed class ProjectionAccessMembership : IProjectionMembershipAdapter
 
     private readonly IAccessMembershipFreshnessRepository _freshness;
     private readonly IAccessMembershipProjectionRepository _projections;
+    private readonly IAccessMembershipStreamRepository _stream;
     private readonly IAccessTenantStateRepository _tenantStates;
     private readonly IOptions<AccessOptions> _options;
     private readonly TimeProvider _time;
@@ -27,12 +28,14 @@ internal sealed class ProjectionAccessMembership : IProjectionMembershipAdapter
     public ProjectionAccessMembership(
         IAccessMembershipFreshnessRepository freshness,
         IAccessMembershipProjectionRepository projections,
+        IAccessMembershipStreamRepository stream,
         IAccessTenantStateRepository tenantStates,
         IOptions<AccessOptions> options,
         TimeProvider time)
     {
         _freshness = freshness;
         _projections = projections;
+        _stream = stream;
         _tenantStates = tenantStates;
         _options = options;
         _time = time;

@@ -23,6 +23,7 @@
   <Folder Name="/Dastarkhwan/">
     <Project Path="Dastarkhwan.Integration/Dastarkhwan.Integration.csproj" />
     <Project Path="Dastarkhwan.Integration.Tests/Dastarkhwan.Integration.Tests.csproj" />
+    <Project Path="Dastarkhwan.Web/Dastarkhwan.Web.csproj" Id="b2c3d4e5-f6a7-8b9c-0d1e2f3a4b5c6d7e" />
   </Folder>
   <Folder Name="/docs/">
     <File Path="AGENTS.md" />

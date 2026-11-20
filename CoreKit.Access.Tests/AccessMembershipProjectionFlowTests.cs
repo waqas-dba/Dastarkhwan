@@ -558,7 +558,7 @@ public sealed class ProjectionAccessMembershipTests : IDisposable
 
         var failing = new FailingProjectionRepository();
         var projection = new ProjectionAccessMembership(
-            _graph.Freshness, failing, _graph.TenantStates, _graph.Options, _graph.Time);
+            _graph.Freshness, failing, _graph.Stream, _graph.TenantStates, _graph.Options, _graph.Time);
 
         Assert.Null(await projection.FindAsync(AccessScope.ForTenant(tenantId), userId));
     }
@@ -671,7 +671,7 @@ internal sealed class Graph : IDisposable
             Freshness, UnitOfWork, Time, NullLogger<AccessMembershipFreshnessRecorder>.Instance);
         Reader = new AccessMembershipProjectionReader(Stream, Projections, TenantStates);
         Projection = new ProjectionAccessMembership(
-            (IAccessMembershipFreshnessRepository)Freshness, Projections, TenantStates, Options, Time);
+            (IAccessMembershipFreshnessRepository)Freshness, Projections, Stream, TenantStates, Options, Time);
     }
 
     public FixedTimeProvider Time { get; }
@@ -821,6 +821,12 @@ public sealed class CompositeAccessMembershipTests
 
         public Task<ProjectionAccessMembershipResult> TryFindAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
             => Task.FromResult(ProjectionAccessMembershipResult.Failure(ProjectionAccessMembershipError.ProjectionFailure));
+
+        public Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default)
+            => Task.FromResult(0L);
+
+        public Task<long> GetLastAppliedSequenceAsync(Guid tenantId, CancellationToken ct = default)
+            => Task.FromResult(0L);
     }
 
     private sealed class TenantMemberAdapter : IAccessMembershipAdapter

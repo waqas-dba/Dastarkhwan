@@ -102,6 +102,9 @@ internal sealed class TestEnv : IDisposable
 
     public AccessMaintenance CreateMaintenance() => new(Db, Roles, Assignments, Audit, UnitOfWork, Cache, Catalog, Time);
 
+    /// <summary>Builds the trusted bootstrap service directly (it is not registered in the general DI container).</summary>
+    public AccessBootstrap CreateBootstrap() => new(Db, Roles, Assignments, Audit, UnitOfWork, Cache, Catalog, Time);
+
     public AccessAuditLog CreateAuditLog() => new(Guard, AuditRepo);
 
     // ---- seeding and reading ----

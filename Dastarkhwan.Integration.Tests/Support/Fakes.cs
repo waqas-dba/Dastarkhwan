@@ -118,7 +118,4 @@ internal sealed class FakeAccessMaintenance : IAccessMaintenance
 
     public Task SetPlatformUserRolesAsync(Guid userId, IReadOnlyCollection<Guid> roleIds, CancellationToken ct = default)
         => Task.CompletedTask;
-
-    public Task<Guid> EnsurePlatformRoleAsync(string name, string? description, IReadOnlyCollection<string> permissions, CancellationToken ct = default)
-        => Task.FromResult(Guid.NewGuid());
 }

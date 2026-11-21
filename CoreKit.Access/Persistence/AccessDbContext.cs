@@ -96,6 +96,15 @@ public sealed class AccessDbContext : DbContext
             b.Property(x => x.ActorSource).HasMaxLength(200);
             b.Property(x => x.Details).HasMaxLength(2000);
             b.HasIndex(x => new { x.ScopeType, x.ScopeId, x.OccurredAt });
+
+            // Persistence-level enforcement of the permitted actor combinations. Mirrors
+            // AccessAuditEntry.ValidateActor so the database is the final backstop even when
+            // entity metadata is written outside the audit recorder.
+            b.HasCheckConstraint(
+                "CK_ACCESS_AuditEntries_Actor",
+                @"(""ActorType"" = 'User' AND ""ActorUserId"" IS NOT NULL AND CAST(""ActorUserId"" AS VARCHAR(36)) <> '00000000-0000-0000-0000-000000000000' AND ""ActorSource"" IS NULL)
+                OR (""ActorType"" = 'System' AND ""ActorUserId"" IS NULL AND ""ActorSource"" IS NOT NULL AND length(trim(""ActorSource"")) > 0)
+                OR (""ActorType"" = 'Unknown' AND ""ActorUserId"" IS NULL AND ""ActorSource"" IS NULL)");
         });
 
         modelBuilder.Entity<AccessMembershipProjection>(b =>

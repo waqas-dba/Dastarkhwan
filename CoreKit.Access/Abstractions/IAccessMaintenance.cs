@@ -15,22 +15,14 @@ public interface IAccessMaintenance
     /// <summary>Copies the role templates into a new scope. Does nothing if the scope already has roles.</summary>
     Task ProvisionScopeAsync(AccessScope scope, CancellationToken ct = default);
 
-/// <summary>
-/// Makes the user an active platform member (idempotent; reactivates with a new generation if they
-/// were revoked). Trusted system provisioning — no permission check. Never expose to callers.
-/// </summary>
-Task AddPlatformMemberAsync(Guid userId, CancellationToken ct = default);
+    /// <summary>
+    /// Makes the user an active platform member (idempotent; reactivates with a new generation if they
+    /// were revoked). Trusted system provisioning — no permission check. Never expose to callers.
+    /// </summary>
+    Task AddPlatformMemberAsync(Guid userId, CancellationToken ct = default);
 
-/// <summary>Revokes the user's platform membership (idempotent). Trusted system provisioning.</summary>
-Task RemovePlatformMemberAsync(Guid userId, CancellationToken ct = default);
-
-/// <summary>
-/// Bootstraps the initial platform administrator (idempotent, trusted deployment operation).
-/// Creates/activates platform membership and adds the Administrator role without removing
-/// unrelated assignments. Refuses if an active platform administrator already exists for
-/// a different user. Trusted system provisioning — no permission check.
-/// </summary>
-Task BootstrapInitialPlatformAdminAsync(Guid userId, CancellationToken ct = default);
+    /// <summary>Revokes the user's platform membership (idempotent). Trusted system provisioning.</summary>
+    Task RemovePlatformMemberAsync(Guid userId, CancellationToken ct = default);
 
     /// <summary>
     /// Replaces the user's platform-scope role assignments with exactly these roles. Trusted system
@@ -39,12 +31,4 @@ Task BootstrapInitialPlatformAdminAsync(Guid userId, CancellationToken ct = defa
     /// </summary>
     Task SetPlatformUserRolesAsync(
         Guid userId, IReadOnlyCollection<Guid> roleIds, CancellationToken ct = default);
-
-    /// <summary>
-    /// Finds or creates a platform-scope role with this name and sets its permissions to exactly the
-    /// given set (adds missing, removes extra). Trusted system provisioning, used by seeding to keep the
-    /// Administrator role in step with the catalog. Returns the role id.
-    /// </summary>
-    Task<Guid> EnsurePlatformRoleAsync(
-        string name, string? description, IReadOnlyCollection<string> permissions, CancellationToken ct = default);
 }

@@ -69,6 +69,10 @@ public sealed class AccessAuditEntryDto
 
     public Guid? ActorUserId { get; set; }
 
+    public string ActorType { get; set; } = null!;
+
+    public string? ActorSource { get; set; }
+
     public string? Details { get; set; }
 
     public DateTime OccurredAt { get; set; }

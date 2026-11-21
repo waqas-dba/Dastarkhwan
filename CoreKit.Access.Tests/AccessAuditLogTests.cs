@@ -39,6 +39,7 @@ public sealed class AccessAuditLogTests : IDisposable
             ScopeId = _env.Scope.Id,
             Action = "role.created",
             ActorUserId = actor,
+            ActorType = AccessAuditEntry.ActorTypeUser,
             Details = "test action",
             OccurredAt = _env.UtcNow
         }));
@@ -47,6 +48,9 @@ public sealed class AccessAuditLogTests : IDisposable
 
         Assert.Single(result.Items);
         Assert.Equal("role.created", result.Items[0].Action);
+        Assert.Equal(AccessAuditEntry.ActorTypeUser, result.Items[0].ActorType);
+        Assert.Equal(actor, result.Items[0].ActorUserId);
+        Assert.Null(result.Items[0].ActorSource);
     }
 
     [Fact]
@@ -64,6 +68,7 @@ public sealed class AccessAuditLogTests : IDisposable
             ScopeId = _env.Scope.Id,
             Action = "role.created",
             ActorUserId = actor,
+            ActorType = AccessAuditEntry.ActorTypeUser,
             Details = "in scope",
             OccurredAt = _env.UtcNow
         }));
@@ -75,6 +80,7 @@ public sealed class AccessAuditLogTests : IDisposable
             ScopeId = otherScope.Id,
             Action = "role.created",
             ActorUserId = actor,
+            ActorType = AccessAuditEntry.ActorTypeUser,
             Details = "other scope",
             OccurredAt = _env.UtcNow
         }));
@@ -101,6 +107,7 @@ public sealed class AccessAuditLogTests : IDisposable
                 ScopeId = _env.Scope.Id,
                 Action = "role.created",
                 ActorUserId = actor,
+                ActorType = AccessAuditEntry.ActorTypeUser,
                 Details = $"entry {i}",
                 OccurredAt = _env.UtcNow.AddSeconds(i)
             }));

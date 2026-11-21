@@ -61,6 +61,7 @@ public sealed class AccessMaintenanceTests : IDisposable
             ScopeType = _env.Scope.Type,
             ScopeId = _env.Scope.Id,
             Action = "earlier",
+            ActorType = AccessAuditEntry.ActorTypeUnknown,
             OccurredAt = _env.UtcNow
         }));
 
@@ -183,6 +184,7 @@ public sealed class AccessMaintenanceTests : IDisposable
             ScopeType = env.Scope.Type,
             ScopeId = env.Scope.Id,
             Action = "earlier",
+            ActorType = AccessAuditEntry.ActorTypeUnknown,
             OccurredAt = env.UtcNow
         }));
 

@@ -4,6 +4,11 @@
 internal interface IAccessAuditRecorder
 {
     void Record(AccessScope scope, string action, string? details = null);
+
+    /// <summary>Records a trusted system or deployment operation. The actor is System,
+    /// ActorUserId is null, and <paramref name="source"/> identifies the trusted origin
+    /// (for example a deployment bootstrap command). Never secrets or credentials.</summary>
+    void RecordSystem(AccessScope scope, string action, string source, string? details = null);
 }
 
 internal sealed class AccessAuditRecorder : IAccessAuditRecorder
@@ -22,16 +27,46 @@ internal sealed class AccessAuditRecorder : IAccessAuditRecorder
     }
 
     public void Record(AccessScope scope, string action, string? details = null)
-        => _audit.Add(new AccessAuditEntry
+    {
+        var (actorType, actorUserId, actorSource) = ResolveActor(_actor);
+        AccessAuditEntry.ValidateActor(actorType, actorUserId, actorSource);
+        _audit.Add(new AccessAuditEntry
         {
             Id = Guid.NewGuid(),
             ScopeType = scope.Type,
             ScopeId = scope.Id,
             Action = action,
-            ActorUserId = _actor.UserId,
+            ActorUserId = actorUserId,
+            ActorType = actorType,
+            ActorSource = actorSource,
             Details = Clean(details),
             OccurredAt = _time.GetUtcNow().UtcDateTime
         });
+    }
+
+    public void RecordSystem(AccessScope scope, string action, string source, string? details = null)
+    {
+        AccessAuditEntry.ValidateActor(AccessAuditEntry.ActorTypeSystem, null, source);
+        _audit.Add(new AccessAuditEntry
+        {
+            Id = Guid.NewGuid(),
+            ScopeType = scope.Type,
+            ScopeId = scope.Id,
+            Action = action,
+            ActorUserId = null,
+            ActorType = AccessAuditEntry.ActorTypeSystem,
+            ActorSource = source,
+            Details = Clean(details),
+            OccurredAt = _time.GetUtcNow().UtcDateTime
+        });
+    }
+
+    private static (string ActorType, Guid? ActorUserId, string? ActorSource) ResolveActor(IAccessCurrentUser actor)
+    {
+        if (actor.UserId is { } id && id != Guid.Empty && actor.IsAuthenticated)
+            return (AccessAuditEntry.ActorTypeUser, id, null);
+        return (AccessAuditEntry.ActorTypeUnknown, null, null);
+    }
 
     /// <summary>
     /// Details can contain names typed by users. Line breaks and other control characters are replaced, so one

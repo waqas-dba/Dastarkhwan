@@ -230,7 +230,8 @@ internal sealed class AccessMaintenance : IAccessMaintenance
             });
         }
 
-        _audit.Record(scope, "platform.admin.bootstrap", $"user: {userId}");
+        // Trusted deployment operation: the operator is the deployment, not the target user.
+        _audit.RecordSystem(scope, "platform.admin.bootstrap", "deployment.bootstrap", $"user: {userId}");
 
         EnsureSaved(await _unitOfWork.SaveAsync(ct), "platform admin bootstrap");
 

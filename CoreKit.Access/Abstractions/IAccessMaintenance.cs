@@ -15,11 +15,14 @@ public interface IAccessMaintenance
     /// <summary>Copies the role templates into a new scope. Does nothing if the scope already has roles.</summary>
     Task ProvisionScopeAsync(AccessScope scope, CancellationToken ct = default);
 
-    /// <summary>
-    /// Makes the user an active platform member (idempotent; reactivates with a new generation if they
-    /// were revoked). Trusted system provisioning — no permission check. Never expose to callers.
-    /// </summary>
-    Task AddPlatformMemberAsync(Guid userId, CancellationToken ct = default);
+/// <summary>
+/// Makes the user an active platform member (idempotent; reactivates with a new generation if they
+/// were revoked). Trusted system provisioning — no permission check. Never expose to callers.
+/// </summary>
+Task AddPlatformMemberAsync(Guid userId, CancellationToken ct = default);
+
+/// <summary>Revokes the user's platform membership (idempotent). Trusted system provisioning.</summary>
+Task RemovePlatformMemberAsync(Guid userId, CancellationToken ct = default);
 
 /// <summary>
 /// Bootstraps the initial platform administrator (idempotent, trusted deployment operation).

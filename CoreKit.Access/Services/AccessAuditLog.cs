@@ -31,6 +31,8 @@ internal sealed class AccessAuditLog : IAccessAuditLog
                 Id = e.Id,
                 Action = e.Action,
                 ActorUserId = e.ActorUserId,
+                ActorType = e.ActorType,
+                ActorSource = e.ActorSource,
                 Details = e.Details,
                 OccurredAt = e.OccurredAt
             }).ToList(),

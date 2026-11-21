@@ -74,6 +74,15 @@ public sealed class AccessPlatformMember
 /// <summary>One recorded change. No foreign key, so history survives when a scope is deleted.</summary>
 public sealed class AccessAuditEntry
 {
+    /// <summary>The acting user was authenticated.</summary>
+    public const string ActorTypeUser = "User";
+
+    /// <summary>A trusted system or deployment operation acted, not a user.</summary>
+    public const string ActorTypeSystem = "System";
+
+    /// <summary>The actor identity cannot be established (for example historical rows).</summary>
+    public const string ActorTypeUnknown = "Unknown";
+
     public Guid Id { get; set; }
 
     public string ScopeType { get; set; } = null!;
@@ -84,9 +93,49 @@ public sealed class AccessAuditEntry
 
     public Guid? ActorUserId { get; set; }
 
+    /// <summary>User, System or Unknown.</summary>
+    public string ActorType { get; set; } = null!;
+
+    /// <summary>Trusted origin of a system action (for example a deployment bootstrap command).
+    /// Never secrets, credentials or tokens.</summary>
+    public string? ActorSource { get; set; }
+
     public string? Details { get; set; }
 
     public DateTime OccurredAt { get; set; }
+
+    /// <summary>Historical classification used by the additive audit-actor migration:
+    /// rows that already carry an actor user id become User; rows without one become Unknown.</summary>
+    public static string ClassifyHistoricalActor(Guid? actorUserId) =>
+        actorUserId is null ? ActorTypeUnknown : ActorTypeUser;
+
+    /// <summary>Rejects actor metadata that is not one of the permitted combinations.</summary>
+    public static void ValidateActor(string actorType, Guid? actorUserId, string? actorSource)
+    {
+        switch (actorType)
+        {
+            case ActorTypeUser:
+                if (actorUserId is null || actorUserId == Guid.Empty)
+                    throw new ArgumentException("A User actor requires a non-empty actor user id.", nameof(actorUserId));
+                if (!string.IsNullOrEmpty(actorSource))
+                    throw new ArgumentException("A User actor must not carry an actor source.", nameof(actorSource));
+                break;
+            case ActorTypeSystem:
+                if (actorUserId is not null)
+                    throw new ArgumentException("A System actor must not carry an actor user id.", nameof(actorUserId));
+                if (string.IsNullOrEmpty(actorSource))
+                    throw new ArgumentException("A System actor requires a non-empty actor source.", nameof(actorSource));
+                break;
+            case ActorTypeUnknown:
+                if (actorUserId is not null)
+                    throw new ArgumentException("An Unknown actor must not carry an actor user id.", nameof(actorUserId));
+                if (!string.IsNullOrEmpty(actorSource))
+                    throw new ArgumentException("An Unknown actor must not carry an actor source.", nameof(actorSource));
+                break;
+            default:
+                throw new ArgumentException($"Unknown actor type '{actorType}'.", nameof(actorType));
+        }
+    }
 }
 
 /// <summary>

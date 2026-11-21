@@ -92,6 +92,8 @@ public sealed class AccessDbContext : DbContext
             b.Property(x => x.Id).ValueGeneratedNever();
             b.Property(x => x.ScopeType).IsRequired().HasMaxLength(AccessScope.MaxTypeLength);
             b.Property(x => x.Action).IsRequired().HasMaxLength(100);
+            b.Property(x => x.ActorType).IsRequired().HasMaxLength(30);
+            b.Property(x => x.ActorSource).HasMaxLength(200);
             b.Property(x => x.Details).HasMaxLength(2000);
             b.HasIndex(x => new { x.ScopeType, x.ScopeId, x.OccurredAt });
         });

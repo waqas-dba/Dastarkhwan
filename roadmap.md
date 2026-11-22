@@ -50,6 +50,8 @@ Slices are prepared/implemented by the assigned implementation owner (OpenCode d
 | S4.4 | Tenant permission enforcement: enforce named Access permissions across protected Tenant operations | Pending | Per-operation permission enforcement not yet implemented. Fail-closed behavior for missing/invalid authorization must be established. |
 | S5.1 | Inspect current Identity login and failed-attempt flow | Pending | Produce a focused design covering thresholds, duration, reset behavior, concurrency and rate limiting. |
 | S5.2 | Implement account lockout | Pending | Implement the accepted five-failed-attempt, fifteen-minute policy with focused tests. Tests are not run by AI unless separately authorized. |
+| S5.3 | Refresh-token atomic rotation, reuse detection, revocation | **Completed at `ef761df`** | `CoreKit.Identity/Repositories/RefreshTokenRepository.cs:TryRotateAsync`, `CoreKit.Identity/Services/SessionIssuer.cs:RotateAsync`, `CoreKit.Identity/Services/AuthService.cs:RefreshAsync` — atomic rotation in single transaction with user-row guard; replay detection via `RotationResult.ReplayDetected`; revocation via `TryRevokeAsync` and `RevokeAllInFamilyAsync`. |
+| S5.4 | JWT placeholder signing key rejection at startup | **Completed at `ef761df`** | `CoreKit.Identity/Extensions/ServiceCollectionExtensions.cs:IsPlaceholderSigningKey()` validation on `Identity:Jwt:SigningKey` at startup. |
 | S6.1 | Inventory role and permission ownership and dependencies | Reported complete (not independently verified) | Previously reported inventory and dependency map require refresh against current source and an approved artifact. |
 | S6.2 | Move role ownership to Access | Under review | Access owns role/permission persistence and behavior; Identity remains responsible for identity and authentication. Identity RBAC tables (`Identity_Roles`, `Identity_RolePermissions`, `Identity_Permissions`, `Identity_UserRoles`) are dropped by the committed migration `RemoveIdentityRbacTables`; per D-018 (2026-11-15), no legacy Identity RBAC data recovery or data-transfer requirement is added. The milestone is not complete: evidence is required that Identity no longer owns active RBAC services, endpoints, persistence or consumers and that Access is the sole owner. Schema correctness and migration application remain unverified (no database operations performed). |
 
@@ -81,6 +83,10 @@ Identity owns accounts, authentication, credentials, sessions/tokens, lockout an
 
 The historical M0 report found Identity to be partial, without lockout, and still containing roles/permissions contrary to the target boundary. Current completion of lockout and role/permission ownership transfer has not been established.
 
+**Completed at `ef761df`:**
+- **S5.3** — Atomic refresh-token rotation with replay detection and revocation (`RefreshTokenRepository.TryRotateAsync`, `SessionIssuer.RotateAsync`, `AuthService.RefreshAsync`)
+- **S5.4** — JWT placeholder signing key rejection at startup (`ServiceCollectionExtensions.IsPlaceholderSigningKey`)
+
 **Done when:** identity lifecycle, login failure/lockout, token issuance/rotation/revocation and recovery paths have reviewed contracts and focused tests.
 
 ## M4 — Access
@@ -88,6 +94,10 @@ The historical M0 report found Identity to be partial, without lockout, and stil
 Access owns roles, permissions, assignments and server-side authorization. It must not access Identity private tables or `DbContext`.
 
 Access implementation exists. Migration artifacts are committed at `43c2179` and require review. Their presence does not prove schema correctness, database compatibility or successful application. Access test suites were separated into `CoreKit.Access.Tests` (`470d42c`). Role ownership transfer remains a separate task.
+
+**Completed at `ef761df`:**
+- **Projection freshness fail-closed (C-03)** — `ProjectionAccessMembership.GetLastEventSequenceAsync` returns cursor's `LastAppliedSequence`
+- **Owner-role lifecycle (C-04/H-08)** — `AccessMembershipEventConsumer` assigns/revokes Owner role on `MemberOwnershipChanged`, `MemberReactivated`, `MemberRemoved` events
 
 **Done when:** role/permission ownership and authorization are implemented with positive and negative tests, including tenant/resource-scope cases, and persistence migration is reviewed.
 

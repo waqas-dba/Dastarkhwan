@@ -1,4 +1,4 @@
-namespace CoreKit.Tenant.Events;
+namespace CoreKit.IntegrationEvents;
 
 /// <summary>
 /// A fact one module announces for others to react to. Integration events carry ids only, never entities,
@@ -24,3 +24,6 @@ public sealed record TenantDeleted(Guid TenantId, DateTime OccurredAt) : IIntegr
 
 /// <summary>A person left (or was removed from) a tenant.</summary>
 public sealed record TenantMemberRemoved(Guid TenantId, Guid UserId, DateTime OccurredAt) : IIntegrationEvent;
+
+/// <summary>An Identity user was permanently deleted. Other modules clean up their data for this user.</summary>
+public sealed record IdentityUserDeleted(Guid UserId, DateTime OccurredAt) : IIntegrationEvent;

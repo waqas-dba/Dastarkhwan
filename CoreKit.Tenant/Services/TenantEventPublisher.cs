@@ -1,4 +1,7 @@
-﻿namespace CoreKit.Tenant.Services;
+﻿using CoreKit.IntegrationEvents;
+using CoreKit.Tenant.Abstractions;
+
+namespace CoreKit.Tenant.Services;
 
 public interface ITenantEventPublisher
 {

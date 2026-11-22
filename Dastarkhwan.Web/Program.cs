@@ -120,6 +120,11 @@ builder.Services.AddAccess(builder.Configuration);
      return new AccessPlatformAdministratorProvider(access);
  });
 
+ // Wire Identity's IIdentityEventPublisher to dispatch integration events to registered handlers.
+ // This keeps Identity independent of other modules; the host connects the publisher to the DI container.
+ builder.Services.AddScoped<CoreKit.Identity.Interfaces.IIdentityEventPublisher>(sp =>
+     new DispatchingIdentityEventPublisher(sp));
+
  // Register the Dastarkhwan integration (cross-module wiring)
 builder.Services.AddDastarkhwanIntegration();
 
@@ -352,5 +357,35 @@ internal sealed class AccessPlatformAdministratorProvider : CoreKit.Identity.Int
     {
         var platformScope = CoreKit.Access.Abstractions.AccessScope.ForPlatform(CoreKit.Access.Abstractions.AccessScope.PlatformId);
         return _access.ListUserIdsWithRoleAsync(platformScope, "Administrator", ct);
+    }
+}
+
+/// <summary>Dispatches Identity integration events to all registered IEventHandler<T> implementations.</summary>
+internal sealed class DispatchingIdentityEventPublisher : CoreKit.Identity.Interfaces.IIdentityEventPublisher
+{
+    private readonly IServiceProvider _services;
+
+    public DispatchingIdentityEventPublisher(IServiceProvider services)
+    {
+        _services = services;
+    }
+
+    public async Task PublishAsync<TEvent>(TEvent integrationEvent, CancellationToken ct = default)
+        where TEvent : CoreKit.IntegrationEvents.IIntegrationEvent
+    {
+        foreach (var handler in _services.GetServices<CoreKit.IntegrationEvents.IEventHandler<TEvent>>())
+        {
+            try
+            {
+                await handler.HandleAsync(integrationEvent, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Log but don't fail the originating operation
+                var loggerFactory = _services.GetService<Microsoft.Extensions.Logging.ILoggerFactory>();
+                var logger = loggerFactory?.CreateLogger("IdentityEventDispatch");
+                logger?.LogError(ex, "Handler failed for {EventType}", typeof(TEvent).Name);
+            }
+        }
     }
 }

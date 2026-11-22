@@ -1,6 +1,6 @@
 using CoreKit.Access.Abstractions;
 using CoreKit.Access.Extensions;
-using CoreKit.Tenant.Events;
+using CoreKit.IntegrationEvents;
 
 namespace Dastarkhwan.Integration.Membership;
 

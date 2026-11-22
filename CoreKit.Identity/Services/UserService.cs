@@ -5,6 +5,7 @@ using CoreKit.Identity.Models;
 using CoreKit.Identity.Normalization;
 using CoreKit.Identity.Security;
 using CoreKit.Identity.Validation;
+using CoreKit.IntegrationEvents;
 
 namespace CoreKit.Identity.Services;
 
@@ -21,6 +22,7 @@ public sealed class UserService : IUserService
     private readonly IPasswordHasher _hasher;
     private readonly ICurrentUserService _currentUser;
     private readonly TimeProvider _time;
+    private readonly IIdentityEventPublisher _eventPublisher;
 
     public UserService(
         IUserRepository userRepository,
@@ -28,7 +30,8 @@ public sealed class UserService : IUserService
         IAdministratorGuard administratorGuard,
         IPasswordHasher hasher,
         ICurrentUserService currentUser,
-        TimeProvider time)
+        TimeProvider time,
+        IIdentityEventPublisher eventPublisher)
     {
         _userRepository = userRepository;
         _authorizer = authorizer;
@@ -36,6 +39,7 @@ public sealed class UserService : IUserService
         _hasher = hasher;
         _currentUser = currentUser;
         _time = time;
+        _eventPublisher = eventPublisher;
     }
 
     public async Task<IdentityResult<PagedResult<UserDto>>> ListAsync(UserListQuery query, CancellationToken ct = default)
@@ -243,6 +247,9 @@ public sealed class UserService : IUserService
             return IdentityErrors.Conflict("The last active administrator cannot be deleted.");
 
         await _userRepository.DeleteAsync(user, ct);
+
+        var now = Now();
+        await _eventPublisher.PublishAsync(new IdentityUserDeleted(id, now), ct);
 
         return Common.IdentityResult.Success();
     }

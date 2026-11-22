@@ -1,5 +1,9 @@
-﻿using CoreKit.Identity.Repositories;
+﻿using CoreKit.Identity.Constants;
+using CoreKit.Identity.Repositories;
 using CoreKit.Identity.Security;
+using CoreKit.IntegrationEvents;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace CoreKit.Identity.Extensions;
 
@@ -118,6 +122,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUserService, UserService>();
 
         services.TryAddSingleton<IIdentityEmailSender, NullIdentityEmailSender>();
+        services.TryAddSingleton<IIdentityEventPublisher, NullIdentityEventPublisher>();
         services.AddScoped<IEmailVerificationService, EmailVerificationService>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -143,6 +148,41 @@ public static class ServiceCollectionExtensions
                     ClockSkew = TimeSpan.FromSeconds(30),
                     NameClaimType = "name",
                     RoleClaimType = "role"
+                };
+
+                // Validate SecurityVersion: reject tokens whose secver claim doesn't match the user's current version.
+                bearer.Events = new JwtBearerEvents
+                {
+                    OnTokenValidated = async context =>
+                    {
+                        var secVerClaim = context.Principal?.FindFirst("secver");
+                        if (secVerClaim is null || !int.TryParse(secVerClaim.Value, out var tokenSecVer))
+                        {
+                            context.Fail("Missing or invalid SecurityVersion claim.");
+                            return;
+                        }
+
+                        var subClaim = context.Principal?.FindFirst(JwtRegisteredClaimNames.Sub);
+                        if (subClaim is null || !Guid.TryParse(subClaim.Value, out var userId))
+                        {
+                            context.Fail("Missing or invalid subject claim.");
+                            return;
+                        }
+
+                        var userRepository = context.HttpContext.RequestServices.GetRequiredService<IUserRepository>();
+                        var user = await userRepository.FindByIdAsync(userId, context.HttpContext.RequestAborted);
+
+                        if (user is null)
+                        {
+                            context.Fail("User not found.");
+                            return;
+                        }
+
+                        if (user.SecurityVersion != tokenSecVer)
+                        {
+                            context.Fail("Token SecurityVersion does not match current user SecurityVersion.");
+                        }
+                    }
                 };
             });
 
@@ -173,4 +213,11 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+}
+
+internal sealed class NullIdentityEventPublisher : IIdentityEventPublisher
+{
+    public Task PublishAsync<TEvent>(TEvent integrationEvent, CancellationToken ct = default)
+        where TEvent : IIntegrationEvent
+        => Task.CompletedTask;
 }

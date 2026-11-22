@@ -44,7 +44,8 @@ public sealed class TokenService : ITokenService
             [JwtRegisteredClaimNames.Aud] = _options.Audience,
             [JwtRegisteredClaimNames.Iat] = new DateTimeOffset(now).ToUnixTimeSeconds(),
             [JwtRegisteredClaimNames.Nbf] = new DateTimeOffset(now).ToUnixTimeSeconds(),
-            [JwtRegisteredClaimNames.Exp] = new DateTimeOffset(expires).ToUnixTimeSeconds()
+            [JwtRegisteredClaimNames.Exp] = new DateTimeOffset(expires).ToUnixTimeSeconds(),
+            [IdentityClaimTypes.SecurityVersion] = user.SecurityVersion
         };
 
         if (!string.IsNullOrWhiteSpace(user.DisplayName))

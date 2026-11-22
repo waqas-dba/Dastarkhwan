@@ -1,8 +1,8 @@
 using CoreKit.Access.Abstractions;
 using CoreKit.Access.Extensions;
+using CoreKit.IntegrationEvents;
 using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Constants;
-using CoreKit.Tenant.Events;
 using CoreKit.Tenant.Outbox;
 using Dastarkhwan.Integration.Authorization;
 using Dastarkhwan.Integration.Membership;
@@ -51,6 +51,10 @@ public static class IntegrationServiceCollectionExtensions
         // When a person leaves a tenant, clear their effective-authorization state in Access so a
         // cached tenant-scoped permission set cannot outlive the membership.
         services.TryAddScoped<IEventHandler<TenantMemberRemoved>, TenantMemberRemovedToAccessMaintenance>();
+
+        // When an Identity user is deleted, clean up their Tenant membership rows and Access platform membership.
+        services.TryAddScoped<IEventHandler<IdentityUserDeleted>, IdentityUserDeletedToTenantCleanup>();
+        services.TryAddScoped<IEventHandler<IdentityUserDeleted>, IdentityUserDeletedToAccessCleanup>();
 
         // Bridge Tenant's current user abstraction to Identity's IAccessCurrentUser.
         services.TryAddScoped<ITenantCurrentUser>(sp =>

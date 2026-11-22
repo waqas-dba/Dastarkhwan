@@ -213,7 +213,7 @@ public sealed class AuthService : IAuthService
         // token must still be current when the guarded insert executes, otherwise no new
         // session is created. A login lockout does not block refresh — the guard only checks
         // account state and credential version. The consumed token stays consumed either way.
-        var issuance = await _sessions.IssueForRefreshAsync(token.User, token.User.SecurityVersion, ct);
+        var issuance = await _sessions.IssueForRefreshAsync(token.User, token.User.SecurityVersion, token.FamilyId, ct);
 
         if (issuance.IsFailure)
         {

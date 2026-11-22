@@ -25,6 +25,7 @@ public interface ISessionIssuer
     /// </summary>
     /// <param name="user">The authenticated user entity.</param>
     /// <param name="expectedSecurityVersion">The version observed when the refresh token was read.</param>
+    /// <param name="familyId">The family ID of the token being refreshed. All tokens in a rotation chain share the same family ID.</param>
     Task<IdentityResult<LoginResponse>> IssueForRefreshAsync(
-        User user, int expectedSecurityVersion, CancellationToken ct = default);
+        User user, int expectedSecurityVersion, Guid familyId, CancellationToken ct = default);
 }

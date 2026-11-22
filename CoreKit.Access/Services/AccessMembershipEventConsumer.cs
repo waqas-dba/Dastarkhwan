@@ -279,6 +279,9 @@ internal sealed class AccessMembershipEventConsumer : IAccessMembershipEventCons
                 if (existing is null)
                 {
                     _projections.Add(NewRow(envelope, payload, AccessMembershipProjectionStatus.Active, now));
+                    // If reactivating an owner, assign Owner role
+                    if (payload.IsOwner)
+                        await AssignOwnerRoleAsync(envelope.TenantId, payload.UserId, now, ct);
                     return null;
                 }
 
@@ -287,6 +290,9 @@ internal sealed class AccessMembershipEventConsumer : IAccessMembershipEventCons
                     return AccessMembershipEventResult.Rejected("A reactivation needs a removed member and a higher generation.");
 
                 Update(existing, envelope, payload, AccessMembershipProjectionStatus.Active, now);
+                // If reactivating an owner, ensure Owner role is assigned
+                if (payload.IsOwner)
+                    await AssignOwnerRoleAsync(envelope.TenantId, payload.UserId, now, ct);
                 return null;
 
             case AccessMembershipEventTypes.MemberRemoved:
@@ -302,14 +308,24 @@ internal sealed class AccessMembershipEventConsumer : IAccessMembershipEventCons
                     return AccessMembershipEventResult.Rejected("A removal needs an active member and a higher generation.");
 
                 Update(existing, envelope, payload, AccessMembershipProjectionStatus.Removed, now);
+                // If removing an owner, revoke Owner role
+                if (payload.IsOwner)
+                    await RevokeOwnerRoleAsync(envelope.TenantId, payload.UserId, now, ct);
                 return null;
 
             default:
-                // Ownership changes do not alter Access state: Tenant ownership never implies Access ownership.
-                // The event still advances the cursor so the stream stays contiguous.
-                return existing is not null && payload.MembershipGeneration != existing.MembershipGeneration
-                    ? AccessMembershipEventResult.Rejected("An ownership change must not change the generation.")
-                    : null;
+                // MemberOwnershipChanged: transfer Owner role from previous owner to new owner
+                if (payload.IsOwner)
+                {
+                    // Grant Owner role to new owner
+                    await AssignOwnerRoleAsync(envelope.TenantId, payload.UserId, now, ct);
+                }
+                else
+                {
+                    // Revoke Owner role from user losing ownership
+                    await RevokeOwnerRoleAsync(envelope.TenantId, payload.UserId, now, ct);
+                }
+                return null;
         }
     }
 
@@ -363,6 +379,23 @@ internal sealed class AccessMembershipEventConsumer : IAccessMembershipEventCons
                 });
                 _audit.Record(scope, AccessAuditActions.RolesAssigned, $"role: Owner; user: {userId}");
             }
+        }
+    }
+
+    private async Task RevokeOwnerRoleAsync(Guid tenantId, Guid userId, DateTime now, CancellationToken ct)
+    {
+        var scope = AccessScope.ForTenant(tenantId);
+        var ownerRole = (await _roles.ListAsync(scope, ct))
+            .FirstOrDefault(r => r.NormalizedName == AccessValidation.NormalizeName("Owner"));
+        if (ownerRole is null)
+            return; // No Owner role exists for this tenant
+
+        var existingAssignment = (await _assignments.ListForUserForUpdateAsync(scope, userId, ct))
+            .FirstOrDefault(a => a.RoleId == ownerRole.Id);
+        if (existingAssignment is not null)
+        {
+            _assignments.Remove(existingAssignment);
+            _audit.Record(scope, AccessAuditActions.RolesRevoked, $"role: Owner; user: {userId}");
         }
     }
 

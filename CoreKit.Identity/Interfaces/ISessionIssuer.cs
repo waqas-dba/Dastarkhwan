@@ -28,4 +28,16 @@ public interface ISessionIssuer
     /// <param name="familyId">The family ID of the token being refreshed. All tokens in a rotation chain share the same family ID.</param>
     Task<IdentityResult<LoginResponse>> IssueForRefreshAsync(
         User user, int expectedSecurityVersion, Guid familyId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Atomically rotates a refresh token: revokes the old token and issues a new one in a single
+    /// transaction with user-row guard. This prevents the window between revoke and issue where
+    /// a concurrent request could steal the token.
+    /// </summary>
+    /// <param name="user">The authenticated user entity.</param>
+    /// <param name="expectedSecurityVersion">The version observed when the refresh token was read.</param>
+    /// <param name="oldTokenId">The ID of the token being rotated (consumed).</param>
+    /// <param name="familyId">The family ID of the token being refreshed. All tokens in a rotation chain share the same family ID.</param>
+    Task<IdentityResult<LoginResponse>> RotateAsync(
+        User user, int expectedSecurityVersion, Guid oldTokenId, Guid familyId, CancellationToken ct = default);
 }

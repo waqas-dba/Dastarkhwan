@@ -196,29 +196,17 @@ public sealed class AuthService : IAuthService
             return IdentityEmailErrors.EmailNotConfirmed;
         }
 
-        // Atomic: of two requests using the same token at the same moment, only one wins.
-        if (!await _refreshTokenRepository.TryRevokeAsync(token.Id, now, ct))
-        {
-            // Another request already revoked this token: this is a replay/reuse of a stolen
-            // token. Revoke the entire family so no session can survive the compromise.
-            _logger.LogWarning(
-                "Refresh-token replay detected for user {UserId}, family {FamilyId}. Revoking the entire family.",
-                token.UserId, token.FamilyId);
-            await _refreshTokenRepository.RevokeAllInFamilyAsync(token.FamilyId, now, ct);
-            return IdentityErrors.InvalidRefreshToken;
-        }
-
-        // The refresh snapshot (user row read with the token) is stale-prone exactly like a
-        // login snapshot, so issuance is guarded the same way: the version observed with the
-        // token must still be current when the guarded insert executes, otherwise no new
-        // session is created. A login lockout does not block refresh — the guard only checks
-        // account state and credential version. The consumed token stays consumed either way.
-        var issuance = await _sessions.IssueForRefreshAsync(token.User, token.User.SecurityVersion, token.FamilyId, ct);
+        // Atomic rotation: revoke the old token and issue the new one in a single transaction
+        // with user-row guard. This eliminates the window between revoke and issue where a
+        // concurrent request could replay the token. The rotation fails if:
+        // - User became inactive or security version changed (credential change, deactivation)
+        // - Old token was already revoked (replay detected)
+        // - Database constraint violation on new token insert
+        var issuance = await _sessions.RotateAsync(token.User, token.User.SecurityVersion, token.Id, token.FamilyId, ct);
 
         if (issuance.IsFailure)
         {
-            _logger.LogInformation(
-                "Refresh rejected for user {UserId}: credentials changed or the account is inactive.", token.UserId);
+            // RotateAsync returns InvalidRefreshToken for replay or guard failure
             return IdentityErrors.InvalidRefreshToken;
         }
 

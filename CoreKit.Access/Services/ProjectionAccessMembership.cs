@@ -114,7 +114,11 @@ internal sealed class ProjectionAccessMembership : IProjectionMembershipAdapter
 
     public async Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default)
     {
-        return 0;
+        // Return the Tenant's head sequence from the last successfully installed snapshot.
+        // This is the same as GetLastAppliedSequenceAsync because the cursor's LastAppliedSequence
+        // is set to the snapshot's HeadSequence (the Tenant's event sequence) on installation.
+        var cursor = await _stream.FindCursorAsync(tenantId, ct);
+        return cursor?.LastAppliedSequence ?? 0;
     }
 
     public async Task<long> GetLastAppliedSequenceAsync(Guid tenantId, CancellationToken ct = default)

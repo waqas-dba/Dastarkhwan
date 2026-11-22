@@ -103,7 +103,7 @@ builder.Services.AddIdentitySeeding(builder.Configuration);
 builder.Services.AddTenant(builder.Configuration);
 builder.Services.AddAccess(builder.Configuration);
 
- // Wire Identity's IPlatformAdministratorProvider to Access's IAccessService
+// Wire Identity's IPlatformAdministratorProvider to Access's IAccessService
  // This keeps Identity independent of Access; the host (which references both) connects them.
  builder.Services.AddScoped<CoreKit.Identity.Interfaces.IPlatformAdministratorProvider>(sp =>
  {
@@ -111,13 +111,8 @@ builder.Services.AddAccess(builder.Configuration);
      return new AccessPlatformAdministratorProvider(access);
  });
 
- // Wire Identity's IIdentityEventPublisher to dispatch integration events to registered handlers.
- // This keeps Identity independent of other modules; the host connects the publisher to the DI container.
- builder.Services.AddScoped<CoreKit.Identity.Interfaces.IIdentityEventPublisher>(sp =>
-     new DispatchingIdentityEventPublisher(sp));
-
  // Register the Dastarkhwan integration (cross-module wiring)
-builder.Services.AddDastarkhwanIntegration();
+ builder.Services.AddDastarkhwanIntegration();
 
 // Register outbox publisher and projection recovery (opt-in, required for projection mode)
 builder.Services.AddTenantOutboxPublisher();

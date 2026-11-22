@@ -73,11 +73,43 @@ public static class ServiceCollectionExtensions
                 o => !string.IsNullOrWhiteSpace(o.SigningKey) && Encoding.UTF8.GetByteCount(o.SigningKey) >= 32,
                 "Identity:Jwt:SigningKey must be set and at least 32 bytes long.")
             .Validate(
+                o => !IsPlaceholderSigningKey(o.SigningKey),
+                "Identity:Jwt:SigningKey cannot be a known placeholder or weak default. Generate a cryptographically random key (32+ bytes).")
+            .Validate(
                 o => !string.IsNullOrWhiteSpace(o.Issuer) && !string.IsNullOrWhiteSpace(o.Audience),
                 "Identity:Jwt:Issuer and Identity:Jwt:Audience must be set.")
             .Validate(o => o.AccessTokenMinutes is >= 1 and <= 120, "Identity:Jwt:AccessTokenMinutes must be 1 to 120.")
             .Validate(o => o.RefreshTokenDays is >= 1 and <= 365, "Identity:Jwt:RefreshTokenDays must be 1 to 365.")
             .ValidateOnStart(); // a missing secret stops the app at startup, not on the first login
+
+        static bool IsPlaceholderSigningKey(string key)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                return true;
+
+            var normalized = key.Trim().ToLowerInvariant();
+            var placeholders = new[]
+            {
+                "your-super-secret-signing-key-at-least-32-chars-long",
+                "your-secret-key-here",
+                "secret",
+                "changeme",
+                "changeme123",
+                "supersecret",
+                "supersecretkey",
+                "development-secret-key-do-not-use-in-production",
+                "test-secret-key",
+                "placeholder",
+                "default",
+                "insecure",
+                "weak",
+                "example",
+                "sample"
+            };
+
+            return placeholders.Any(p => normalized.Contains(p, StringComparison.OrdinalIgnoreCase))
+                || normalized.Length < 32; // Additional safety: keys shorter than 32 chars are likely placeholders
+        }
 
         services.AddOptions<IdentityRateLimitOptions>()
             .Bind(configuration.GetSection(IdentityRateLimitOptions.SectionName))

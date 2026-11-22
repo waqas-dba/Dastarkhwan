@@ -96,4 +96,59 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
         => await _db.RefreshTokens
             .Where(t => t.FamilyId == familyId && t.RevokedAt == null)
             .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, (DateTime?)now), ct);
+
+    public async Task<RotationResult> TryRotateAsync(
+        Guid userId,
+        Guid oldTokenId,
+        int expectedSecurityVersion,
+        DateTime now,
+        RefreshToken newToken,
+        CancellationToken ct = default)
+    {
+        // Atomic rotation: revoke old token + issue new token in one transaction with user-row guard.
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+
+        try
+        {
+            // Guard: re-check user state under row lock
+            var guarded = await _db.Users
+                .Where(u => u.Id == userId
+                    && u.IsActive
+                    && u.SecurityVersion == expectedSecurityVersion)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(u => u.SecurityVersion, u => u.SecurityVersion),
+                    ct);
+
+            if (guarded == 0)
+            {
+                await transaction.RollbackAsync(ct);
+                return RotationResult.UserUnavailable;
+            }
+
+            // Check if old token is still unrevoked (not replayed by another request)
+            var oldTokenRevoked = await _db.RefreshTokens
+                .Where(t => t.Id == oldTokenId && t.RevokedAt == null)
+                .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, (DateTime?)now), ct);
+
+            if (oldTokenRevoked == 0)
+            {
+                // Old token already revoked = replay detected
+                await transaction.RollbackAsync(ct);
+                return RotationResult.ReplayDetected;
+            }
+
+            // Issue new token with same family ID
+            _db.RefreshTokens.Add(newToken);
+            await _db.SaveChangesAsync(ct);
+
+            await transaction.CommitAsync(ct);
+            return RotationResult.Rotated;
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync(CancellationToken.None);
+            _db.Entry(newToken).State = EntityState.Detached;
+            return RotationResult.InsertFailed;
+        }
+    }
 }

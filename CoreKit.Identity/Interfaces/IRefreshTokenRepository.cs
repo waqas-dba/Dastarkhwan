@@ -40,6 +40,38 @@ public interface IRefreshTokenRepository
 
     /// <summary>Revokes every unrevoked token in the family.</summary>
     Task<int> RevokeAllInFamilyAsync(Guid familyId, DateTime now, CancellationToken ct = default);
+
+    /// <summary>
+    /// Atomic refresh-token rotation: revokes the old token and issues the new one in a single transaction.
+    /// The guard re-checks the user row (active, security version) while holding a row lock until commit.
+    /// Returns the result of the rotation attempt.
+    /// </summary>
+    Task<RotationResult> TryRotateAsync(
+        Guid userId,
+        Guid oldTokenId,
+        int expectedSecurityVersion,
+        DateTime now,
+        RefreshToken newToken,
+        CancellationToken ct = default);
+}
+
+/// <summary>Outcome of a guarded refresh-token rotation.</summary>
+public enum RotationResult
+{
+    /// <summary>The guard passed and the token was rotated (old revoked, new issued) and committed.</summary>
+    Rotated,
+
+    /// <summary>
+    /// The user-row guard refused: the account is missing, inactive, its security version moved
+    /// on (password change, reset, deactivation).
+    /// </summary>
+    UserUnavailable,
+
+    /// <summary>The old token was already revoked (replay detected). No rotation performed.</summary>
+    ReplayDetected,
+
+    /// <summary>The token insert failed; the transaction was rolled back and nothing was stored.</summary>
+    InsertFailed
 }
 
 /// <summary>Outcome of a guarded refresh-token issuance.</summary>

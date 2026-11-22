@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 using System.Diagnostics;
 using System.Text.Json;
 
@@ -37,19 +38,38 @@ public sealed class PlatformExceptionMiddleware
         var traceId = Activity.Current?.Id ?? context.TraceIdentifier;
         var (statusCode, title, errorCode, detail, logLevel, logException) = MapException(exception);
 
-        if (logLevel == LogLevel.Error || logLevel == LogLevel.Critical)
+        // Log the full exception internally for diagnosis, but never emit raw
+        // exception messages to the client.
+        if (logException is not null)
         {
             _logger.Log(
                 logLevel,
                 logException,
-                "Unhandled exception {ErrorCode} at {Path} (TraceId: {TraceId}): {Message}",
-                errorCode, context.Request.Path, traceId, exception.Message);
+                "Unhandled exception {ErrorCode} at {Path} (TraceId: {TraceId})",
+                errorCode, context.Request.Path, traceId);
+        }
+        else if (logLevel == LogLevel.Error || logLevel == LogLevel.Critical)
+        {
+            _logger.Log(
+                logLevel,
+                "Unhandled exception {ErrorCode} at {Path} (TraceId: {TraceId})",
+                errorCode, context.Request.Path, traceId);
         }
         else if (logLevel == LogLevel.Warning)
         {
             _logger.LogWarning(
-                "Handled exception {ErrorCode} at {Path} (TraceId: {TraceId}): {Message}",
-                errorCode, context.Request.Path, traceId, exception.Message);
+                "Handled exception {ErrorCode} at {Path} (TraceId: {TraceId})",
+                errorCode, context.Request.Path, traceId);
+        }
+
+        // If the response has already started, the status code and headers cannot be
+        // changed. Abort safely rather than throwing a second exception.
+        if (context.Response.HasStarted)
+        {
+            _logger.LogWarning(
+                "Exception {ErrorCode} at {Path} (TraceId: {TraceId}) could not be written: response already started.",
+                errorCode, context.Request.Path, traceId);
+            return;
         }
 
         var problem = new Dictionary<string, object?>
@@ -74,23 +94,23 @@ public sealed class PlatformExceptionMiddleware
         {
             ArgumentException argEx =>
                 (StatusCodes.Status400BadRequest, "Invalid request", ErrorCodes.InvalidRequest,
-                    argEx.Message, LogLevel.Warning, null),
+                    "The request is invalid.", LogLevel.Warning, argEx),
 
-            InvalidOperationException invOpEx when invOpEx.Message.Contains("conflict", StringComparison.OrdinalIgnoreCase)
-                => (StatusCodes.Status409Conflict, "Conflict", ErrorCodes.Conflict,
-                    invOpEx.Message, LogLevel.Warning, null),
+            InvalidOperationException invOpEx when IsConflict(invOpEx) =>
+                (StatusCodes.Status409Conflict, "Conflict", ErrorCodes.Conflict,
+                    "The request conflicts with the current state.", LogLevel.Warning, invOpEx),
 
             InvalidOperationException invOpEx =>
                 (StatusCodes.Status400BadRequest, "Invalid request", ErrorCodes.InvalidRequest,
-                    invOpEx.Message, LogLevel.Warning, null),
+                    "The request cannot be processed.", LogLevel.Warning, invOpEx),
 
             KeyNotFoundException knfEx =>
                 (StatusCodes.Status404NotFound, "Not found", ErrorCodes.NotFound,
-                    knfEx.Message, LogLevel.Warning, null),
+                    "The requested resource was not found.", LogLevel.Warning, knfEx),
 
             UnauthorizedAccessException uaEx =>
                 (StatusCodes.Status401Unauthorized, "Unauthorized", ErrorCodes.Unauthorized,
-                    uaEx.Message, LogLevel.Warning, null),
+                    "Authentication is required.", LogLevel.Warning, uaEx),
 
             DbUpdateConcurrencyException concEx =>
                 (StatusCodes.Status409Conflict, "Concurrency conflict", ErrorCodes.ConcurrencyFailure,
@@ -114,13 +134,39 @@ public sealed class PlatformExceptionMiddleware
         };
     }
 
+    /// <summary>
+    /// Detects constraint violations using provider SQLSTATE codes where available,
+    /// falling back to message matching only when the provider does not expose codes.
+    /// </summary>
     private static bool IsConstraintViolation(DbUpdateException dbEx)
     {
+        // Npgsql exposes SQLSTATE codes directly: 23505 unique_violation,
+        // 23514 check_violation, 23503 foreign_key_violation, 23P01 exclusion_violation.
+        var postgres = dbEx.InnerException as PostgresException;
+        if (postgres is not null)
+        {
+            return postgres.SqlState switch
+            {
+                "23505" => true, // unique_violation
+                "23514" => true, // check_violation
+                "23503" => true, // foreign_key_violation
+                "23P01" => true, // exclusion_violation
+                _ => false
+            };
+        }
+
+        // Fallback for providers that do not expose SQLSTATE codes.
         var message = (dbEx.InnerException?.Message ?? dbEx.Message)?.ToLowerInvariant() ?? string.Empty;
         return message.Contains("unique") ||
                message.Contains("duplicate") ||
                message.Contains("check constraint") ||
                message.Contains("violat");
+    }
+
+    private static bool IsConflict(InvalidOperationException ex)
+    {
+        var message = ex.Message?.ToLowerInvariant() ?? string.Empty;
+        return message.Contains("conflict");
     }
 }
 

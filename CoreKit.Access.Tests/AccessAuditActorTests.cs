@@ -126,138 +126,168 @@ public sealed class AccessAuditActorTests : IDisposable
     public async Task HistoricalMigrationBackfill_AppliesActualEFMigration_OnPostgres()
     {
         var scratch = await PostgresScratchDb.TryCreateAsync(_output);
-        if (scratch is null) return;
-
-        try
+        if (scratch is null)
         {
-            await using (scratch)
+            // Optional mode: PostgreSQL is not available. No assertions are executed so this
+            // is never mistaken for a passing test. In required mode
+            // (COREKIT_REQUIRE_POSTGRES=1) TryCreateAsync throws above, failing the test.
+            _output.WriteLine("Skipped: PostgreSQL migration test infrastructure unavailable; no assertions executed.");
+            return;
+        }
+
+        await using (scratch)
+        {
+            await using var connection = new NpgsqlConnection(scratch.ConnectionString);
+            await connection.OpenAsync();
+
+            var options = new DbContextOptionsBuilder<AccessDbContext>()
+                .UseNpgsql(scratch.ConnectionString,
+                    npgsql => npgsql.MigrationsHistoryTable(AccessDbContextConfigurator.MigrationsHistoryTable))
+                .Options;
+
+            await using var context = new AccessDbContext(options);
+            var migrator = context.Database.GetService<IMigrator>();
+
+            // Migrate to the state just before the actor-schema migration: no ActorType / ActorUserId / ActorSource columns.
+            migrator.Migrate("20261116043029_AddAccessMembershipStreamAndFreshness");
+
+            // Insert pre-existing historical rows. ActorUserId column does not exist yet, so it is omitted.
+            var scopeId = Guid.NewGuid();
+            var id1 = Guid.NewGuid();
+            var id2 = Guid.NewGuid();
+
+            await using (var insert = new NpgsqlCommand(@"
+                INSERT INTO ""ACCESS_AuditEntries"" (""Id"", ""ScopeType"", ""ScopeId"", ""Action"", ""Details"", ""OccurredAt"")
+                VALUES (@id1, 'tenant', @scopeId, 'access.role_created', 'historic', '2026-01-01 12:00:00+00'),
+                        (@id2, 'tenant', @scopeId, 'access.role_created', 'historic', '2026-01-01 12:00:00+00');", connection))
             {
-                await using var connection = new NpgsqlConnection(scratch.ConnectionString);
-                await connection.OpenAsync();
+                insert.Parameters.AddWithValue("@id1", id1);
+                insert.Parameters.AddWithValue("@id2", id2);
+                insert.Parameters.AddWithValue("@scopeId", scopeId);
+                await insert.ExecuteNonQueryAsync();
+            }
 
-                var options = new DbContextOptionsBuilder<AccessDbContext>()
-                    .UseNpgsql(scratch.ConnectionString,
-                        npgsql => npgsql.MigrationsHistoryTable(AccessDbContextConfigurator.MigrationsHistoryTable))
-                    .Options;
+            // Apply the ACTUAL actor-schema migration (adds columns, backfills ActorType from ActorUserId).
+            migrator.Migrate("20261121130000_AddAccessAuditActorSchema");
 
-                await using var context = new AccessDbContext(options);
-                var migrator = context.Database.GetService<IMigrator>();
+            // Every row must now have a non-null ActorType (backfilled by the migration).
+            await using (var nullCheck = new NpgsqlCommand(
+                "SELECT COUNT(*) FROM \"ACCESS_AuditEntries\" WHERE \"ActorType\" IS NULL;", connection))
+            {
+                var nullCount = (long)await nullCheck.ExecuteScalarAsync();
+                Assert.Equal(0L, nullCount);
+            }
 
-                // Migrate to the state just before the actor-schema migration: no ActorType / ActorSource columns.
-                migrator.Migrate("20261116043029_AddAccessMembershipStreamAndFreshness");
+            // All pre-existing rows had no ActorUserId, so all are backfilled to Unknown;
+            // original fields are preserved.
+            await using (var row1 = new NpgsqlCommand(@"
+                SELECT ""ActorType"", ""ActorUserId"", ""ActorSource"", ""Action"", ""Details"", ""ScopeType"", ""ScopeId"", ""OccurredAt""
+                FROM ""ACCESS_AuditEntries"" WHERE ""Id"" = @id;", connection))
+            {
+                row1.Parameters.AddWithValue("@id", id1);
+                await using var reader = await row1.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal(AccessAuditEntry.ActorTypeUnknown, reader.GetString(0));
+                Assert.True(reader.IsDBNull(1)); // ActorUserId is NULL
+                Assert.True(reader.IsDBNull(2)); // ActorSource is NULL
+                Assert.Equal("access.role_created", reader.GetString(3));
+                Assert.Equal("historic", reader.GetString(4));
+                Assert.Equal("tenant", reader.GetString(5));
+                Assert.Equal(scopeId, reader.GetGuid(6));
+            }
 
-                // Insert pre-existing historical rows (ActorType / ActorSource columns do not exist yet).
-                var actorUserId = Guid.NewGuid();
-                var scopeId = Guid.NewGuid();
-                var idWithActor = Guid.NewGuid();
-                var idWithoutActor = Guid.NewGuid();
+            await using (var row2 = new NpgsqlCommand(@"
+                SELECT ""ActorType"", ""ActorUserId"", ""ActorSource""
+                FROM ""ACCESS_AuditEntries"" WHERE ""Id"" = @id;", connection))
+            {
+                row2.Parameters.AddWithValue("@id", id2);
+                await using var reader = await row2.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal(AccessAuditEntry.ActorTypeUnknown, reader.GetString(0));
+                Assert.True(reader.IsDBNull(1));
+                Assert.True(reader.IsDBNull(2));
+            }
 
-                await using (var insert = new NpgsqlCommand(@"
-                    INSERT INTO ""ACCESS_AuditEntries"" (""Id"", ""ScopeType"", ""ScopeId"", ""Action"", ""ActorUserId"", ""Details"", ""OccurredAt"")
-                    VALUES (@id1, 'tenant', @scopeId, 'access.role_created', @actorUserId, 'historic', '2026-01-01 12:00:00+00'),
-                            (@id2, 'tenant', @scopeId, 'access.role_created', NULL, 'historic', '2026-01-01 12:00:00+00');", connection))
+            // Apply the check-constraint migration, then the whitespace corrective migration.
+            migrator.Migrate("20261121160000_AddAccessAuditActorCheckConstraint");
+            migrator.Migrate("20261121170000_CorrectAccessAuditActorWhitespaceConstraint");
+
+            // Verify the database constraint rejects invalid combinations. Each assertion uses its own
+            // context instance so a failed SaveChanges leaves no tracked entities that could contaminate
+            // subsequent assertions.
+            AssertConstraintRejected(options, scopeId, new AccessAuditEntry
+            {
+                ActorType = AccessAuditEntry.ActorTypeUser,
+                Action = "invalid",
+                OccurredAt = DateTimeOffset.UtcNow.UtcDateTime
+            });
+
+            // Spaces-only source must be rejected by trim-based constraint.
+            AssertConstraintRejected(options, scopeId, new AccessAuditEntry
+            {
+                ActorType = AccessAuditEntry.ActorTypeSystem,
+                ActorSource = "   ",
+                Action = "invalid",
+                OccurredAt = DateTimeOffset.UtcNow.UtcDateTime
+            });
+
+            // Tab-only source must be rejected.
+            AssertConstraintRejected(options, scopeId, new AccessAuditEntry
+            {
+                ActorType = AccessAuditEntry.ActorTypeSystem,
+                ActorSource = "\t",
+                Action = "invalid",
+                OccurredAt = DateTimeOffset.UtcNow.UtcDateTime
+            });
+
+            // Carriage-return-only source must be rejected.
+            AssertConstraintRejected(options, scopeId, new AccessAuditEntry
+            {
+                ActorType = AccessAuditEntry.ActorTypeSystem,
+                ActorSource = "\r",
+                Action = "invalid",
+                OccurredAt = DateTimeOffset.UtcNow.UtcDateTime
+            });
+
+            // Line-feed-only source must be rejected.
+            AssertConstraintRejected(options, scopeId, new AccessAuditEntry
+            {
+                ActorType = AccessAuditEntry.ActorTypeSystem,
+                ActorSource = "\n",
+                Action = "invalid",
+                OccurredAt = DateTimeOffset.UtcNow.UtcDateTime
+            });
+
+            // Valid nonblank source with surrounding whitespace must be accepted.
+            var acceptedId = Guid.NewGuid();
+            using (var acceptedContext = new AccessDbContext(options))
+            {
+                acceptedContext.AuditEntries.Add(new AccessAuditEntry
                 {
-                    insert.Parameters.AddWithValue("@id1", idWithActor);
-                    insert.Parameters.AddWithValue("@id2", idWithoutActor);
-                    insert.Parameters.AddWithValue("@scopeId", scopeId);
-                    await insert.ExecuteNonQueryAsync();
-                }
-
-                // Apply the ACTUAL actor-schema migration (adds columns, backfills, makes ActorType non-null).
-                migrator.Migrate("20261121130000_AddAccessAuditActorSchema");
-
-                // Every row must now have a non-null ActorType.
-                await using (var nullCheck = new NpgsqlCommand(
-                    "SELECT COUNT(*) FROM \"ACCESS_AuditEntries\" WHERE \"ActorType\" IS NULL;", connection))
-                {
-                    var nullCount = (long)await nullCheck.ExecuteScalarAsync();
-                    Assert.Equal(0L, nullCount);
-                }
-
-                // Row with an original actor user id is classified User; every original field preserved.
-                await using (var row1 = new NpgsqlCommand(@"
-                    SELECT ""ActorType"", ""ActorUserId"", ""ActorSource"", ""Action"", ""Details"", ""ScopeType"", ""ScopeId"", ""OccurredAt""
-                    FROM ""ACCESS_AuditEntries"" WHERE ""Id"" = @id;", connection))
-                {
-                    row1.Parameters.AddWithValue("@id", idWithActor);
-                    await using var reader = await row1.ExecuteReaderAsync();
-                    Assert.True(await reader.ReadAsync());
-                    Assert.Equal(AccessAuditEntry.ActorTypeUser, reader.GetString(0));
-                    Assert.Equal(actorUserId, reader.GetGuid(1));
-                    Assert.True(reader.IsDBNull(2)); // ActorSource remains null
-                    Assert.Equal("access.role_created", reader.GetString(3));
-                    Assert.Equal("historic", reader.GetString(4));
-                    Assert.Equal("tenant", reader.GetString(5));
-                    Assert.Equal(scopeId, reader.GetGuid(6));
-                }
-
-                // Row without an actor user id is classified Unknown; no system actor or origin invented.
-                await using (var row2 = new NpgsqlCommand(@"
-                    SELECT ""ActorType"", ""ActorUserId"", ""ActorSource""
-                    FROM ""ACCESS_AuditEntries"" WHERE ""Id"" = @id;", connection))
-                {
-                    row2.Parameters.AddWithValue("@id", idWithoutActor);
-                    await using var reader = await row2.ExecuteReaderAsync();
-                    Assert.True(await reader.ReadAsync());
-                    Assert.Equal(AccessAuditEntry.ActorTypeUnknown, reader.GetString(0));
-                    Assert.True(reader.IsDBNull(1));
-                    Assert.True(reader.IsDBNull(2));
-                }
-
-                // Apply the check-constraint migration, then the whitespace corrective migration.
-                migrator.Migrate("20261121160000_AddAccessAuditActorCheckConstraint");
-                migrator.Migrate("20261121170000_CorrectAccessAuditActorWhitespaceConstraint");
-
-                // Verify the database constraint rejects invalid combinations via EF context.
-                Assert.Throws<DbUpdateException>(() =>
-                {
-                    context.AuditEntries.Add(new AccessAuditEntry
-                    {
-                        Id = Guid.NewGuid(),
-                        ScopeType = "tenant",
-                        ScopeId = scopeId,
-                        Action = "invalid",
-                        ActorType = AccessAuditEntry.ActorTypeUser,
-                        // User actor with null ActorUserId and null ActorSource is not a permitted combination.
-                        OccurredAt = DateTimeOffset.UtcNow.UtcDateTime
-                    });
-                    context.SaveChanges();
-                });
-
-                // Spaces-only source must be rejected by trim-based constraint.
-                Assert.Throws<DbUpdateException>(() =>
-                {
-                    context.AuditEntries.Add(new AccessAuditEntry
-                    {
-                        Id = Guid.NewGuid(),
-                        ScopeType = "tenant",
-                        ScopeId = scopeId,
-                        Action = "invalid",
-                        ActorType = AccessAuditEntry.ActorTypeSystem,
-                        ActorSource = "   ", // spaces only
-                        OccurredAt = DateTimeOffset.UtcNow.UtcDateTime
-                    });
-                    context.SaveChanges();
-                });
-
-                // Valid nonblank source with surrounding whitespace must be accepted.
-                context.AuditEntries.Add(new AccessAuditEntry
-                {
-                    Id = Guid.NewGuid(),
+                    Id = acceptedId,
                     ScopeType = "tenant",
                     ScopeId = scopeId,
                     Action = "platform.admin.bootstrap",
                     ActorType = AccessAuditEntry.ActorTypeSystem,
-                    ActorSource = "  deployment.bootstrap  ", // nonblank with padding
+                    ActorSource = "  deployment.bootstrap  ",
                     OccurredAt = DateTimeOffset.UtcNow.UtcDateTime
                 });
-                context.SaveChanges();
+                acceptedContext.SaveChanges();
             }
         }
-        catch (Exception ex) when (ex is Npgsql.NpgsqlException or System.InvalidOperationException)
-        {
-            _output.WriteLine($"Skipped: PostgreSQL migration test infrastructure unavailable ({ex.Message}).");
-        }
+    }
+
+    private static void AssertConstraintRejected(
+        DbContextOptions<AccessDbContext> options, Guid scopeId, AccessAuditEntry entry)
+    {
+        // Each call uses a fresh context so a failed SaveChanges leaves no tracked entities
+        // that could contaminate subsequent assertions.
+        entry.Id = Guid.NewGuid();
+        entry.ScopeType = "tenant";
+        entry.ScopeId = scopeId;
+        using var context = new AccessDbContext(options);
+        context.AuditEntries.Add(entry);
+        Assert.Throws<DbUpdateException>(() => context.SaveChanges());
     }
 
     [Fact]
@@ -333,6 +363,120 @@ public sealed class AccessAuditActorTests : IDisposable
                 OccurredAt = _env.UtcNow
             });
         }));
+    }
+
+    [Fact]
+    public void System_Actor_With_Tab_Source_RejectedByDatabaseConstraint()
+    {
+        Assert.Throws<DbUpdateException>(() => _env.Seed(db =>
+        {
+            db.AuditEntries.Add(new AccessAuditEntry
+            {
+                Id = Guid.NewGuid(),
+                ScopeType = _env.Scope.Type,
+                ScopeId = _env.Scope.Id,
+                Action = "invalid",
+                ActorType = AccessAuditEntry.ActorTypeSystem,
+                ActorSource = "\t",
+                OccurredAt = _env.UtcNow
+            });
+        }));
+    }
+
+    [Fact]
+    public void System_Actor_With_CarriageReturn_Source_RejectedByDatabaseConstraint()
+    {
+        Assert.Throws<DbUpdateException>(() => _env.Seed(db =>
+        {
+            db.AuditEntries.Add(new AccessAuditEntry
+            {
+                Id = Guid.NewGuid(),
+                ScopeType = _env.Scope.Type,
+                ScopeId = _env.Scope.Id,
+                Action = "invalid",
+                ActorType = AccessAuditEntry.ActorTypeSystem,
+                ActorSource = "\r",
+                OccurredAt = _env.UtcNow
+            });
+        }));
+    }
+
+    [Fact]
+    public void System_Actor_With_LineFeed_Source_RejectedByDatabaseConstraint()
+    {
+        Assert.Throws<DbUpdateException>(() => _env.Seed(db =>
+        {
+            db.AuditEntries.Add(new AccessAuditEntry
+            {
+                Id = Guid.NewGuid(),
+                ScopeType = _env.Scope.Type,
+                ScopeId = _env.Scope.Id,
+                Action = "invalid",
+                ActorType = AccessAuditEntry.ActorTypeSystem,
+                ActorSource = "\n",
+                OccurredAt = _env.UtcNow
+            });
+        }));
+    }
+
+    [Fact]
+    public void System_Actor_With_MixedWhitespace_Source_RejectedByDatabaseConstraint()
+    {
+        Assert.Throws<DbUpdateException>(() => _env.Seed(db =>
+        {
+            db.AuditEntries.Add(new AccessAuditEntry
+            {
+                Id = Guid.NewGuid(),
+                ScopeType = _env.Scope.Type,
+                ScopeId = _env.Scope.Id,
+                Action = "invalid",
+                ActorType = AccessAuditEntry.ActorTypeSystem,
+                ActorSource = " \t\r\n ",
+                OccurredAt = _env.UtcNow
+            });
+        }));
+    }
+
+    [Fact]
+    public void System_Actor_With_Nonblank_Source_AcceptedByDatabaseConstraint()
+    {
+        _env.Seed(db =>
+        {
+            db.AuditEntries.Add(new AccessAuditEntry
+            {
+                Id = Guid.NewGuid(),
+                ScopeType = _env.Scope.Type,
+                ScopeId = _env.Scope.Id,
+                Action = "platform.admin.bootstrap",
+                ActorType = AccessAuditEntry.ActorTypeSystem,
+                ActorSource = "deployment.bootstrap",
+                OccurredAt = _env.UtcNow
+            });
+        });
+
+        var count = _env.Read(db => db.AuditEntries.Count(e => e.ActorSource == "deployment.bootstrap"));
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public void System_Actor_With_WhitespaceOnly_Source_RejectedByValidator()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            AccessAuditEntry.ValidateActor(AccessAuditEntry.ActorTypeSystem, null, " \t\r\n"));
+    }
+
+    [Fact]
+    public void System_Actor_With_TabOnly_Source_RejectedByValidator()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            AccessAuditEntry.ValidateActor(AccessAuditEntry.ActorTypeSystem, null, "\t"));
+    }
+
+    [Fact]
+    public void Unknown_Actor_With_Whitespace_Source_RejectedByValidator()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            AccessAuditEntry.ValidateActor(AccessAuditEntry.ActorTypeUnknown, null, " \t"));
     }
 
     [Fact]

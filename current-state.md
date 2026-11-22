@@ -32,21 +32,23 @@ A status must describe the evidence available, not the intended architecture or 
 
 | Field | Value |
 |---|---|
-| Latest inspected commit | `0a5f64db557b9171037bbda56f15fc751da1337c` |
-| Parent commit | `aafecd8bb6a71c0db7c3bb514250ad063ddaf96e` |
+| Latest inspected commit | `49f130243ae64bf189909faf0c2934d7014b67da` |
+| Parent commit | `0a5f64db557b9171037bbda56f15fc751da1337c` |
 | Repository evidence | Local build + test verification at current HEAD |
-| Local HEAD | Verified: `0a5f64db557b9171037bbda56f15fc751da1337c` |
-| Local working-tree status | Modified (uncommitted): 7 files changed across Access constraint fix, Identity lockout fix, centralized error handling |
-| Source inspection baseline | `0a5f64db557b9171037bbda56f15fc751da1337c` |
-| Documentation snapshot | `0a5f64db557b9171037bbda56f15fc751da1337c` |
-| Scope | Committed source + uncommitted corrections; build + test verified |
+| Local HEAD | Verified: `49f130243ae64bf189909faf0c2934d7014b67da` |
+| Local working-tree status | Clean (all changes committed at `49f130243ae64bf189909faf0c2934d7014b67da`) |
+| Source inspection baseline | `49f130243ae64bf189909faf0c2934d7014b67da` |
+| Documentation snapshot | `49f130243ae64bf189909faf0c2934d7014b67da` |
+| Scope | Committed source at current HEAD; build + test verified |
 
-Build verification: `dotnet build Dastarkhwan.slnx` — 0 errors, 4 warnings (all pre-existing).
+Build verification: `dotnet build Dastarkhwan.slnx` — 0 errors, 0 warnings.
 
-Test results (observed, current HEAD):
-- `CoreKit.Access.Tests`: 346 passed, 0 failed, 0 skipped — includes actor schema validation, check constraint enforcement, historical migration backfill, bootstrap trust boundary
-- `CoreKit.Identity.Tests`: 152 passed, 0 failed, 0 skipped — all tests pass including lockout, concurrent failed attempts, refresh rotation, recovery, and PostgreSQL concurrency transitions
+Test results (observed, current HEAD `49f130243ae64bf189909faf0c2934d7014b67da`):
+- `CoreKit.Access.Tests`: 354 passed, 0 failed, 0 skipped — includes actor schema validation, check constraint enforcement, whitespace validation (space, tab, CR, LF, mixed), historical migration backfill, bootstrap trust boundary
+- `CoreKit.Identity.Tests`: 151 passed, 1 failed, 0 skipped — the single failure is `PostgresLoginTransitionTests.ConcurrentFailedLogins_OnPostgres_DoNotLoseIncrementsAndEstablishLockout`, which requires a live PostgreSQL instance (`ConnectionStrings__Access`) not available in this environment; all other Identity tests pass including lockout, concurrent failed attempts, refresh rotation, recovery
 - `CoreKit.Tenant.Tests`: 358 passed, 0 failed, 0 skipped — includes tenant lifecycle, isolation, outbox, projection recovery
+
+PostgreSQL integration tests: `CoreKit.Access.Tests/AccessAuditActorTests.HistoricalMigrationBackfill_AppliesActualEFMigration_OnPostgres` returns early (no assertions executed) when `ConnectionStrings__Access` is not set. With `COREKIT_REQUIRE_POSTGRES=1`, unavailability causes test failure rather than a silent pass.
 
 
 The previous remote HEAD `7ed4c61fca8b06f35a0e2f1ce5f806ae22ad0043` (2026-11-13 19:53:27 +0500, `docs(governance): accept D-017 automation and align agent guidance`) and the FIX1 baseline `f09f236bcbc162387b572e0ed8cee4d29949a816` are preserved as historical baselines. The historical audit baseline `1c832de` (2026-11-15 13:57:49 +0500, `Fix Tenant membership revocation -> Access cache consistency`) addressed audit finding D-02 (Tenant–Access cache-invalidation handler + DI registration committed). D-01 (test rewrite of `CoreKit.Tenant.Tests/TenantMemberRemovedAccessCacheTests.cs`) existed as an uncommitted working-tree change at `1c832de` and is committed at `7115b14`; it is not build-verified or test-verified, and cache-invalidated regression coverage is not confirmed until its assertions are independently reviewed. Baseline `7115b14` (2026-11-15 15:07:48 +0500, `docs(governance): synchronize core documents with baseline 1c832de`) is the documentation-sync commit that reconciled all six core documents with `1c832de`. The current baseline `c9dbbe12` (2026-11-15 16:01:53 +0500, `update the current sate and road map`) is the task baseline for DK-DOCUMENTATION-FINALIZE-06.

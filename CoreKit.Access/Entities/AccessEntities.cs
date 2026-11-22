@@ -123,13 +123,13 @@ public sealed class AccessAuditEntry
             case ActorTypeSystem:
                 if (actorUserId is not null)
                     throw new ArgumentException("A System actor must not carry an actor user id.", nameof(actorUserId));
-                if (string.IsNullOrEmpty(actorSource))
+                if (string.IsNullOrWhiteSpace(actorSource))
                     throw new ArgumentException("A System actor requires a non-empty actor source.", nameof(actorSource));
                 break;
             case ActorTypeUnknown:
                 if (actorUserId is not null)
                     throw new ArgumentException("An Unknown actor must not carry an actor user id.", nameof(actorUserId));
-                if (!string.IsNullOrEmpty(actorSource))
+                if (actorSource is not null)
                     throw new ArgumentException("An Unknown actor must not carry an actor source.", nameof(actorSource));
                 break;
             default:

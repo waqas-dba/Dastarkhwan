@@ -7,17 +7,21 @@ namespace CoreKit.Access.Tests.Support;
 /// An isolated PostgreSQL scratch database for integration tests. Creates a uniquely named database
 /// on the server named by <c>ConnectionStrings__Access</c>, and drops it on disposal. The configured
 /// database itself is never touched. When the environment variable is missing, or a scratch database
-/// cannot be created, the test reports the reason through <see cref="ITestOutputHelper"/> and skips.
+/// cannot be created, the test reports the reason through <see cref="ITestOutputHelper"/> and skips,
+/// unless <c>COREKIT_REQUIRE_POSTGRES=1</c> is set, in which case the unavailability is reported as a
+/// test failure rather than a skip.
 /// </summary>
 internal sealed class PostgresScratchDb : IAsyncDisposable
 {
     private readonly string _serverConnectionString;
     private readonly string _databaseName;
+    private readonly bool _required;
 
-    private PostgresScratchDb(string serverConnectionString, string databaseName, string connectionString)
+    private PostgresScratchDb(string serverConnectionString, string databaseName, string connectionString, bool required)
     {
         _serverConnectionString = serverConnectionString;
         _databaseName = databaseName;
+        _required = required;
         ConnectionString = connectionString;
     }
 
@@ -25,10 +29,17 @@ internal sealed class PostgresScratchDb : IAsyncDisposable
 
     public static async Task<PostgresScratchDb?> TryCreateAsync(ITestOutputHelper output)
     {
+        var required = string.Equals(Environment.GetEnvironmentVariable("COREKIT_REQUIRE_POSTGRES"), "1", StringComparison.OrdinalIgnoreCase);
         var baseConnection = Environment.GetEnvironmentVariable("ConnectionStrings__Access");
         if (string.IsNullOrWhiteSpace(baseConnection))
         {
-            output.WriteLine("Skipped: ConnectionStrings__Access is not set; no PostgreSQL integration coverage in this environment.");
+            var message = "Skipped: ConnectionStrings__Access is not set; no PostgreSQL integration coverage in this environment.";
+            if (required)
+            {
+                output.WriteLine("FAIL: " + message);
+                throw new InvalidOperationException(message);
+            }
+            output.WriteLine(message);
             return null;
         }
 
@@ -51,11 +62,18 @@ internal sealed class PostgresScratchDb : IAsyncDisposable
             return new PostgresScratchDb(
                 serverBuilder.ConnectionString,
                 databaseName,
-                new NpgsqlConnectionStringBuilder(baseConnection) { Database = databaseName }.ConnectionString);
+                new NpgsqlConnectionStringBuilder(baseConnection) { Database = databaseName }.ConnectionString,
+                required);
         }
         catch (Exception ex)
         {
-            output.WriteLine($"Skipped: could not create an isolated scratch database on the configured PostgreSQL server ({ex.Message}).");
+            var message = $"Skipped: could not create an isolated scratch database on the configured PostgreSQL server ({ex.Message}).";
+            if (required)
+            {
+                output.WriteLine("FAIL: " + message);
+                throw new InvalidOperationException(message, ex);
+            }
+            output.WriteLine(message);
             await TryDropAsync(baseConnection, databaseName);
             return null;
         }

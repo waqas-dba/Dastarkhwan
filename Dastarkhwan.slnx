@@ -16,8 +16,6 @@
     <Project Path="CoreKit.Architecture.Tests/CoreKit.Architecture.Tests.csproj" Id="7e7ec530-7036-4a8e-9579-a2554bfa4c5c" />
     <Project Path="CoreKit.Identity/CoreKit.Identity.csproj" />
     <Project Path="CoreKit.Identity.Tests/CoreKit.Identity.Tests.csproj" />
-    <Project Path="CoreKit.SampleHost/CoreKit.SampleHost.csproj" />
-    <Project Path="CoreKit.SharedKernel/CoreKit.SharedKernel.csproj" />
     <Project Path="CoreKit.Tenant.Tests/CoreKit.Tenant.Tests.csproj" />
     <Project Path="CoreKit.Tenant/CoreKit.Tenant.csproj" Id="e0d47be8-fd8d-4032-98ab-e5e8ba6480a3" />
   </Folder>
@@ -37,4 +35,5 @@
     <File Path="CLAUDE.md" />
     <File Path="roadmap.md" />
   </Folder>
+  <Project Path="CoreKit.Abstractions/CoreKit.Abstractions.csproj" />
 </Solution>

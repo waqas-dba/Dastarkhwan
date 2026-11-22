@@ -1,4 +1,4 @@
-﻿using CoreKit.IntegrationEvents;
+﻿using CoreKit.Abstractions.IntegrationEvents;
 using CoreKit.Tenant.Abstractions;
 
 namespace CoreKit.Tenant.Services;
@@ -10,8 +10,7 @@ public interface ITenantEventPublisher
 
 /// <summary>
 /// Delivers Tenant's events to their handlers. The three facts other modules care about are also announced
-/// as small integration events from the shared kernel (ids only), so other modules can react
-/// without referencing Tenant.
+/// as small integration events (ids only), so other modules can react without referencing Tenant internals.
 /// </summary>
 public sealed class TenantEventPublisher : ITenantEventPublisher
 {

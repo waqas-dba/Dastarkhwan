@@ -3,9 +3,10 @@ using CoreKit.Identity.Entities;
 using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Models;
 using CoreKit.Identity.Normalization;
+using CoreKit.Identity.Persistence;
 using CoreKit.Identity.Security;
 using CoreKit.Identity.Validation;
-using CoreKit.IntegrationEvents;
+using CoreKit.Identity.IntegrationEvents;
 
 namespace CoreKit.Identity.Services;
 
@@ -17,6 +18,7 @@ namespace CoreKit.Identity.Services;
 public sealed class UserService : IUserService
 {
     private readonly IUserRepository _userRepository;
+    private readonly IdentityDbContext _db;
     private readonly IIdentityAdminAuthorizer _authorizer;
     private readonly IAdministratorGuard _administratorGuard;
     private readonly IPasswordHasher _hasher;
@@ -26,6 +28,7 @@ public sealed class UserService : IUserService
 
     public UserService(
         IUserRepository userRepository,
+        IdentityDbContext db,
         IIdentityAdminAuthorizer authorizer,
         IAdministratorGuard administratorGuard,
         IPasswordHasher hasher,
@@ -34,6 +37,7 @@ public sealed class UserService : IUserService
         IIdentityEventPublisher eventPublisher)
     {
         _userRepository = userRepository;
+        _db = db;
         _authorizer = authorizer;
         _administratorGuard = administratorGuard;
         _hasher = hasher;
@@ -190,10 +194,35 @@ public sealed class UserService : IUserService
 
             if (!isActive)
             {
-                var deactivated = await _userRepository.TryDeactivateAsync(id, user.SecurityVersion, now, ct);
+                // If password change is also requested, do both atomically in a single transaction.
+                // Otherwise, use the existing deactivation-only path.
+                if (request.Password is not null)
+                {
+                    var passwordError = PasswordPolicy.Validate(request.Password, user.Email);
+                    if (passwordError is not null)
+                        return IdentityErrors.Validation(passwordError);
 
-                if (deactivated != CredentialUpdateResult.Updated)
-                    return IdentityErrors.Conflict("The account was changed by another request. Please try again.");
+                    var combined = await _userRepository.TryDeactivateAndChangePasswordAsync(
+                        id,
+                        user.SecurityVersion,
+                        user.PasswordHash,
+                        _hasher.Hash(request.Password),
+                        now,
+                        ct);
+
+                    if (combined != CredentialUpdateResult.Updated)
+                        return IdentityErrors.Conflict("The account was changed by another request. Please try again.");
+
+                    // Both operations succeeded; skip the separate password change below.
+                    request.Password = null;
+                }
+                else
+                {
+                    var deactivated = await _userRepository.TryDeactivateAsync(id, user.SecurityVersion, now, ct);
+
+                    if (deactivated != CredentialUpdateResult.Updated)
+                        return IdentityErrors.Conflict("The account was changed by another request. Please try again.");
+                }
             }
             else
             {
@@ -246,10 +275,15 @@ public sealed class UserService : IUserService
         if (await _administratorGuard.IsLastActiveAdministratorAsync(id, ct))
             return IdentityErrors.Conflict("The last active administrator cannot be deleted.");
 
-        await _userRepository.DeleteAsync(user, ct);
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+
+        _userRepository.StageDelete(user);
 
         var now = Now();
         await _eventPublisher.PublishAsync(new IdentityUserDeleted(id, now), ct);
+
+        await _db.SaveChangesAsync(ct);
+        await transaction.CommitAsync(ct);
 
         return Common.IdentityResult.Success();
     }

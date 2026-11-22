@@ -132,6 +132,13 @@ builder.Services.AddDastarkhwanIntegration();
 builder.Services.AddTenantOutboxPublisher();
 builder.Services.AddTenantProjectionRecovery();
 
+// Register AccessBootstrap for trusted startup provisioning
+builder.Services.AddScoped<CoreKit.Access.Abstractions.IAccessBootstrap, CoreKit.Access.Services.AccessBootstrap>();
+
+// Register rate limiting for tenant and access write endpoints
+builder.Services.AddTenantRateLimiting(builder.Configuration);
+builder.Services.AddAccessRateLimiting();
+
 // The application declares what can be allowed, and the roles every new tenant starts with.
 builder.Services.AddAccessPermissions(p =>
 {
@@ -199,6 +206,10 @@ await app.Services.SeedIdentityAsync();
 // authorization traffic in Projection mode.
 using (var scope = app.Services.CreateScope())
 {
+    // Grant platform access for the trusted startup recovery operation (no authenticated user yet).
+    var platformAccess = scope.ServiceProvider.GetRequiredService<CoreKit.Tenant.Services.TenantPlatformAccess>();
+    using var _ = platformAccess.Grant();
+
     var recovery = scope.ServiceProvider.GetRequiredService<TenantProjectionRecoveryService>();
     var result = await recovery.RebuildAllAsync(CancellationToken.None);
     if (result.Value.Failed.Count > 0)
@@ -213,6 +224,21 @@ using (var scope = app.Services.CreateScope())
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
         logger.LogInformation("Projection bootstrap complete: {Installed} installed, {Repaired} repaired, {Unchanged} unchanged, {Stale} ignored",
             result.Value.Installed, result.Value.Repaired, result.Value.Unchanged, result.Value.IgnoredStale);
+}
+
+// Bootstrap the initial platform administrator (idempotent).
+    // This is a trusted deployment operation; the target user is the first Identity admin.
+    var bootstrap = scope.ServiceProvider.GetRequiredService<CoreKit.Access.Abstractions.IAccessBootstrap>();
+    var config = scope.ServiceProvider.GetRequiredService<IOptions<CoreKit.Identity.Seeding.IdentitySeedOptions>>().Value;
+    if (!string.IsNullOrWhiteSpace(config.AdminEmail))
+    {
+        var userRepo = scope.ServiceProvider.GetRequiredService<CoreKit.Identity.Interfaces.IUserRepository>();
+        var normalizedEmail = CoreKit.Identity.Normalization.IdentityNormalizer.NormalizeEmail(config.AdminEmail);
+        var user = await userRepo.FindByNormalizedEmailAsync(normalizedEmail, CancellationToken.None);
+        if (user is not null)
+        {
+            await bootstrap.BootstrapInitialPlatformAdminAsync(user.Id, CancellationToken.None);
+        }
     }
 }
 
@@ -371,9 +397,9 @@ internal sealed class DispatchingIdentityEventPublisher : CoreKit.Identity.Inter
     }
 
     public async Task PublishAsync<TEvent>(TEvent integrationEvent, CancellationToken ct = default)
-        where TEvent : CoreKit.IntegrationEvents.IIntegrationEvent
+        where TEvent : CoreKit.Identity.Interfaces.IIdentityIntegrationEvent
     {
-        foreach (var handler in _services.GetServices<CoreKit.IntegrationEvents.IEventHandler<TEvent>>())
+        foreach (var handler in _services.GetServices<CoreKit.Abstractions.IntegrationEvents.IEventHandler<TEvent>>())
         {
             try
             {

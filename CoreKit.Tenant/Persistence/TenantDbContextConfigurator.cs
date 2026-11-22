@@ -30,8 +30,10 @@ public static class TenantDbContextConfigurator
             {
                 npgsql.MigrationsHistoryTable(MigrationsHistoryTable);
 
-                if (database?.EnableRetryOnFailure == true)
-                    npgsql.EnableRetryOnFailure(database.MaxRetryAttempts);
+                // Retry on failure is explicitly disabled because Tenant uses manual transactions
+                // (BeginTransactionAsync) which are not compatible with EF Core's retry strategy.
+                // If transient failure handling is needed, use IExecutionStrategy.ExecuteAsync for
+                // specific read-only operations instead.
             });
 
         return options;

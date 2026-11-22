@@ -1,6 +1,6 @@
 ﻿namespace CoreKit.Access.Persistence;
 
-internal interface IAccessAssignmentRepository
+public interface IAccessAssignmentRepository
 {
     /// <summary>Read-only. The roles a user holds in a scope, with their permissions.</summary>
     Task<IReadOnlyList<AccessRole>> ListRolesForUserAsync(AccessScope scope, Guid userId, long membershipGeneration, CancellationToken ct = default);

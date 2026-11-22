@@ -1,11 +1,12 @@
+using CoreKit.Abstractions.IntegrationEvents;
 using CoreKit.Access.Abstractions;
 using CoreKit.Access.Extensions;
-using CoreKit.IntegrationEvents;
+using CoreKit.Tenant.Abstractions;
 
 namespace Dastarkhwan.Integration.Membership;
 
 /// <summary>
-/// Reacts to the shared-kernel <see cref="TenantMemberRemoved"/> integration event and clears the
+/// Reacts to the <see cref="TenantMemberRemoved"/> integration event and clears the
 /// removed person's effective-authorization state in Access. Without this handler a person who leaves
 /// a tenant keeps their cached tenant-scoped permissions until the Access cache entry expires, because
 /// Access resolves membership through <c>IAccessMembership</c>, which reads the Tenant membership

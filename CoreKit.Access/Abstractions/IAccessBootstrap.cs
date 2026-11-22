@@ -13,7 +13,7 @@ namespace CoreKit.Access.Abstractions;
 /// origin. The target user id is never treated as the operator, and a caller-supplied source string alone
 /// cannot establish trusted system identity.
 /// </summary>
-internal interface IAccessBootstrap
+public interface IAccessBootstrap
 {
     /// <summary>
     /// Bootstraps the initial platform administrator (idempotent, trusted deployment operation).

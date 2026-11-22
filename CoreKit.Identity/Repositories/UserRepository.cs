@@ -250,6 +250,63 @@ public sealed class UserRepository : IUserRepository
         return CredentialUpdateResult.Updated;
     }
 
+    /// <summary>
+    /// Atomically deactivates a user AND changes their password in a single transaction.
+    /// Returns CredentialUpdateResult indicating success or the type of conflict.
+    /// </summary>
+    public async Task<CredentialUpdateResult> TryDeactivateAndChangePasswordAsync(
+        Guid userId,
+        int expectedSecurityVersion,
+        string expectedCurrentHash,
+        string newHash,
+        DateTime now,
+        CancellationToken ct = default)
+    {
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+
+        // Single UPDATE with conditional predicates for both version and password hash.
+        // If either predicate fails, affected == 0 and we rollback.
+        var affected = await _db.Users
+            .Where(u => u.Id == userId
+                && u.IsActive
+                && u.SecurityVersion == expectedSecurityVersion
+                && u.PasswordHash == expectedCurrentHash)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.IsActive, false)
+                .SetProperty(u => u.PasswordHash, newHash)
+                .SetProperty(u => u.SecurityVersion, u => u.SecurityVersion + 1)
+                .SetProperty(u => u.UpdatedAt, (DateTime?)now),
+                ct);
+
+        if (affected == 0)
+        {
+            await transaction.RollbackAsync(ct);
+
+            var current = await _db.Users
+                .AsNoTracking()
+                .Where(u => u.Id == userId)
+                .Select(u => new { u.IsActive, u.PasswordHash, u.SecurityVersion })
+                .FirstOrDefaultAsync(ct);
+
+            if (current is null)
+                return CredentialUpdateResult.UserMissing;
+
+            if (!current.IsActive)
+                return CredentialUpdateResult.VersionConflict; // Already deactivated (treated as version conflict)
+
+            if (current.SecurityVersion != expectedSecurityVersion)
+                return CredentialUpdateResult.VersionConflict;
+
+            return CredentialUpdateResult.HashConflict;
+        }
+
+        await RefreshTokenRevocation.RevokeAllForUserAsync(_db, userId, now, ct);
+
+        await transaction.CommitAsync(ct);
+
+        return CredentialUpdateResult.Updated;
+    }
+
     public async Task<bool> TryRehashPasswordAsync(
         Guid userId, string expectedCurrentHash, int expectedSecurityVersion, string newHash, DateTime now,
         CancellationToken ct = default)
@@ -271,8 +328,13 @@ public sealed class UserRepository : IUserRepository
 
     public async Task DeleteAsync(User user, CancellationToken ct = default)
     {
-        _db.Users.Remove(user); // role links and refresh tokens are removed by the database (cascade)
+        StageDelete(user);
         await _db.SaveChangesAsync(ct);
+    }
+
+    public void StageDelete(User user)
+    {
+        _db.Users.Remove(user); // role links and refresh tokens are removed by the database (cascade)
     }
 
     /// <summary>

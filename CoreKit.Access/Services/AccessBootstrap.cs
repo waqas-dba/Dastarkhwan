@@ -6,7 +6,7 @@ namespace CoreKit.Access.Services;
 /// application callers and not registered in the general DI container; a trusted deployment path
 /// composes and invokes it directly.
 /// </summary>
-internal sealed class AccessBootstrap : IAccessBootstrap
+public sealed class AccessBootstrap : IAccessBootstrap
 {
     private readonly AccessDbContext _db;
     private readonly IAccessRoleRepository _roles;

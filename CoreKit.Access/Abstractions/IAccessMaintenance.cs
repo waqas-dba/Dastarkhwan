@@ -9,6 +9,9 @@ public interface IAccessMaintenance
     /// <summary>Removes every role the user holds in the scope (for example when they leave).</summary>
     Task RemoveUserAsync(AccessScope scope, Guid userId, CancellationToken ct = default);
 
+    /// <summary>Removes the user from all scopes (platform and all tenants). Used when a user is deleted from Identity.</summary>
+    Task RemoveUserFromAllScopesAsync(Guid userId, CancellationToken ct = default);
+
     /// <summary>Deletes all roles and assignments of a scope (for example when a tenant is deleted).</summary>
     Task RemoveScopeAsync(AccessScope scope, CancellationToken ct = default);
 

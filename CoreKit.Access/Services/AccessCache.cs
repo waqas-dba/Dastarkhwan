@@ -10,9 +10,9 @@ namespace CoreKit.Access.Services;
 /// Which cache generation a permission lookup started in. If a role or an assignment changes while the lookup
 /// reads the database, the generation moves on and the (now stale) result is not stored.
 /// </summary>
-internal readonly record struct AccessCacheToken(long Epoch, long ScopeVersion, long UserVersion);
+public readonly record struct AccessCacheToken(long Epoch, long ScopeVersion, long UserVersion);
 
-internal interface IAccessCache
+public interface IAccessCache
 {
     bool TryGet(AccessScope scope, Guid userId, out EffectiveAccess access);
 

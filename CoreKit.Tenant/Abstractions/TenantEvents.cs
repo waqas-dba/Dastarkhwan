@@ -17,6 +17,23 @@ public interface ITenantEventHandler<TEvent> where TEvent : ITenantEvent
     Task HandleAsync(TEvent tenantEvent, CancellationToken ct = default);
 }
 
+/// <summary>
+/// Base marker for cross-module integration events published by Tenant.
+/// Other modules implement <see cref="CoreKit.Abstractions.IntegrationEvents.IEventHandler{TEvent}"/> for these.
+/// </summary>
+public interface ITenantIntegrationEvent : CoreKit.Abstractions.IntegrationEvents.IIntegrationEvent
+{
+}
+
+/// <summary>A tenant was created.</summary>
+public sealed record TenantCreated(Guid TenantId, DateTime OccurredAt) : ITenantIntegrationEvent;
+
+/// <summary>A tenant was permanently deleted. Other modules delete the data they hold for it.</summary>
+public sealed record TenantDeleted(Guid TenantId, DateTime OccurredAt) : ITenantIntegrationEvent;
+
+/// <summary>A person left (or was removed from) a tenant.</summary>
+public sealed record TenantMemberRemoved(Guid TenantId, Guid UserId, DateTime OccurredAt) : ITenantIntegrationEvent;
+
 public sealed record TenantCreatedEvent(
     Guid TenantId, string Slug, string Name, TenantStatus Status, DateTime OccurredAt) : ITenantEvent;
 

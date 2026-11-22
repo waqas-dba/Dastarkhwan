@@ -41,11 +41,11 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
     public async Task<PlatformMemberResult> AddMemberAsync(Guid userId, CancellationToken ct = default)
     {
         if (userId == Guid.Empty)
-            return PlatformMemberResult.Fail("validation.failed", "A user id is required.");
+            return PlatformMemberResult.Fail(AccessErrorKind.Validation, "validation.failed", "A user id is required.");
 
         var guardResult = await _guard.RequirePlatformScopePermissionAsync(AccessPermissionNames.PlatformMembersManage, ct);
         if (guardResult.IsFailure)
-            return PlatformMemberResult.Fail(guardResult.Error!.Code, guardResult.Error!.Message);
+            return PlatformMemberResult.Fail(guardResult.Error!.Kind, guardResult.Error!.Code, guardResult.Error!.Message);
 
         var existing = await _db.PlatformMembers
             .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId, ct);
@@ -81,7 +81,7 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
         try
         {
             if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
-                return PlatformMemberResult.Fail(saveError.Code, saveError.Message);
+                return PlatformMemberResult.Fail(saveError.Kind, saveError.Code, saveError.Message);
         }
         catch (DbUpdateException)
         {
@@ -104,11 +104,11 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
     public async Task<PlatformMemberResult> RevokeMemberAsync(Guid userId, CancellationToken ct = default)
     {
         if (userId == Guid.Empty)
-            return PlatformMemberResult.Fail("validation.failed", "A user id is required.");
+            return PlatformMemberResult.Fail(AccessErrorKind.Validation, "validation.failed", "A user id is required.");
 
         var guardResult = await _guard.RequirePlatformScopePermissionAsync(AccessPermissionNames.PlatformMembersManage, ct);
         if (guardResult.IsFailure)
-            return PlatformMemberResult.Fail(guardResult.Error!.Code, guardResult.Error!.Message);
+            return PlatformMemberResult.Fail(guardResult.Error!.Kind, guardResult.Error!.Code, guardResult.Error!.Message);
 
         var existing = await _db.PlatformMembers
             .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId, ct);
@@ -123,7 +123,7 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
             AccessAuditActions.MemberRevoked, $"user: {userId}");
 
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
-            return PlatformMemberResult.Fail(saveError.Code, saveError.Message);
+            return PlatformMemberResult.Fail(saveError.Kind, saveError.Code, saveError.Message);
 
         _cache.InvalidateUser(AccessScope.ForPlatform(AccessScope.PlatformId), userId);
         return PlatformMemberResult.Ok();

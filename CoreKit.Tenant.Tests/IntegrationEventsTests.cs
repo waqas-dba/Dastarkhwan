@@ -1,4 +1,7 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using CoreKit.Abstractions.IntegrationEvents;
+using CoreKit.Tenant.Abstractions;
+using CoreKit.Tenant.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace CoreKit.Tenant.Tests;
 

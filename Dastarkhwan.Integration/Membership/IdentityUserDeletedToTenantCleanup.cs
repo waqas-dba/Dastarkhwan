@@ -1,4 +1,5 @@
-using CoreKit.IntegrationEvents;
+using CoreKit.Abstractions.IntegrationEvents;
+using CoreKit.Identity.IntegrationEvents;
 using CoreKit.Tenant.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;

@@ -1,11 +1,15 @@
 ﻿using CoreKit.Access.Abstractions;
 using CoreKit.Access.Models;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+using System.Threading.RateLimiting;
 
 namespace CoreKit.Access.Endpoints;
 
 public static class AccessEndpointExtensions
 {
+    public const string AccessWritePolicy = "access.write";
+
     /// <summary>
     /// Maps the Access HTTP API under a prefix (default "/access"). Every route needs a signed-in user,
     /// and the services check the permission, so the same rules apply when you call them from code.
@@ -36,24 +40,28 @@ public static class AccessEndpointExtensions
             return result.IsSuccess
                 ? Results.Created($"{basePath}/roles/{result.Value.Id}", result.Value)
                 : result.ToHttpResult();
-        });
+        }).RequireRateLimiting(AccessWritePolicy);
 
         access.MapPut("/roles/{id:guid}", async (Guid id, UpdateAccessRoleRequest r, IAccessRoleService s, CancellationToken ct) =>
-            (await s.UpdateAsync(id, r, ct)).ToHttpResult());
+            (await s.UpdateAsync(id, r, ct)).ToHttpResult())
+            .RequireRateLimiting(AccessWritePolicy);
 
         access.MapPut("/roles/{id:guid}/permissions", async (
                 Guid id, SetAccessRolePermissionsRequest r, IAccessRoleService s, CancellationToken ct) =>
-            (await s.SetPermissionsAsync(id, r, ct)).ToHttpResult());
+            (await s.SetPermissionsAsync(id, r, ct)).ToHttpResult())
+            .RequireRateLimiting(AccessWritePolicy);
 
         access.MapDelete("/roles/{id:guid}", async (Guid id, IAccessRoleService s, CancellationToken ct) =>
-            (await s.DeleteAsync(id, ct)).ToHttpResult());
+            (await s.DeleteAsync(id, ct)).ToHttpResult())
+            .RequireRateLimiting(AccessWritePolicy);
 
         access.MapGet("/users/{userId:guid}/roles", async (Guid userId, IAccessAssignmentService s, CancellationToken ct) =>
             (await s.GetRolesAsync(userId, ct)).ToHttpResult());
 
         access.MapPut("/users/{userId:guid}/roles", async (
                 Guid userId, SetAccessUserRolesRequest r, IAccessAssignmentService s, CancellationToken ct) =>
-            (await s.SetRolesAsync(userId, r, ct)).ToHttpResult());
+            (await s.SetRolesAsync(userId, r, ct)).ToHttpResult())
+            .RequireRateLimiting(AccessWritePolicy);
 
         access.MapGet("/audit", async (int? page, int? pageSize, IAccessAuditLog s, CancellationToken ct) =>
             (await s.ListAsync(page ?? 1, pageSize ?? 50, ct)).ToHttpResult());
@@ -67,7 +75,7 @@ public static class AccessEndpointExtensions
             return result.IsSuccess
                 ? Results.Created($"{basePath}/platform/members/{req.UserId}", result)
                 : result.ToHttpResult();
-        });
+        }).RequireRateLimiting(AccessWritePolicy);
 
         platform.MapGet("/{userId:guid}", async (Guid userId, IPlatformMembershipService s, CancellationToken ct) =>
         {
@@ -79,8 +87,25 @@ public static class AccessEndpointExtensions
         {
             var result = await s.RevokeMemberAsync(userId, ct);
             return result.IsSuccess ? Results.Ok(result) : result.ToHttpResult();
-        });
+        }).RequireRateLimiting(AccessWritePolicy);
 
         return app;
+    }
+
+    public static IServiceCollection AddAccessRateLimiting(this IServiceCollection services)
+    {
+        services.AddRateLimiter(limiter =>
+        {
+            limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+            limiter.AddPolicy(AccessWritePolicy, _ => RateLimitPartition.GetFixedWindowLimiter("access-write", _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+        });
+
+        return services;
     }
 }

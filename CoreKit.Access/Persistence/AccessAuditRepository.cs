@@ -1,6 +1,6 @@
 ﻿namespace CoreKit.Access.Persistence;
 
-internal interface IAccessAuditRepository
+public interface IAccessAuditRepository
 {
     void Add(AccessAuditEntry entry);
 
@@ -9,7 +9,7 @@ internal interface IAccessAuditRepository
         AccessScope scope, int page, int pageSize, CancellationToken ct = default);
 }
 
-internal sealed class AccessAuditRepository : IAccessAuditRepository
+public sealed class AccessAuditRepository : IAccessAuditRepository
 {
     private readonly AccessDbContext _db;
 

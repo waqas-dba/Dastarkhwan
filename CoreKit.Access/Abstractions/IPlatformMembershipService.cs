@@ -17,8 +17,8 @@ public interface IPlatformMembershipService
 }
 
 /// <summary>Result of a platform membership operation.</summary>
-public sealed record PlatformMemberResult(bool IsSuccess, string? ErrorCode = null, string? Message = null)
+public sealed record PlatformMemberResult(bool IsSuccess, AccessError? Error = null)
 {
     public static PlatformMemberResult Ok() => new(true);
-    public static PlatformMemberResult Fail(string errorCode, string message) => new(false, errorCode, message);
+    public static PlatformMemberResult Fail(AccessErrorKind kind, string errorCode, string message) => new(false, new AccessError(kind, errorCode, message));
 }

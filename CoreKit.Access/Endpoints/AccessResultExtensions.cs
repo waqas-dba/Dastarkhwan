@@ -1,6 +1,6 @@
 ﻿namespace CoreKit.Access.Endpoints;
 
-/// <summary>The one place that turns an AccessError into an HTTP status code.</summary>
+/// <summary>The one place that turns an AccessError into an HTTP status code using RFC 9457 Problem Details.</summary>
 public static class AccessResultExtensions
 {
     public static IResult ToHttpResult(this AccessResult result, Func<IResult>? onSuccess = null)
@@ -10,32 +10,28 @@ public static class AccessResultExtensions
         => result.IsSuccess ? Results.Ok(result.Value) : result.Error!.ToHttpResult();
 
     public static IResult ToHttpResult(this PlatformMemberResult result)
-        => result.IsSuccess ? Results.Ok(result) : Results.Json(new { code = result.ErrorCode, message = result.Message }, statusCode: StatusCodeForErrorCode(result.ErrorCode));
+        => result.IsSuccess ? Results.Ok(result) : result.Error!.ToHttpResult();
 
     public static IResult ToHttpResult(this AccessError error)
-        => Results.Json(new { code = error.Code, message = error.Message }, statusCode: StatusCodeFor(error.Kind));
-
-    internal static int StatusCodeFor(AccessErrorKind kind) => kind switch
     {
-        AccessErrorKind.Validation => StatusCodes.Status400BadRequest,
-        AccessErrorKind.Unauthorized => StatusCodes.Status401Unauthorized,
-        AccessErrorKind.Forbidden => StatusCodes.Status403Forbidden,
-        AccessErrorKind.NotFound => StatusCodes.Status404NotFound,
-        AccessErrorKind.Conflict => StatusCodes.Status409Conflict,
-        _ => StatusCodes.Status500InternalServerError
-    };
+        var (statusCode, title) = error.Kind switch
+        {
+            AccessErrorKind.Validation => (StatusCodes.Status400BadRequest, "Invalid request"),
+            AccessErrorKind.Unauthorized => (StatusCodes.Status401Unauthorized, "Unauthorized"),
+            AccessErrorKind.Forbidden => (StatusCodes.Status403Forbidden, "Forbidden"),
+            AccessErrorKind.NotFound => (StatusCodes.Status404NotFound, "Not found"),
+            AccessErrorKind.Conflict => (StatusCodes.Status409Conflict, "Conflict"),
+            _ => (StatusCodes.Status500InternalServerError, "Internal server error")
+        };
 
-    internal static int StatusCodeForErrorCode(string? errorCode) => errorCode switch
-    {
-        "validation.failed" => StatusCodes.Status400BadRequest,
-        "access.not_authenticated" => StatusCodes.Status401Unauthorized,
-        "access.denied" => StatusCodes.Status403Forbidden,
-        "access.escalation" => StatusCodes.Status403Forbidden,
-        "access.scope_required" => StatusCodes.Status400BadRequest,
-        "access.save_conflict" => StatusCodes.Status409Conflict,
-        "access.concurrency_stamp_required" => StatusCodes.Status400BadRequest,
-        "not_found" => StatusCodes.Status404NotFound,
-        "conflict" => StatusCodes.Status409Conflict,
-        _ => StatusCodes.Status500InternalServerError
-    };
+        return Results.Json(new
+        {
+            type = $"https://dastarkhwan.platform/errors/{error.Code}",
+            title = title,
+            status = statusCode,
+            detail = error.Message,
+            errorCode = error.Code,
+            instance = string.Empty
+        }, statusCode: statusCode, contentType: "application/problem+json");
+    }
 }

@@ -1,7 +1,7 @@
 ﻿namespace CoreKit.Access.Services;
 
 /// <summary>Stages an audit entry. It is saved together with the change it describes.</summary>
-internal interface IAccessAuditRecorder
+public interface IAccessAuditRecorder
 {
     void Record(AccessScope scope, string action, string? details = null);
 
@@ -11,7 +11,7 @@ internal interface IAccessAuditRecorder
     void RecordSystem(AccessScope scope, string action, string source, string? details = null);
 }
 
-internal sealed class AccessAuditRecorder : IAccessAuditRecorder
+public sealed class AccessAuditRecorder : IAccessAuditRecorder
 {
     private const int MaxDetailsLength = 2000;
 

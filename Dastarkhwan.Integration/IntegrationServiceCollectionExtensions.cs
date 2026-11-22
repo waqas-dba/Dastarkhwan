@@ -1,6 +1,8 @@
+using CoreKit.Abstractions.IntegrationEvents;
 using CoreKit.Access.Abstractions;
 using CoreKit.Access.Extensions;
-using CoreKit.IntegrationEvents;
+using CoreKit.Identity.Outbox;
+using CoreKit.Identity.IntegrationEvents;
 using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Constants;
 using CoreKit.Tenant.Outbox;
@@ -32,6 +34,9 @@ public static class IntegrationServiceCollectionExtensions
         services.TryAddScoped<ITenantOutboxTransport, TenantToAccessOutboxTransport>();
         services.TryAddScoped<ITenantProjectionGateway, AccessTenantProjectionGateway>();
 
+        // Identity outbox transport for durable account deletion events
+        services.TryAddScoped<IIdentityOutboxTransport, IdentityOutboxTransport>();
+
         // Cross-module components moved from Tenant to Integration
 
         // Declare Tenant's permissions in the Access catalog so Access can grant them to tenant roles.
@@ -43,7 +48,9 @@ public static class IntegrationServiceCollectionExtensions
 
         // Expose Tenant membership to Access through the public adapter contract. Access composes it
         // with the platform (and default) adapter behind a single CompositeAccessMembership.
-        services.AddScoped<IAccessMembershipAdapter, TenantAccessMembership>();
+        // NOTE: TenantAccessMembership registration removed per REV-15. Projection mode is now the
+        // default authorization source. If fallback is needed, register explicitly.
+        // services.AddScoped<IAccessMembershipAdapter, TenantAccessMembership>();
 
         // Tenant adds its tenant claim to every access token Identity issues.
         services.TryAddScoped<IAccessTokenClaimsContributor, TenantClaimsContributor>();
@@ -69,6 +76,9 @@ public static class IntegrationServiceCollectionExtensions
             var permissionChecker = sp.GetService<IPermissionChecker>();
             return permissionChecker is not null ? new TenantPermissionCheckerBridge(permissionChecker) : null!;
         });
+
+        // Validate that a tenant owner user exists and is active in Identity.
+        services.TryAddScoped<CoreKit.Tenant.Abstractions.IOwnerUserValidator, IdentityOwnerUserValidator>();
 
         return services;
     }

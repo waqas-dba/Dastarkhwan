@@ -10,6 +10,9 @@ using Dastarkhwan.Integration.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using System.Threading.RateLimiting;
 
 namespace Dastarkhwan.Integration.Endpoints;
 
@@ -19,6 +22,8 @@ namespace Dastarkhwan.Integration.Endpoints;
 /// </summary>
 public static class TenantEndpointExtensions
 {
+    public const string TenantWritePolicy = "tenant.write";
+
     public static IEndpointRouteBuilder MapTenants(this IEndpointRouteBuilder app, string prefix = "/tenants")
     {
         prefix = EndpointRoutes.NormalizePrefix(prefix);
@@ -35,6 +40,23 @@ public static class TenantEndpointExtensions
             .RequireAccessPermission(TenantPermissionNames.AuditRead);
 
         return app;
+    }
+
+    public static IServiceCollection AddTenantRateLimiting(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddRateLimiter(limiter =>
+        {
+            limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+            limiter.AddPolicy(TenantWritePolicy, _ => RateLimitPartition.GetFixedWindowLimiter("tenant-write", _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 20,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+        });
+
+        return services;
     }
 
     private static void MapTenantRoutes(RouteGroupBuilder tenants, string basePath)
@@ -74,7 +96,8 @@ public static class TenantEndpointExtensions
                 : TenantResult.Failure(TenantErrors.NotAuthenticated);
 
             return result.ToHttpResult();
-        }).RequireAuthorization();
+        }).RequireAuthorization()
+          .RequireRateLimiting(TenantWritePolicy);
 
         tenants.MapGet("/{id:guid}", async (Guid id, ITenantService s, CancellationToken ct) =>
                 (await s.GetAsync(id, ct)).ToHttpResult())
@@ -87,31 +110,38 @@ public static class TenantEndpointExtensions
             return result.IsSuccess
                 ? Results.Created($"{basePath}/{result.Value.Id}", result.Value)
                 : result.ToHttpResult();
-        }).RequireAccessPermission(TenantPermissionNames.Create);
+        }).RequireAccessPermission(TenantPermissionNames.Create)
+          .RequireRateLimiting(TenantWritePolicy);
 
         tenants.MapPut("/{id:guid}", async (Guid id, UpdateTenantRequest r, ITenantService s, CancellationToken ct) =>
                 (await s.UpdateAsync(id, r, ct)).ToHttpResult())
-            .RequireAccessPermission(TenantPermissionNames.Update);
+            .RequireAccessPermission(TenantPermissionNames.Update)
+            .RequireRateLimiting(TenantWritePolicy);
 
         tenants.MapPost("/{id:guid}/activate", async (Guid id, ITenantService s, CancellationToken ct) =>
                 (await s.ActivateAsync(id, ct)).ToHttpResult())
-            .RequireAccessPermission(TenantPermissionNames.ManageStatus);
+            .RequireAccessPermission(TenantPermissionNames.ManageStatus)
+            .RequireRateLimiting(TenantWritePolicy);
 
         tenants.MapPost("/{id:guid}/suspend", async (Guid id, ChangeTenantStatusRequest? r, ITenantService s, CancellationToken ct) =>
                 (await s.SuspendAsync(id, r ?? new ChangeTenantStatusRequest(), ct)).ToHttpResult())
-            .RequireAccessPermission(TenantPermissionNames.ManageStatus);
+            .RequireAccessPermission(TenantPermissionNames.ManageStatus)
+            .RequireRateLimiting(TenantWritePolicy);
 
         tenants.MapPost("/{id:guid}/archive", async (Guid id, ChangeTenantStatusRequest? r, ITenantService s, CancellationToken ct) =>
                 (await s.ArchiveAsync(id, r ?? new ChangeTenantStatusRequest(), ct)).ToHttpResult())
-            .RequireAccessPermission(TenantPermissionNames.ManageStatus);
+            .RequireAccessPermission(TenantPermissionNames.ManageStatus)
+            .RequireRateLimiting(TenantWritePolicy);
 
         tenants.MapPost("/{id:guid}/restore", async (Guid id, ITenantService s, CancellationToken ct) =>
                 (await s.RestoreAsync(id, ct)).ToHttpResult())
-            .RequireAccessPermission(TenantPermissionNames.ManageStatus);
+            .RequireAccessPermission(TenantPermissionNames.ManageStatus)
+            .RequireRateLimiting(TenantWritePolicy);
 
         tenants.MapDelete("/{id:guid}", async (Guid id, ITenantService s, CancellationToken ct) =>
                 (await s.DeleteAsync(id, ct)).ToHttpResult())
-            .RequireAccessPermission(TenantPermissionNames.Delete);
+            .RequireAccessPermission(TenantPermissionNames.Delete)
+            .RequireRateLimiting(TenantWritePolicy);
     }
 
     private static void MapSettingRoutes(RouteGroupBuilder settings)
@@ -127,16 +157,19 @@ public static class TenantEndpointExtensions
         settings.MapPut("/{key}", async (
                 Guid tenantId, string key, SetTenantSettingRequest r, ITenantSettingsService s, CancellationToken ct) =>
             (await s.SetAsync(tenantId, key, r, ct)).ToHttpResult())
-            .RequireAccessPermission(TenantPermissionNames.SettingsUpdate);
+            .RequireAccessPermission(TenantPermissionNames.SettingsUpdate)
+            .RequireRateLimiting(TenantWritePolicy);
 
         settings.MapPut("/", async (
                 Guid tenantId, SetTenantSettingsRequest r, ITenantSettingsService s, CancellationToken ct) =>
             (await s.SetManyAsync(tenantId, r, ct)).ToHttpResult())
-            .RequireAccessPermission(TenantPermissionNames.SettingsUpdate);
+            .RequireAccessPermission(TenantPermissionNames.SettingsUpdate)
+            .RequireRateLimiting(TenantWritePolicy);
 
         settings.MapDelete("/{key}", async (Guid tenantId, string key, ITenantSettingsService s, CancellationToken ct) =>
                 (await s.RemoveAsync(tenantId, key, ct)).ToHttpResult())
-            .RequireAccessPermission(TenantPermissionNames.SettingsUpdate);
+            .RequireAccessPermission(TenantPermissionNames.SettingsUpdate)
+            .RequireRateLimiting(TenantWritePolicy);
     }
 
     private static void MapMemberRoutes(RouteGroupBuilder members)
@@ -148,16 +181,19 @@ public static class TenantEndpointExtensions
         members.MapPost("/", async (
                 Guid tenantId, AddTenantMemberRequest r, ITenantMembershipService s, CancellationToken ct) =>
             (await s.AddMemberAsync(tenantId, r, ct)).ToHttpResult())
-            .RequireAccessPermission(TenantPermissionNames.MembersManage);
+            .RequireAccessPermission(TenantPermissionNames.MembersManage)
+            .RequireRateLimiting(TenantWritePolicy);
 
         members.MapDelete("/{userId:guid}", async (
                 Guid tenantId, Guid userId, ITenantMembershipService s, CancellationToken ct) =>
             (await s.RemoveMemberAsync(tenantId, userId, ct)).ToHttpResult())
-            .RequireAccessPermission(TenantPermissionNames.MembersManage);
+            .RequireAccessPermission(TenantPermissionNames.MembersManage)
+            .RequireRateLimiting(TenantWritePolicy);
 
         members.MapPut("/{userId:guid}/owner", async (
                 Guid tenantId, Guid userId, SetTenantOwnerRequest r, ITenantMembershipService s, CancellationToken ct) =>
             (await s.SetOwnerAsync(tenantId, userId, r, ct)).ToHttpResult())
-            .RequireAccessPermission(TenantPermissionNames.MembersManage);
+            .RequireAccessPermission(TenantPermissionNames.MembersManage)
+            .RequireRateLimiting(TenantWritePolicy);
     }
 }

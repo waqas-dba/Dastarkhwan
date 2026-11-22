@@ -1,8 +1,10 @@
 ﻿using CoreKit.Identity.Constants;
 using CoreKit.Identity.Repositories;
 using CoreKit.Identity.Security;
-using CoreKit.IntegrationEvents;
+using CoreKit.Identity.Outbox;
+using CoreKit.Abstractions.IntegrationEvents;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace CoreKit.Identity.Extensions;
@@ -99,6 +101,10 @@ public static class ServiceCollectionExtensions
             .ValidateOnStart();
 
         services.AddHttpContextAccessor();
+        services.AddMemoryCache(options =>
+        {
+            options.SizeLimit = 1024; // Limit total cache entries to prevent unbounded memory growth
+        });
 
         // Persistence: the only code that touches the DbContext.
         services.AddScoped<IUserRepository, UserRepository>();
@@ -122,7 +128,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUserService, UserService>();
 
         services.TryAddSingleton<IIdentityEmailSender, NullIdentityEmailSender>();
-        services.TryAddSingleton<IIdentityEventPublisher, NullIdentityEventPublisher>();
+
+        // Outbox for durable integration events (account deletion, etc.)
+        services.AddIdentityOutbox(configuration);
+
         services.AddScoped<IEmailVerificationService, EmailVerificationService>();
 
         services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -151,6 +160,8 @@ public static class ServiceCollectionExtensions
                 };
 
                 // Validate SecurityVersion: reject tokens whose secver claim doesn't match the user's current version.
+                // Uses IMemoryCache to avoid per-request DB queries. Cache TTL is short (30s) because
+                // SecurityVersion changes invalidate all tokens immediately via the token family mechanism.
                 bearer.Events = new JwtBearerEvents
                 {
                     OnTokenValidated = async context =>
@@ -169,16 +180,29 @@ public static class ServiceCollectionExtensions
                             return;
                         }
 
-                        var userRepository = context.HttpContext.RequestServices.GetRequiredService<IUserRepository>();
-                        var user = await userRepository.FindByIdAsync(userId, context.HttpContext.RequestAborted);
+                        var cache = context.HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
+                        var cacheKey = $"secver:{userId}";
 
-                        if (user is null)
+                        if (!cache.TryGetValue<int>(cacheKey, out var currentSecVer))
                         {
-                            context.Fail("User not found.");
-                            return;
+                            var userRepository = context.HttpContext.RequestServices.GetRequiredService<IUserRepository>();
+                            var user = await userRepository.FindByIdAsync(userId, context.HttpContext.RequestAborted);
+
+                            if (user is null)
+                            {
+                                context.Fail("User not found.");
+                                return;
+                            }
+
+                            currentSecVer = user.SecurityVersion;
+                            cache.Set(cacheKey, currentSecVer, new MemoryCacheEntryOptions
+                            {
+                                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30),
+                                Size = 1
+                            });
                         }
 
-                        if (user.SecurityVersion != tokenSecVer)
+                        if (currentSecVer != tokenSecVer)
                         {
                             context.Fail("Token SecurityVersion does not match current user SecurityVersion.");
                         }
@@ -218,6 +242,6 @@ public static class ServiceCollectionExtensions
 internal sealed class NullIdentityEventPublisher : IIdentityEventPublisher
 {
     public Task PublishAsync<TEvent>(TEvent integrationEvent, CancellationToken ct = default)
-        where TEvent : IIntegrationEvent
+        where TEvent : IIdentityIntegrationEvent
         => Task.CompletedTask;
 }

@@ -95,7 +95,26 @@ public interface IUserRepository
         DateTime now,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// Atomically deactivates an account AND changes its password in a single transaction,
+    /// under an expected-version and expected-hash guard. Increments SecurityVersion and
+    /// revokes all refresh tokens. Returns how the transition ended; on failure nothing is applied.
+    /// </summary>
+    Task<CredentialUpdateResult> TryDeactivateAndChangePasswordAsync(
+        Guid userId,
+        int expectedSecurityVersion,
+        string expectedCurrentHash,
+        string newHash,
+        DateTime now,
+        CancellationToken ct = default);
+
     Task DeleteAsync(User user, CancellationToken ct = default);
+
+    /// <summary>
+    /// Stages a user for deletion without saving. The caller must call SaveChangesAsync.
+    /// This allows the deletion to be combined with outbox event staging in a single transaction.
+    /// </summary>
+    void StageDelete(User user);
 }
 
 /// <summary>Outcome of the authoritative successful-login transition.</summary>

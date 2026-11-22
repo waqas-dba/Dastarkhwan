@@ -74,7 +74,7 @@ public sealed class TenantMemberRepository : ITenantMemberRepository
 
     public Task<Guid?> FindPreferredTenantIdAsync(Guid userId, CancellationToken ct = default)
         => _db.Members.AsNoTracking()
-            .Where(m => m.UserId == userId && m.Tenant.Status != TenantStatus.Archived)
+            .Where(m => m.UserId == userId && m.Tenant.Status == TenantStatus.Active)
             .OrderByDescending(m => m.IsDefault).ThenBy(m => m.JoinedAt).ThenBy(m => m.TenantId)
             .Select(m => (Guid?)m.TenantId)
             .FirstOrDefaultAsync(ct);

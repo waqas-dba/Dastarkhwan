@@ -1,6 +1,6 @@
 ﻿namespace CoreKit.Access.Persistence;
 
-internal enum SaveOutcome
+public enum SaveOutcome
 {
     Saved,
 
@@ -12,12 +12,12 @@ internal enum SaveOutcome
 }
 
 /// <summary>Saves everything staged by the repositories in one transaction, so a change and its audit entry go together.</summary>
-internal interface IAccessUnitOfWork
+public interface IAccessUnitOfWork
 {
     Task<SaveOutcome> SaveAsync(CancellationToken ct = default);
 }
 
-internal sealed class AccessUnitOfWork : IAccessUnitOfWork
+public sealed class AccessUnitOfWork : IAccessUnitOfWork
 {
     private readonly AccessDbContext _db;
     private readonly ILogger<AccessUnitOfWork> _logger;

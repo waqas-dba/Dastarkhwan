@@ -15,26 +15,38 @@ internal sealed class AccessMembershipEventConsumer : IAccessMembershipEventCons
     private readonly IAccessMembershipStreamRepository _stream;
     private readonly IAccessMembershipProjectionRepository _projections;
     private readonly IAccessTenantStateRepository _tenantStates;
+    private readonly IAccessRoleRepository _roles;
+    private readonly IAccessAssignmentRepository _assignments;
+    private readonly IAccessAuditRecorder _audit;
     private readonly IAccessUnitOfWork _unitOfWork;
     private readonly TimeProvider _time;
     private readonly ILogger<AccessMembershipEventConsumer> _logger;
+    private readonly AccessCatalog _catalog;
     private readonly IAccessCache? _cache;
 
     public AccessMembershipEventConsumer(
         IAccessMembershipStreamRepository stream,
         IAccessMembershipProjectionRepository projections,
         IAccessTenantStateRepository tenantStates,
+        IAccessRoleRepository roles,
+        IAccessAssignmentRepository assignments,
+        IAccessAuditRecorder audit,
         IAccessUnitOfWork unitOfWork,
         TimeProvider time,
         ILogger<AccessMembershipEventConsumer> logger,
+        AccessCatalog catalog,
         IAccessCache? cache = null)
     {
         _stream = stream;
         _projections = projections;
         _tenantStates = tenantStates;
+        _roles = roles;
+        _assignments = assignments;
+        _audit = audit;
         _unitOfWork = unitOfWork;
         _time = time;
         _logger = logger;
+        _catalog = catalog;
         _cache = cache;
     }
 
@@ -255,6 +267,12 @@ internal sealed class AccessMembershipEventConsumer : IAccessMembershipEventCons
                 if (existing is not null)
                     return AccessMembershipEventResult.Rejected("The member is already projected.");
                 _projections.Add(NewRow(envelope, payload, AccessMembershipProjectionStatus.Active, now));
+
+                // If this member is the tenant owner, assign them the Owner role.
+                if (payload.IsOwner)
+                {
+                    await AssignOwnerRoleAsync(envelope.TenantId, payload.UserId, now, ct);
+                }
                 return null;
 
             case AccessMembershipEventTypes.MemberReactivated:
@@ -295,6 +313,59 @@ internal sealed class AccessMembershipEventConsumer : IAccessMembershipEventCons
         }
     }
 
+    private async Task AssignOwnerRoleAsync(Guid tenantId, Guid userId, DateTime now, CancellationToken ct)
+    {
+        var scope = AccessScope.ForTenant(tenantId);
+        var ownerTemplate = _catalog.RoleTemplates.FirstOrDefault(t => t.Name == "Owner" && t.ScopeType == AccessScope.TenantType);
+        if (ownerTemplate is null)
+            return; // No Owner role template defined
+
+        // Check if Owner role already exists for this tenant
+        var existingOwnerRole = (await _roles.ListAsync(scope, ct))
+            .FirstOrDefault(r => r.NormalizedName == AccessValidation.NormalizeName("Owner"));
+        if (existingOwnerRole is null)
+        {
+            // Create Owner role from template
+            var ownerRole = new AccessRole
+            {
+                Id = Guid.NewGuid(),
+                ScopeType = scope.Type,
+                ScopeId = scope.Id,
+                Name = "Owner",
+                NormalizedName = AccessValidation.NormalizeName("Owner"),
+                Description = ownerTemplate.Description,
+                CreatedAt = now,
+                ConcurrencyStamp = Guid.NewGuid()
+            };
+            foreach (var permission in ownerTemplate.Permissions)
+                ownerRole.Permissions.Add(new AccessRolePermission { RoleId = ownerRole.Id, Permission = permission });
+            _roles.Add(ownerRole);
+            _audit.Record(scope, AccessAuditActions.RoleCreated, $"role: Owner (provisioned); permissions: {ownerTemplate.Permissions.Count}");
+            existingOwnerRole = ownerRole;
+        }
+
+        // Assign Owner role to the user
+        var existingAssignment = (await _assignments.ListForUserForUpdateAsync(scope, userId, ct))
+            .FirstOrDefault(a => a.RoleId == existingOwnerRole.Id);
+        if (existingAssignment is null)
+        {
+            var projection = await _projections.FindAsync(tenantId, userId, ct);
+            if (projection is not null)
+            {
+                _assignments.Add(new AccessAssignment
+                {
+                    RoleId = existingOwnerRole.Id,
+                    UserId = userId,
+                    ScopeType = scope.Type,
+                    ScopeId = scope.Id,
+                    MembershipGeneration = projection.MembershipGeneration,
+                    AssignedAt = now
+                });
+                _audit.Record(scope, AccessAuditActions.RolesAssigned, $"role: Owner; user: {userId}");
+            }
+        }
+    }
+
     private AccessMembershipEventResult? ApplyLifecycle(
         AccessMembershipEventEnvelope envelope, LifecyclePayload payload, AccessTenantState? state, DateTime now)
     {
@@ -304,6 +375,9 @@ internal sealed class AccessMembershipEventConsumer : IAccessMembershipEventCons
                 if (state is not null)
                     return AccessMembershipEventResult.Rejected("The tenant state already exists.");
                 _tenantStates.Add(NewState(envelope.TenantId, payload.Status!, now));
+
+                // Provision default roles for the new tenant
+                ProvisionDefaultRoles(envelope.TenantId, now);
                 return null;
 
             case AccessMembershipEventTypes.TenantStatusChanged:
@@ -332,6 +406,50 @@ internal sealed class AccessMembershipEventConsumer : IAccessMembershipEventCons
                 }
 
                 return null;
+        }
+    }
+
+    private void ProvisionDefaultRoles(Guid tenantId, DateTime now)
+    {
+        var scope = AccessScope.ForTenant(tenantId);
+
+        // Provision Manager role template
+        var managerTemplate = _catalog.RoleTemplates.FirstOrDefault(t => t.Name == "Manager" && t.ScopeType == AccessScope.TenantType);
+        if (managerTemplate is not null)
+        {
+            CreateRoleIfNotExists(scope, managerTemplate, now);
+        }
+
+        // Provision Cashier role template
+        var cashierTemplate = _catalog.RoleTemplates.FirstOrDefault(t => t.Name == "Cashier" && t.ScopeType == AccessScope.TenantType);
+        if (cashierTemplate is not null)
+        {
+            CreateRoleIfNotExists(scope, cashierTemplate, now);
+        }
+    }
+
+    private void CreateRoleIfNotExists(AccessScope scope, AccessRoleTemplate template, DateTime now)
+    {
+        var normalizedName = AccessValidation.NormalizeName(template.Name);
+        var existingRole = _roles.ListAsync(scope, default).Result
+            .FirstOrDefault(r => r.NormalizedName == normalizedName);
+        if (existingRole is null)
+        {
+            var role = new AccessRole
+            {
+                Id = Guid.NewGuid(),
+                ScopeType = scope.Type,
+                ScopeId = scope.Id,
+                Name = template.Name,
+                NormalizedName = normalizedName,
+                Description = template.Description,
+                CreatedAt = now,
+                ConcurrencyStamp = Guid.NewGuid()
+            };
+            foreach (var permission in template.Permissions)
+                role.Permissions.Add(new AccessRolePermission { RoleId = role.Id, Permission = permission });
+            _roles.Add(role);
+            _audit.Record(scope, AccessAuditActions.RoleCreated, $"role: {template.Name} (provisioned); permissions: {template.Permissions.Count}");
         }
     }
 

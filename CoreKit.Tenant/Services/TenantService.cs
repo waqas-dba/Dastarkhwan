@@ -20,6 +20,7 @@ public sealed class TenantService : ITenantService
     private readonly TenantOptions _options;
     private readonly TimeProvider _time;
     private readonly ITenantOutbox _outbox;
+    private readonly IOwnerUserValidator? _ownerUserValidator;
 
     public TenantService(
         ITenantRepository tenants,
@@ -32,7 +33,8 @@ public sealed class TenantService : ITenantService
         ITenantPermissionChecker permissions,
         IOptions<TenantOptions> options,
         TimeProvider time,
-        ITenantOutbox outbox)
+        ITenantOutbox outbox,
+        IOwnerUserValidator? ownerUserValidator = null)
     {
         _tenants = tenants;
         _members = members;
@@ -45,6 +47,7 @@ public sealed class TenantService : ITenantService
         _options = options.Value;
         _time = time;
         _outbox = outbox;
+        _ownerUserValidator = ownerUserValidator;
     }
 
     public async Task<TenantResult<TenantPagedResult<TenantDto>>> ListAsync(
@@ -108,6 +111,14 @@ public sealed class TenantService : ITenantService
 
         if (request.OwnerUserId == Guid.Empty)
             return TenantErrors.Validation("The owner user id is not valid.");
+
+        // Validate the owner user exists and is active (if validator is available)
+        if (_ownerUserValidator is not null && request.OwnerUserId is { } ownerUserId)
+        {
+            var isValidOwner = await _ownerUserValidator.ValidateOwnerUserAsync(ownerUserId, ct);
+            if (!isValidOwner)
+                return TenantErrors.Validation("The specified owner user does not exist or is not active.");
+        }
 
         string slug;
 

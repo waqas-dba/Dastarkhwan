@@ -234,6 +234,56 @@ internal sealed class AccessMaintenance : IAccessMaintenance
         _cache.InvalidateUser(scope, userId);
     }
 
+    public async Task RemoveUserFromAllScopesAsync(Guid userId, CancellationToken ct = default)
+    {
+        if (userId == Guid.Empty)
+            return;
+
+        // Get all tenant IDs from Access's membership projection (all tenants this user was a member of)
+        var tenantIds = await _db.MembershipProjections
+            .Where(mp => mp.UserId == userId)
+            .Select(mp => mp.TenantId)
+            .Distinct()
+            .ToListAsync(ct);
+
+        // Also get any additional tenant IDs from tenant states (in case projection is empty)
+        var stateTenantIds = await _db.TenantStates
+            .Select(ts => ts.TenantId)
+            .ToListAsync(ct);
+
+        // Combine and deduplicate
+        var allTenantIds = tenantIds.Concat(stateTenantIds).Distinct().ToList();
+
+        // Remove from all tenant scopes
+        foreach (var tenantId in allTenantIds)
+        {
+            var scope = AccessScope.ForTenant(tenantId);
+            await _assignments.RemoveUserAsync(scope, userId, ct);
+            _audit.Record(scope, AccessAuditActions.UserRemoved, $"user: {userId}; account-deleted");
+        }
+
+        // Remove platform membership
+        var platformScope = AccessScope.ForPlatform(AccessScope.PlatformId);
+        var platformMember = await _db.PlatformMembers
+            .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId, ct);
+
+        if (platformMember is not null && platformMember.RevokedAt is null)
+        {
+            platformMember.RevokedAt = _time.GetUtcNow().UtcDateTime;
+            platformMember.MembershipGeneration++;
+            _audit.Record(platformScope, AccessAuditActions.MemberRevoked, $"user: {userId}; account-deleted");
+        }
+
+        EnsureSaved(await _unitOfWork.SaveAsync(ct), "remove user from all scopes");
+
+        // Invalidate cache for all affected scopes
+        foreach (var tenantId in allTenantIds)
+        {
+            _cache.InvalidateUser(AccessScope.ForTenant(tenantId), userId);
+        }
+        _cache.InvalidateUser(platformScope, userId);
+    }
+
     private async Task<long> NextGenerationAsync(CancellationToken ct)
     {
         var max = await _db.PlatformMembers

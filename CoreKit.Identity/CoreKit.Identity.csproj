@@ -9,10 +9,7 @@
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\CoreKit.SharedKernel\CoreKit.SharedKernel.csproj" />
+    <ProjectReference Include="..\CoreKit.Abstractions\CoreKit.Abstractions.csproj" />
   </ItemGroup>
 
   <ItemGroup>

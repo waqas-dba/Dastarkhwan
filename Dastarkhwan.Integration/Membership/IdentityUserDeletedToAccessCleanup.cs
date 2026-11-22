@@ -1,5 +1,6 @@
+using CoreKit.Abstractions.IntegrationEvents;
 using CoreKit.Access.Abstractions;
-using CoreKit.IntegrationEvents;
+using CoreKit.Identity.IntegrationEvents;
 using Microsoft.Extensions.Logging;
 
 namespace Dastarkhwan.Integration.Membership;
@@ -29,14 +30,9 @@ public sealed class IdentityUserDeletedToAccessCleanup : IEventHandler<IdentityU
     {
         var userId = integrationEvent.UserId;
 
-        // Remove platform membership (if any)
-        await _maintenance.RemovePlatformMemberAsync(userId, ct);
+        // Remove user from all scopes (platform and all tenants)
+        await _maintenance.RemoveUserFromAllScopesAsync(userId, ct);
 
-        // Note: RemoveUserAsync is per-scope (tenant). There's no single method to remove a user
-        // from ALL scopes. For now, we only clean up platform membership.
-        // Tenant-scoped assignments are cleaned up when the Tenant membership rows are deleted
-        // and the TenantMemberRemoved event fires for each tenant.
-
-        _logger.LogInformation("Removed Access platform membership for deleted user {UserId}.", userId);
+        _logger.LogInformation("Removed Access membership and all role assignments for deleted user {UserId}.", userId);
     }
 }

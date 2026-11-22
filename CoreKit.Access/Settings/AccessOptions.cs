@@ -29,10 +29,10 @@ public sealed class AccessOptions
     public string UserIdClaimType { get; set; } = "sub";
 
     /// <summary>
-    /// Where tenant membership comes from. Defaults to the legacy Tenant adapter so enabling the projection is
-    /// an explicit cutover step, not a silent behavior change.
+    /// Where tenant membership comes from. Defaults to the Access-owned projection, gated by freshness
+    /// and the tenant's lifecycle state.
     /// </summary>
-    public AccessMembershipSource MembershipSource { get; set; } = AccessMembershipSource.TenantAdapter;
+    public AccessMembershipSource MembershipSource { get; set; } = AccessMembershipSource.Projection;
 
     /// <summary>
     /// A projection lookup is trusted only when the Tenant heartbeat is no older than this. Bounds how long a

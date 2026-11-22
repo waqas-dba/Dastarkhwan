@@ -12,6 +12,7 @@ public sealed class AdministratorGuard : IAdministratorGuard
 {
     private readonly IPlatformAdministratorProvider _provider;
     private readonly IUserRepository _userRepository;
+    private readonly SemaphoreSlim _lastAdminLock = new(1, 1);
 
     public AdministratorGuard(IPlatformAdministratorProvider provider, IUserRepository userRepository)
     {
@@ -21,16 +22,35 @@ public sealed class AdministratorGuard : IAdministratorGuard
 
     public async Task<bool> IsLastActiveAdministratorAsync(Guid userId, CancellationToken ct = default)
     {
-        var adminUserIds = await _provider.GetPlatformAdministratorUserIdsAsync(ct);
+        // Serialize the check to prevent concurrent deactivation of the last two administrators.
+        // Note: This is an in-process lock. For multi-instance deployments, a distributed lock
+        // (e.g., PostgreSQL advisory lock or Redis lock) would be required.
+        await _lastAdminLock.WaitAsync(ct);
+        try
+        {
+            var adminUserIds = await _provider.GetPlatformAdministratorUserIdsAsync(ct);
 
-        if (adminUserIds.Count != 1)
-            return false;
+            // Filter out inactive Identity accounts. Access role holders may include users
+            // that have been deactivated in Identity; they should not count as active admins.
+            var activeAdminIds = new List<Guid>();
+            foreach (var adminId in adminUserIds)
+            {
+                var user = await _userRepository.FindByIdAsync(adminId, ct);
+                if (user is not null && user.IsActive)
+                {
+                    activeAdminIds.Add(adminId);
+                }
+            }
 
-        var soleAdminId = adminUserIds[0];
-        if (soleAdminId != userId)
-            return false;
+            if (activeAdminIds.Count != 1)
+                return false;
 
-        var user = await _userRepository.FindByIdAsync(soleAdminId, ct);
-        return user is not null && user.IsActive;
+            var soleAdminId = activeAdminIds[0];
+            return soleAdminId == userId;
+        }
+        finally
+        {
+            _lastAdminLock.Release();
+        }
     }
 }

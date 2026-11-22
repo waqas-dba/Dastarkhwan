@@ -1,6 +1,6 @@
 ﻿namespace CoreKit.Access.Persistence;
 
-internal interface IAccessRoleRepository
+public interface IAccessRoleRepository
 {
     /// <summary>Read-only, with permissions, ordered by name.</summary>
     Task<IReadOnlyList<AccessRole>> ListAsync(AccessScope scope, CancellationToken ct = default);

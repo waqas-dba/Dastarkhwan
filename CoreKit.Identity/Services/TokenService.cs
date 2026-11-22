@@ -13,7 +13,8 @@ public sealed class TokenService : ITokenService
 {
     private static readonly HashSet<string> ReservedClaims = new(StringComparer.Ordinal)
     {
-        "sub", "jti", "email", "name", "role", "permission", "iss", "aud", "exp", "nbf", "iat"
+        "sub", "jti", "email", "name", "role", "permission", "iss", "aud", "exp", "nbf", "iat",
+        IdentityClaimTypes.SecurityVersion
     };
 
     private readonly JwtOptions _options;

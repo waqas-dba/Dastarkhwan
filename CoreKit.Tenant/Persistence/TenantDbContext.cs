@@ -25,6 +25,8 @@ public sealed class TenantDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasDefaultSchema(TenantDbContextConfigurator.Schema);
+        
         modelBuilder.Entity<TenantEntity>(b =>
         {
             b.ToTable("TENANT_Tenants");

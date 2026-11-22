@@ -11,7 +11,7 @@ namespace CoreKit.Identity.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    public const string ConnectionStringName = "Identity";
+    public const string ConnectionStringName = "Default";
 
     /// <summary>
     /// The smallest registration: the Identity database, a clock and the password hasher.
@@ -39,7 +39,7 @@ public static class ServiceCollectionExtensions
             var connectionString = configuration.GetConnectionString(ConnectionStringName)
                 ?? throw new InvalidOperationException(
                     $"Connection string '{ConnectionStringName}' is missing. " +
-                    "Set ConnectionStrings:Identity (user-secrets or the ConnectionStrings__Identity environment variable).");
+                    "Set ConnectionStrings:Default (user-secrets or the ConnectionStrings__Default environment variable).");
 
             var database = sp.GetRequiredService<IOptions<DatabaseOptions>>().Value;
             IdentityDbContextConfigurator.Configure(options, connectionString, database);
@@ -55,7 +55,7 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Registers all of Identity for a web app: database, repositories, services, JWT authentication,
     /// permission-based authorization and rate limiting.
-    /// Reads "ConnectionStrings:Identity", "Identity:Jwt" and "Identity:RateLimit" from configuration.
+    /// Reads "ConnectionStrings:Default", "Identity:Jwt" and "Identity:RateLimit" from configuration.
     /// </summary>
     /// <param name="configureDatabase">
     /// Optional. Replaces the PostgreSQL setup, which is how tests plug in an in-memory database.

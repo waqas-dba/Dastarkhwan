@@ -1,5 +1,4 @@
-﻿using CoreKit.Abstractions.Identity;
-using CoreKit.Identity.Common;
+﻿using CoreKit.Identity.Common;
 using CoreKit.Identity.Entities;
 using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Models;

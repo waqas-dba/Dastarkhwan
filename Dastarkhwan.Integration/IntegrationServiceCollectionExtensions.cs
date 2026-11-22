@@ -1,9 +1,9 @@
-using CoreKit.Abstractions.Identity;
 using CoreKit.Abstractions.IntegrationEvents;
 using CoreKit.Access.Abstractions;
 using CoreKit.Access.Extensions;
 using CoreKit.Identity.Outbox;
 using CoreKit.Identity.IntegrationEvents;
+using CoreKit.Identity.Interfaces;
 using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Constants;
 using CoreKit.Tenant.Outbox;
@@ -49,12 +49,9 @@ public static class IntegrationServiceCollectionExtensions
                 p.Add(permission.Name, permission.Description);
         });
 
-        // Expose Tenant membership to Access through the public adapter contract. Access composes it
-        // with the platform (and default) adapter behind a single CompositeAccessMembership.
-        // NOTE: TenantAccessMembership registration removed per REV-15. Projection mode is now the
-        // default authorization source. If fallback is needed, register explicitly.
-        // services.AddScoped<IAccessMembershipAdapter, TenantAccessMembership>();
-
+        // Tenant membership is exposed to Access through the projection-only adapter (ProjectionAccessMembership).
+        // The old direct adapter (TenantAccessMembership) is removed per D-019: Access uses its own membership
+        // projection as the authoritative source. Missing, stale, or untrusted projection data fails closed.
         // Tenant adds its tenant claim to every access token Identity issues.
         services.TryAddScoped<IAccessTokenClaimsContributor, TenantClaimsContributor>();
 

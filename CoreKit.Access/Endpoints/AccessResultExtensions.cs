@@ -1,5 +1,4 @@
-﻿using CoreKit.Abstractions.Errors;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 
 namespace CoreKit.Access.Endpoints;
 
@@ -17,21 +16,27 @@ public static class AccessResultExtensions
 
     public static IResult ToHttpResult(this AccessError error)
     {
-        var (statusCode, title) = ProblemDetailsFactory.Map(error.Kind switch
-        {
-            AccessErrorKind.Validation => ErrorKind.Validation,
-            AccessErrorKind.Unauthorized => ErrorKind.Unauthorized,
-            AccessErrorKind.Forbidden => ErrorKind.Forbidden,
-            AccessErrorKind.NotFound => ErrorKind.NotFound,
-            AccessErrorKind.Conflict => ErrorKind.Conflict,
-            _ => ErrorKind.Internal
-        });
+        var (statusCode, title) = MapErrorKind(error.Kind);
 
-        return ProblemDetailsFactory.Create(
-            errorCode: error.Code,
-            title: title,
+        return Results.Problem(
             detail: error.Message,
             statusCode: statusCode,
-            traceId: System.Diagnostics.Activity.Current?.Id);
+            title: title,
+            type: $"https://dastarkhwan.platform/errors/{error.Code}",
+            extensions: new Dictionary<string, object?>
+            {
+                ["errorCode"] = error.Code,
+                ["traceId"] = System.Diagnostics.Activity.Current?.Id
+            });
     }
+
+    private static (int StatusCode, string Title) MapErrorKind(AccessErrorKind kind) => kind switch
+    {
+        AccessErrorKind.Validation => (StatusCodes.Status400BadRequest, "Invalid request"),
+        AccessErrorKind.Unauthorized => (StatusCodes.Status401Unauthorized, "Unauthorized"),
+        AccessErrorKind.Forbidden => (StatusCodes.Status403Forbidden, "Forbidden"),
+        AccessErrorKind.NotFound => (StatusCodes.Status404NotFound, "Not found"),
+        AccessErrorKind.Conflict => (StatusCodes.Status409Conflict, "Conflict"),
+        _ => (StatusCodes.Status500InternalServerError, "Internal server error")
+    };
 }

@@ -1,5 +1,4 @@
-﻿using CoreKit.Abstractions.Errors;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 
 namespace CoreKit.Tenant.Endpoints;
 
@@ -14,23 +13,29 @@ public static class TenantResultExtensions
 
     public static IResult ToHttpResult(this TenantError error)
     {
-        var (statusCode, title) = ProblemDetailsFactory.Map(error.Kind switch
-        {
-            TenantErrorKind.Validation => ErrorKind.Validation,
-            TenantErrorKind.Unauthorized => ErrorKind.Unauthorized,
-            TenantErrorKind.Forbidden => ErrorKind.Forbidden,
-            TenantErrorKind.NotFound => ErrorKind.NotFound,
-            TenantErrorKind.Conflict => ErrorKind.Conflict,
-            _ => ErrorKind.Internal
-        });
+        var (statusCode, title) = MapErrorKind(error.Kind);
 
-        return ProblemDetailsFactory.Create(
-            errorCode: error.Code,
-            title: title,
+        return Results.Problem(
             detail: error.Message,
             statusCode: statusCode,
-            traceId: System.Diagnostics.Activity.Current?.Id);
+            title: title,
+            type: $"https://dastarkhwan.platform/errors/{error.Code}",
+            extensions: new Dictionary<string, object?>
+            {
+                ["errorCode"] = error.Code,
+                ["traceId"] = System.Diagnostics.Activity.Current?.Id
+            });
     }
+
+    private static (int StatusCode, string Title) MapErrorKind(TenantErrorKind kind) => kind switch
+    {
+        TenantErrorKind.Validation => (StatusCodes.Status400BadRequest, "Invalid request"),
+        TenantErrorKind.Unauthorized => (StatusCodes.Status401Unauthorized, "Unauthorized"),
+        TenantErrorKind.Forbidden => (StatusCodes.Status403Forbidden, "Forbidden"),
+        TenantErrorKind.NotFound => (StatusCodes.Status404NotFound, "Not found"),
+        TenantErrorKind.Conflict => (StatusCodes.Status409Conflict, "Conflict"),
+        _ => (StatusCodes.Status500InternalServerError, "Internal server error")
+    };
 
     public static int StatusCodeFor(TenantErrorKind kind) => kind switch
     {

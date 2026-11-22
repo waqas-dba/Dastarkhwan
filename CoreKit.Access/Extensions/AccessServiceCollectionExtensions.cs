@@ -4,12 +4,12 @@ namespace CoreKit.Access.Extensions;
 
 public static class AccessServiceCollectionExtensions
 {
-    public const string ConnectionStringName = "Access";
+    public const string ConnectionStringName = "Default";
 
     /// <summary>
     /// Registers Access: database, repositories, services, and defaults that read the current user and
     /// scope through Access's own abstractions. Without a scope module nobody belongs to a scope, so
-    /// nothing is granted. Reads "ConnectionStrings:Access" and "Access".
+    /// nothing is granted. Reads "ConnectionStrings:Default" and "Access".
     /// </summary>
     /// <param name="configureDatabase">
     /// Optional. Replaces the PostgreSQL setup, which is how tests plug in another database.
@@ -47,7 +47,7 @@ public static class AccessServiceCollectionExtensions
             var connectionString = configuration.GetConnectionString(ConnectionStringName)
                 ?? throw new InvalidOperationException(
                     $"Connection string '{ConnectionStringName}' is missing. " +
-                    "Set ConnectionStrings:Access (user-secrets or the ConnectionStrings__Access environment variable).");
+                    "Set ConnectionStrings:Default (user-secrets or the ConnectionStrings__Default environment variable).");
 
             var database = sp.GetRequiredService<IOptions<AccessDatabaseOptions>>().Value;
             AccessDbContextConfigurator.Configure(options, connectionString, database);

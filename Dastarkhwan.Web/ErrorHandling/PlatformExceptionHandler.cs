@@ -1,4 +1,3 @@
-using CoreKit.Abstractions.Errors;
 using Dastarkhwan.Web.ErrorHandling;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;

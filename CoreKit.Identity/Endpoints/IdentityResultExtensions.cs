@@ -1,5 +1,4 @@
-﻿using CoreKit.Abstractions.Errors;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Http;
 
 namespace CoreKit.Identity.Endpoints;
 
@@ -14,21 +13,27 @@ internal static class IdentityResultExtensions
 
     private static IResult Problem(Common.IdentityError error)
     {
-        var (statusCode, title) = ProblemDetailsFactory.Map(error.Kind switch
-        {
-            IdentityErrorKind.Validation => ErrorKind.Validation,
-            IdentityErrorKind.Unauthorized => ErrorKind.Unauthorized,
-            IdentityErrorKind.Forbidden => ErrorKind.Forbidden,
-            IdentityErrorKind.NotFound => ErrorKind.NotFound,
-            IdentityErrorKind.Conflict => ErrorKind.Conflict,
-            _ => ErrorKind.Internal
-        });
+        var (statusCode, title) = MapErrorKind(error.Kind);
 
-        return ProblemDetailsFactory.Create(
-            errorCode: error.Code,
-            title: title,
+        return Results.Problem(
             detail: error.Message,
             statusCode: statusCode,
-            traceId: System.Diagnostics.Activity.Current?.Id);
+            title: title,
+            type: $"https://dastarkhwan.platform/errors/{error.Code}",
+            extensions: new Dictionary<string, object?>
+            {
+                ["errorCode"] = error.Code,
+                ["traceId"] = System.Diagnostics.Activity.Current?.Id
+            });
     }
+
+    private static (int StatusCode, string Title) MapErrorKind(IdentityErrorKind kind) => kind switch
+    {
+        IdentityErrorKind.Validation => (StatusCodes.Status400BadRequest, "Invalid request"),
+        IdentityErrorKind.Unauthorized => (StatusCodes.Status401Unauthorized, "Unauthorized"),
+        IdentityErrorKind.Forbidden => (StatusCodes.Status403Forbidden, "Forbidden"),
+        IdentityErrorKind.NotFound => (StatusCodes.Status404NotFound, "Not found"),
+        IdentityErrorKind.Conflict => (StatusCodes.Status409Conflict, "Conflict"),
+        _ => (StatusCodes.Status500InternalServerError, "Internal server error")
+    };
 }

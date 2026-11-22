@@ -17,6 +17,7 @@ namespace CoreKit.Identity.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
+                .HasDefaultSchema("identity")
                 .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
@@ -59,7 +60,7 @@ namespace CoreKit.Identity.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Idenity_EmailVerificationTokens", (string)null);
+                    b.ToTable("Idenity_EmailVerificationTokens", "identity");
                 });
 
             modelBuilder.Entity("CoreKit.Identity.Entities.IdentityOutboxMessage", b =>
@@ -128,7 +129,7 @@ namespace CoreKit.Identity.Migrations
                     b.HasIndex("Status", "NextAttemptAt")
                         .HasDatabaseName("IX_Identity_OutboxMessages_Status_NextAttemptAt");
 
-                    b.ToTable("Identity_OutboxMessages", (string)null);
+                    b.ToTable("Identity_OutboxMessages", "identity");
                 });
 
             modelBuilder.Entity("CoreKit.Identity.Entities.RefreshToken", b =>
@@ -169,7 +170,7 @@ namespace CoreKit.Identity.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Identity_RefreshTokens", (string)null);
+                    b.ToTable("Identity_RefreshTokens", "identity");
                 });
 
             modelBuilder.Entity("CoreKit.Identity.Entities.User", b =>
@@ -236,7 +237,7 @@ namespace CoreKit.Identity.Migrations
                         .HasDatabaseName("UX_Identity_Users_NormalizedMobile")
                         .HasFilter("\"NormalizedMobile\" IS NOT NULL");
 
-                    b.ToTable("Identity_Users", (string)null);
+                    b.ToTable("Identity_Users", "identity");
                 });
 
             modelBuilder.Entity("CoreKit.Identity.Entities.EmailVerificationToken", b =>

@@ -1,7 +1,5 @@
 using System.Diagnostics;
-using System.Net;
 using System.Security.Claims;
-using CoreKit.Abstractions.Errors;
 using CoreKit.Tenant.Settings;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
@@ -131,26 +129,31 @@ public sealed class TenantResolutionMiddleware
 
     private static async Task WriteErrorAsync(HttpContext context, TenantError error)
     {
-        var (statusCode, title) = ProblemDetailsFactory.Map(error.Kind switch
-        {
-            TenantErrorKind.Validation => ErrorKind.Validation,
-            TenantErrorKind.Unauthorized => ErrorKind.Unauthorized,
-            TenantErrorKind.Forbidden => ErrorKind.Forbidden,
-            TenantErrorKind.NotFound => ErrorKind.NotFound,
-            TenantErrorKind.Conflict => ErrorKind.Conflict,
-            _ => ErrorKind.Internal
-        });
+        var (statusCode, title) = MapErrorKind(error.Kind);
 
-        var result = ProblemDetailsFactory.Create(
-            errorCode: error.Code,
-            title: title,
+        var result = Results.Problem(
             detail: error.Message,
             statusCode: statusCode,
-            instance: context.Request.Path.Value,
-            traceId: Activity.Current?.Id ?? context.TraceIdentifier);
+            title: title,
+            type: $"https://dastarkhwan.platform/errors/{error.Code}",
+            extensions: new Dictionary<string, object?>
+            {
+                ["errorCode"] = error.Code,
+                ["traceId"] = Activity.Current?.Id ?? context.TraceIdentifier
+            });
 
         await result.ExecuteAsync(context);
     }
+
+    private static (int StatusCode, string Title) MapErrorKind(TenantErrorKind kind) => kind switch
+    {
+        TenantErrorKind.Validation => (StatusCodes.Status400BadRequest, "Invalid request"),
+        TenantErrorKind.Unauthorized => (StatusCodes.Status401Unauthorized, "Unauthorized"),
+        TenantErrorKind.Forbidden => (StatusCodes.Status403Forbidden, "Forbidden"),
+        TenantErrorKind.NotFound => (StatusCodes.Status404NotFound, "Not found"),
+        TenantErrorKind.Conflict => (StatusCodes.Status409Conflict, "Conflict"),
+        _ => (StatusCodes.Status500InternalServerError, "Internal server error")
+    };
 
     private static Guid? GetUserId(ClaimsPrincipal user)
     {

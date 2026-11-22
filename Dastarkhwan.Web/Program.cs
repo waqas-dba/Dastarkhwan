@@ -17,6 +17,7 @@ using CoreKit.Tenant.Persistence;
 using CoreKit.Tenant.Outbox;
 using Dastarkhwan.Integration;
 using Dastarkhwan.Integration.Endpoints;
+using Dastarkhwan.Web.Configuration;
 using Dastarkhwan.Web.Email;
 using Dastarkhwan.Web.ErrorHandling;
 using Microsoft.AspNetCore.Builder;
@@ -29,6 +30,10 @@ using System.Collections.Concurrent;
 using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Expand ${VAR_NAME} placeholders in configuration (e.g., ${DB_PASSWORD} in connection strings)
+// This must be added after all other configuration sources are loaded.
+builder.Configuration.AddEnvironmentVariableExpansion();
 
 // CORS: read allowed origins from configuration. Development allows any origin;
 // production requires explicit configuration (empty list = no cross-origin access).

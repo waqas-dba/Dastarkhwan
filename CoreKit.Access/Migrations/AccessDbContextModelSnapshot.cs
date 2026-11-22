@@ -17,6 +17,7 @@ namespace CoreKit.Access.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
+                .HasDefaultSchema("access")
                 .HasAnnotation("ProductVersion", "10.0.13")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
@@ -53,7 +54,7 @@ namespace CoreKit.Access.Migrations
 
                     b.HasIndex("ScopeType", "ScopeId", "UserId");
 
-                    b.ToTable("ACCESS_Assignments", (string)null);
+                    b.ToTable("ACCESS_Assignments", "access");
                 });
 
             modelBuilder.Entity("CoreKit.Access.Entities.AccessAuditEntry", b =>
@@ -66,27 +67,21 @@ namespace CoreKit.Access.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<Guid?>("ActorUserId")
-                        .HasColumnType("uuid");
+                    b.Property<string>("ActorSource")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("ActorType")
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
-                    b.Property<string>("ActorSource")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Details")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
-
-                    b.HasCheckConstraint(
-                        "CK_ACCESS_AuditEntries_Actor",
-                        @"(""ActorType"" = 'User' AND ""ActorUserId"" IS NOT NULL AND CAST(""ActorUserId"" AS VARCHAR(36)) <> '00000000-0000-0000-0000-000000000000' AND ""ActorSource"" IS NULL)
-OR (""ActorType"" = 'System' AND ""ActorUserId"" IS NULL AND ""ActorSource"" IS NOT NULL AND length(trim(""ActorSource"", chr(9)||chr(10)||chr(13)||' ')) > 0)
-OR (""ActorType"" = 'Unknown' AND ""ActorUserId"" IS NULL AND ""ActorSource"" IS NULL)");
 
                     b.Property<DateTime>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
@@ -103,7 +98,10 @@ OR (""ActorType"" = 'Unknown' AND ""ActorUserId"" IS NULL AND ""ActorSource"" IS
 
                     b.HasIndex("ScopeType", "ScopeId", "OccurredAt");
 
-                    b.ToTable("ACCESS_AuditEntries", (string)null);
+                    b.ToTable("ACCESS_AuditEntries", "access", t =>
+                        {
+                            t.HasCheckConstraint("CK_ACCESS_AuditEntries_Actor", "(\"ActorType\" = 'User' AND \"ActorUserId\" IS NOT NULL AND CAST(\"ActorUserId\" AS VARCHAR(36)) <> '00000000-0000-0000-0000-000000000000' AND \"ActorSource\" IS NULL)\r\n    OR (\"ActorType\" = 'System' AND \"ActorUserId\" IS NULL AND \"ActorSource\" IS NOT NULL AND length(trim(\"ActorSource\", chr(9)||chr(10)||chr(13)||' ')) > 0)\r\n    OR (\"ActorType\" = 'Unknown' AND \"ActorUserId\" IS NULL AND \"ActorSource\" IS NULL)");
+                        });
                 });
 
             modelBuilder.Entity("CoreKit.Access.Entities.AccessMembershipProjection", b =>
@@ -135,7 +133,7 @@ OR (""ActorType"" = 'Unknown' AND ""ActorUserId"" IS NULL AND ""ActorSource"" IS
                         .IsUnique()
                         .HasDatabaseName("UX_ACCESS_MembershipProjections_Tenant_User");
 
-                    b.ToTable("ACCESS_MembershipProjections", (string)null);
+                    b.ToTable("ACCESS_MembershipProjections", "access");
                 });
 
             modelBuilder.Entity("CoreKit.Access.Entities.AccessMembershipStreamCursor", b =>
@@ -152,7 +150,7 @@ OR (""ActorType"" = 'Unknown' AND ""ActorUserId"" IS NULL AND ""ActorSource"" IS
 
                     b.HasKey("TenantId");
 
-                    b.ToTable("ACCESS_MembershipStreamCursors", (string)null);
+                    b.ToTable("ACCESS_MembershipStreamCursors", "access");
                 });
 
             modelBuilder.Entity("CoreKit.Access.Entities.AccessMembershipWatermark", b =>
@@ -169,7 +167,7 @@ OR (""ActorType"" = 'Unknown' AND ""ActorUserId"" IS NULL AND ""ActorSource"" IS
 
                     b.HasKey("Id");
 
-                    b.ToTable("ACCESS_MembershipWatermarks", (string)null);
+                    b.ToTable("ACCESS_MembershipWatermarks", "access");
                 });
 
             modelBuilder.Entity("CoreKit.Access.Entities.AccessPlatformMember", b =>
@@ -194,7 +192,7 @@ OR (""ActorType"" = 'Unknown' AND ""ActorUserId"" IS NULL AND ""ActorSource"" IS
 
                     b.HasIndex("PlatformId", "UserId");
 
-                    b.ToTable("ACCESS_PlatformMembers", (string)null);
+                    b.ToTable("ACCESS_PlatformMembers", "access");
                 });
 
             modelBuilder.Entity("CoreKit.Access.Entities.AccessProcessedEvent", b =>
@@ -222,7 +220,7 @@ OR (""ActorType"" = 'Unknown' AND ""ActorUserId"" IS NULL AND ""ActorSource"" IS
                         .IsUnique()
                         .HasDatabaseName("UX_ACCESS_ProcessedEvents_Tenant_Sequence");
 
-                    b.ToTable("ACCESS_ProcessedEvents", (string)null);
+                    b.ToTable("ACCESS_ProcessedEvents", "access");
                 });
 
             modelBuilder.Entity("CoreKit.Access.Entities.AccessQuarantinedTenant", b =>
@@ -235,7 +233,7 @@ OR (""ActorType"" = 'Unknown' AND ""ActorUserId"" IS NULL AND ""ActorSource"" IS
 
                     b.HasKey("TenantId");
 
-                    b.ToTable("ACCESS_QuarantinedTenants", (string)null);
+                    b.ToTable("ACCESS_QuarantinedTenants", "access");
                 });
 
             modelBuilder.Entity("CoreKit.Access.Entities.AccessRole", b =>
@@ -281,7 +279,7 @@ OR (""ActorType"" = 'Unknown' AND ""ActorUserId"" IS NULL AND ""ActorSource"" IS
                         .IsUnique()
                         .HasDatabaseName("UX_ACCESS_Roles_Scope_Name");
 
-                    b.ToTable("ACCESS_Roles", (string)null);
+                    b.ToTable("ACCESS_Roles", "access");
                 });
 
             modelBuilder.Entity("CoreKit.Access.Entities.AccessRolePermission", b =>
@@ -295,7 +293,7 @@ OR (""ActorType"" = 'Unknown' AND ""ActorUserId"" IS NULL AND ""ActorSource"" IS
 
                     b.HasKey("RoleId", "Permission");
 
-                    b.ToTable("ACCESS_RolePermissions", (string)null);
+                    b.ToTable("ACCESS_RolePermissions", "access");
                 });
 
             modelBuilder.Entity("CoreKit.Access.Entities.AccessTenantState", b =>
@@ -313,7 +311,7 @@ OR (""ActorType"" = 'Unknown' AND ""ActorUserId"" IS NULL AND ""ActorSource"" IS
 
                     b.HasKey("TenantId");
 
-                    b.ToTable("ACCESS_TenantStates", (string)null);
+                    b.ToTable("ACCESS_TenantStates", "access");
                 });
 
             modelBuilder.Entity("CoreKit.Access.Entities.AccessAssignment", b =>

@@ -20,6 +20,9 @@ public interface ITenantMemberRepository
     /// <summary>Tracked, oldest membership first.</summary>
     Task<IReadOnlyList<TenantMember>> ListForUserForUpdateAsync(Guid userId, CancellationToken ct = default);
 
+    /// <summary>Read-only, including soft-deleted rows, with each member's tenant. Used for cleanup when a user is deleted from Identity.</summary>
+    Task<IReadOnlyList<TenantMember>> ListForUserIncludingRemovedAsync(Guid userId, CancellationToken ct = default);
+
     Task<int> CountOwnersAsync(Guid tenantId, CancellationToken ct = default);
 
     Task<bool> HasDefaultAsync(Guid userId, CancellationToken ct = default);
@@ -62,6 +65,13 @@ public sealed class TenantMemberRepository : ITenantMemberRepository
 
     public async Task<IReadOnlyList<TenantMember>> ListForUserForUpdateAsync(Guid userId, CancellationToken ct = default)
         => await _db.Members
+            .Where(m => m.UserId == userId)
+            .OrderBy(m => m.JoinedAt).ThenBy(m => m.TenantId)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<TenantMember>> ListForUserIncludingRemovedAsync(Guid userId, CancellationToken ct = default)
+        => await _db.Members.IgnoreQueryFilters()
+            .Include(m => m.Tenant)
             .Where(m => m.UserId == userId)
             .OrderBy(m => m.JoinedAt).ThenBy(m => m.TenantId)
             .ToListAsync(ct);

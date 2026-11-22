@@ -321,5 +321,23 @@ public sealed class TenantMembershipService : ITenantMembershipService
     public async Task<bool> IsMemberAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
         => await _members.FindAsync(tenantId, userId, ct) is not null;
 
+    public async Task<int> RemoveAllMembershipsForDeletedUserAsync(Guid userId, CancellationToken ct = default)
+    {
+        // Find all membership rows for this user (including soft-deleted ones)
+        var memberships = await _members.ListForUserIncludingRemovedAsync(userId, ct);
+
+        if (memberships.Count == 0)
+            return 0;
+
+        // Hard-delete all membership rows since the user no longer exists in Identity
+        foreach (var membership in memberships)
+        {
+            _members.Remove(membership);
+        }
+
+        await _unitOfWork.SaveAsync(ct);
+        return memberships.Count;
+    }
+
     private DateTime Now() => _time.GetUtcNow().UtcDateTime;
 }

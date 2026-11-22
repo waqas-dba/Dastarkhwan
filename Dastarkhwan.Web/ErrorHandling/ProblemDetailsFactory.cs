@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Http;
 
-namespace CoreKit.Abstractions.Errors;
+namespace Dastarkhwan.Web.ErrorHandling;
 
 /// <summary>
 /// Standardized RFC 9457 Problem Details factory for consistent error responses across modules.

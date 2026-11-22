@@ -21,4 +21,12 @@ public interface ITenantMembershipService
     Task<TenantResult> SetDefaultTenantAsync(Guid userId, Guid tenantId, CancellationToken ct = default);
 
     Task<bool> IsMemberAsync(Guid tenantId, Guid userId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Removes all membership rows for a deleted user across all tenants.
+    /// This is a system-level operation called when an Identity user is deleted.
+    /// Since the user no longer exists, owner protection and authorization checks are bypassed.
+    /// Returns the count of removed membership rows.
+    /// </summary>
+    Task<int> RemoveAllMembershipsForDeletedUserAsync(Guid userId, CancellationToken ct = default);
 }

@@ -8,8 +8,9 @@ namespace CoreKit.Tenant.Persistence;
 /// </summary>
 public static class TenantDbContextConfigurator
 {
-    /// <summary>Tenant keeps its own migration history, so it never mixes with Identity's or another module's.</summary>
+    /// <summary>Tenant keeps its own migration history in the tenant schema, so it never mixes with Identity's or another module's.</summary>
     public const string MigrationsHistoryTable = "__TenantMigrationsHistory";
+    public const string Schema = "tenant";
 
     public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options,
@@ -28,7 +29,7 @@ public static class TenantDbContextConfigurator
             builder.ConnectionString,
             npgsql =>
             {
-                npgsql.MigrationsHistoryTable(MigrationsHistoryTable);
+                npgsql.MigrationsHistoryTable(MigrationsHistoryTable, Schema);
 
                 // Retry on failure is explicitly disabled because Tenant uses manual transactions
                 // (BeginTransactionAsync) which are not compatible with EF Core's retry strategy.

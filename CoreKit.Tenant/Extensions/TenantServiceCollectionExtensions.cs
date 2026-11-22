@@ -5,11 +5,11 @@ namespace CoreKit.Tenant.Extensions;
 
 public static class TenantServiceCollectionExtensions
 {
-    public const string ConnectionStringName = "Tenant";
+    public const string ConnectionStringName = "Default";
 
     /// <summary>
     /// Registers everything Tenant needs: database, repositories, services, tenant resolution.
-    /// Reads "ConnectionStrings:Tenant" and "Tenant".
+    /// Reads "ConnectionStrings:Default" and "Tenant".
     /// </summary>
     /// <param name="configureDatabase">
     /// Optional. Replaces the PostgreSQL setup, which is how tests plug in another database.
@@ -44,7 +44,7 @@ public static class TenantServiceCollectionExtensions
             var connectionString = configuration.GetConnectionString(ConnectionStringName)
                 ?? throw new InvalidOperationException(
                     $"Connection string '{ConnectionStringName}' is missing. " +
-                    "Set ConnectionStrings:Tenant (user-secrets or the ConnectionStrings__Tenant environment variable).");
+                    "Set ConnectionStrings:Default (user-secrets or the ConnectionStrings__Default environment variable).");
 
             var database = sp.GetRequiredService<IOptions<DatabaseOptions>>().Value;
             TenantDbContextConfigurator.Configure(options, connectionString, database);

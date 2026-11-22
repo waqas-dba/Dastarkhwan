@@ -1,4 +1,7 @@
-﻿namespace CoreKit.Access.Persistence;
+﻿using CoreKit.Access.Entities;
+using Microsoft.EntityFrameworkCore;
+
+namespace CoreKit.Access.Persistence;
 
 /// <summary>Roles, their permissions, who holds them, the audit trail, and the tenant membership projection.</summary>
 public sealed class AccessDbContext : DbContext
@@ -31,6 +34,8 @@ public sealed class AccessDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.HasDefaultSchema(AccessDbContextConfigurator.Schema);
+        
         modelBuilder.Entity<AccessRole>(b =>
         {
             b.ToTable("ACCESS_Roles");

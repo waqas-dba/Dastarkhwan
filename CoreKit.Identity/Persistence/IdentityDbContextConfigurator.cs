@@ -9,10 +9,11 @@ namespace CoreKit.Identity.Persistence;
 public static class IdentityDbContextConfigurator
 {
     /// <summary>
-    /// Identity keeps its own migration history table, so later modules that share the
+    /// Identity keeps its own migration history table in the identity schema, so later modules that share the
     /// same database never mix their migrations with Identity's.
     /// </summary>
     public const string MigrationsHistoryTable = "__IdentityMigrationsHistory";
+    public const string Schema = "identity";
 
     public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options,
@@ -31,7 +32,7 @@ public static class IdentityDbContextConfigurator
             builder.ConnectionString,
             npgsql =>
             {
-                npgsql.MigrationsHistoryTable(MigrationsHistoryTable);
+                npgsql.MigrationsHistoryTable(MigrationsHistoryTable, Schema);
 
                 // Retry on failure is explicitly disabled because Identity uses manual transactions
                 // (BeginTransactionAsync) which are not compatible with EF Core's retry strategy.

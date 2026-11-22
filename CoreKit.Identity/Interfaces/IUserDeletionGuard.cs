@@ -1,4 +1,4 @@
-namespace CoreKit.Abstractions.Identity;
+namespace CoreKit.Identity.Interfaces;
 
 /// <summary>
 /// Validates whether a user can be deleted. Used for cross-module deletion checks.

@@ -8,8 +8,9 @@ namespace CoreKit.Access.Persistence;
 /// </summary>
 public static class AccessDbContextConfigurator
 {
-    /// <summary>Access keeps its own migration history, so it never mixes with another module's.</summary>
+    /// <summary>Access keeps its own migration history in the access schema, so it never mixes with another module's.</summary>
     public const string MigrationsHistoryTable = "__AccessMigrationsHistory";
+    public const string Schema = "access";
 
     public static DbContextOptionsBuilder Configure(
         DbContextOptionsBuilder options,
@@ -28,7 +29,7 @@ public static class AccessDbContextConfigurator
             builder.ConnectionString,
             npgsql =>
             {
-                npgsql.MigrationsHistoryTable(MigrationsHistoryTable);
+                npgsql.MigrationsHistoryTable(MigrationsHistoryTable, Schema);
 
                 // Retry on failure is explicitly disabled because Access uses manual transactions
                 // (BeginTransactionAsync) which are not compatible with EF Core's retry strategy.

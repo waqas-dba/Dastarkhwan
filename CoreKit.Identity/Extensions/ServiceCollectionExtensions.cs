@@ -103,7 +103,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
 
         // Focused collaborators.
-        services.AddScoped<IAdministratorGuard>(sp => new AdministratorGuard(Array.Empty<Guid>()));
+        services.AddScoped<IAdministratorGuard, AdministratorGuard>();
         services.AddScoped<ISessionIssuer, SessionIssuer>();
         services.AddSingleton<ITokenService, TokenService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();

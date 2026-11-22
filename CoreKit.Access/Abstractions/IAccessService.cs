@@ -29,4 +29,8 @@ public interface IAccessService
     /// <summary>All roles of a scope (read-only, unguarded). For callers that have already authorized their
     /// operation, for example Identity user management validating role ids and detecting the Administrator role.</summary>
     Task<IReadOnlyList<AccessRoleDto>> ListRolesAsync(AccessScope scope, CancellationToken ct = default);
+
+    /// <summary>Fresh access for a user in a scope, bypassing any cache. Used for security-critical
+    /// authorization decisions that must reflect the latest membership and role state.</summary>
+    Task<EffectiveAccess> GetFreshAccessAsync(Guid userId, AccessScope scope, CancellationToken ct = default);
 }

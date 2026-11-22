@@ -1,27 +1,36 @@
-﻿using System.Collections.Generic;
-using CoreKit.Identity.Interfaces;
+﻿using CoreKit.Identity.Interfaces;
+using CoreKit.Identity.Repositories;
 
 namespace CoreKit.Identity.Services;
 
 /// <summary>
 /// Prevents the one mistake that locks everybody out: removing, deactivating or deleting the last
-/// administrator. The host configures which user IDs count as administrators; Access owns the
-/// authoritative role data, so this guard is a best-effort check based on the configured list.
+/// administrator. Delegates to an <see cref="IPlatformAdministratorProvider"/> (implemented by Access)
+/// for the authoritative admin list, and verifies the user is active in Identity.
 /// </summary>
 public sealed class AdministratorGuard : IAdministratorGuard
 {
-    private readonly IReadOnlyCollection<Guid> _administratorUserIds;
+    private readonly IPlatformAdministratorProvider _provider;
+    private readonly IUserRepository _userRepository;
 
-    public AdministratorGuard(IEnumerable<Guid> administratorUserIds)
+    public AdministratorGuard(IPlatformAdministratorProvider provider, IUserRepository userRepository)
     {
-        _administratorUserIds = administratorUserIds is IReadOnlyCollection<Guid> collection
-            ? collection
-            : new List<Guid>(administratorUserIds);
+        _provider = provider;
+        _userRepository = userRepository;
     }
 
-    public Task<bool> IsLastActiveAdministratorAsync(Guid userId, CancellationToken ct = default)
+    public async Task<bool> IsLastActiveAdministratorAsync(Guid userId, CancellationToken ct = default)
     {
-        return Task.FromResult(
-            _administratorUserIds.Count == 1 && _administratorUserIds.Contains(userId));
+        var adminUserIds = await _provider.GetPlatformAdministratorUserIdsAsync(ct);
+
+        if (adminUserIds.Count != 1)
+            return false;
+
+        var soleAdminId = adminUserIds[0];
+        if (soleAdminId != userId)
+            return false;
+
+        var user = await _userRepository.FindByIdAsync(soleAdminId, ct);
+        return user is not null && user.IsActive;
     }
 }

@@ -198,7 +198,15 @@ public sealed class AuthService : IAuthService
 
         // Atomic: of two requests using the same token at the same moment, only one wins.
         if (!await _refreshTokenRepository.TryRevokeAsync(token.Id, now, ct))
+        {
+            // Another request already revoked this token: this is a replay/reuse of a stolen
+            // token. Revoke the entire family so no session can survive the compromise.
+            _logger.LogWarning(
+                "Refresh-token replay detected for user {UserId}, family {FamilyId}. Revoking the entire family.",
+                token.UserId, token.FamilyId);
+            await _refreshTokenRepository.RevokeAllInFamilyAsync(token.FamilyId, now, ct);
             return IdentityErrors.InvalidRefreshToken;
+        }
 
         // The refresh snapshot (user row read with the token) is stale-prone exactly like a
         // login snapshot, so issuance is guarded the same way: the version observed with the

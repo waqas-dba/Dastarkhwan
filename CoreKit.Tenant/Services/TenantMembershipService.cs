@@ -177,10 +177,18 @@ public sealed class TenantMembershipService : ITenantMembershipService
             return TenantErrors.NotFound("Member");
 
         // F1: Require an identified actor for owner removal.
+        // Only tenant owners or platform administrators can remove an owner.
         if (member.IsOwner)
         {
             if (_actor.UserId is null || _actor.UserId == Guid.Empty)
                 return TenantErrors.Forbidden("An identified actor is required to remove an owner.");
+
+            if (!await _platform.IsGrantedAsync(ct))
+            {
+                var caller = await _members.FindAsync(tenantId, _actor.UserId.Value, ct);
+                if (caller is null || !caller.IsOwner)
+                    return TenantErrors.Forbidden("Only a tenant owner or platform administrator can remove an owner.");
+            }
         }
 
         if (member.IsOwner && await _members.CountOwnersAsync(tenantId, ct) <= 1)

@@ -20,10 +20,12 @@ using Dastarkhwan.Integration.Endpoints;
 using Dastarkhwan.Web.ErrorHandling;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
+using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -73,13 +75,26 @@ builder.Services.AddHsts(options =>
 });
 
 // Forwarded headers: trust X-Forwarded-For and X-Forwarded-Proto from a reverse proxy.
-// Only configure when behind a proxy; the host sets ForwardedHeadersOptions.AllowedHosts.
-builder.Services.Configure<ForwardedHeadersOptions>(options =>
-{
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    options.KnownNetworks.Clear();
-    options.KnownProxies.Clear();
-});
+ // Do NOT clear KnownProxies/KnownNetworks: clearing them trusts any client-supplied
+ // forwarded header, enabling IP spoofing and rate-limit bypass. Trusted reverse-proxy
+ // addresses must be added explicitly via "ForwardedHeaders:KnownProxies" configuration.
+ // By default only loopback is trusted, which is safe for non-proxied deployments.
+ builder.Services.Configure<ForwardedHeadersOptions>(options =>
+ {
+     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+     foreach (var proxy in builder.Configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? Array.Empty<string>())
+     {
+         if (System.Net.IPAddress.TryParse(proxy, out var address))
+         {
+             options.KnownProxies.Add(address);
+         }
+         else if (System.Net.IPNetwork.TryParse(proxy, out var network))
+         {
+             options.KnownIPNetworks.Add(network);
+         }
+     }
+ });
 
 builder.Services.AddIdentity(builder.Configuration);
 
@@ -97,7 +112,15 @@ builder.Services.AddIdentitySeeding(builder.Configuration);
 builder.Services.AddTenant(builder.Configuration);
 builder.Services.AddAccess(builder.Configuration);
 
-// Register the Dastarkhwan integration (cross-module wiring)
+ // Wire Identity's IPlatformAdministratorProvider to Access's IAccessService
+ // This keeps Identity independent of Access; the host (which references both) connects them.
+ builder.Services.AddScoped<CoreKit.Identity.Interfaces.IPlatformAdministratorProvider>(sp =>
+ {
+     var access = sp.GetRequiredService<CoreKit.Access.Abstractions.IAccessService>();
+     return new AccessPlatformAdministratorProvider(access);
+ });
+
+ // Register the Dastarkhwan integration (cross-module wiring)
 builder.Services.AddDastarkhwanIntegration();
 
 // Register outbox publisher and projection recovery (opt-in, required for projection mode)
@@ -312,5 +335,22 @@ public sealed class ConsoleEmailSender : IIdentityEmailSender
             message.Email, message.Token, message.ExpiresAt);
 
         return Task.CompletedTask;
+    }
+}
+
+/// <summary>Adapter: implements Identity's IPlatformAdministratorProvider using Access's IAccessService.</summary>
+internal sealed class AccessPlatformAdministratorProvider : CoreKit.Identity.Interfaces.IPlatformAdministratorProvider
+{
+    private readonly CoreKit.Access.Abstractions.IAccessService _access;
+
+    public AccessPlatformAdministratorProvider(CoreKit.Access.Abstractions.IAccessService access)
+    {
+        _access = access;
+    }
+
+    public Task<IReadOnlyList<Guid>> GetPlatformAdministratorUserIdsAsync(CancellationToken ct = default)
+    {
+        var platformScope = CoreKit.Access.Abstractions.AccessScope.ForPlatform(CoreKit.Access.Abstractions.AccessScope.PlatformId);
+        return _access.ListUserIdsWithRoleAsync(platformScope, "Administrator", ct);
     }
 }

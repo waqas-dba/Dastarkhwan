@@ -40,6 +40,9 @@ public sealed class FakePermissionChecker : IPermissionChecker
 
     public Task<bool> HasPlatformPermissionAsync(string permission, CancellationToken ct = default)
         => Task.FromResult(_permissions.Contains(permission));
+
+    public Task<bool> HasFreshPermissionAsync(string permission, CancellationToken ct = default)
+        => Task.FromResult(_permissions.Contains(permission));
 }
 
 public sealed class FakeTenantPermissionChecker : ITenantPermissionChecker
@@ -56,6 +59,9 @@ public sealed class FakeTenantPermissionChecker : ITenantPermissionChecker
         => Task.FromResult(_permissions.Contains(permission));
 
     public Task<bool> HasPlatformPermissionAsync(string permission, CancellationToken ct = default)
+        => Task.FromResult(_permissions.Contains(permission));
+
+    public Task<bool> HasFreshPermissionAsync(string permission, CancellationToken ct = default)
         => Task.FromResult(_permissions.Contains(permission));
 }
 

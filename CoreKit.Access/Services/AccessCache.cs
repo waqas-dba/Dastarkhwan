@@ -40,7 +40,7 @@ internal interface IAccessCache
 /// </summary>
 internal sealed class AccessCache : IAccessCache, IDisposable
 {
-    private const int DefaultMaxGenerationEntries = 10_000;
+    private const int DefaultMaxGenerationEntries = 100_000;
 
     private readonly ReaderWriterLockSlim _gate = new();
     private readonly IMemoryCache _cache;

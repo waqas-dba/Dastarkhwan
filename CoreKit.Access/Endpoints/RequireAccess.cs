@@ -59,17 +59,36 @@ public sealed class RequireAccessFilter : IEndpointFilter
         if (_scopeContext.Current is null)
             return AccessErrors.ScopeRequired.ToHttpResult();
 
-        if (_currentUser.UserId is null)
+        if (_currentUser.UserId is not { } userId || userId == Guid.Empty || !_currentUser.IsAuthenticated)
             return AccessErrors.NotAuthenticated.ToHttpResult();
 
-        // Access answers from its effective-access cache, which role and assignment changes invalidate.
-        // Revocation is therefore prompt, not immediate: a permission removed without going through Access
-        // keeps working until the cached entry expires.
-        var allowed = await _access.HasPermissionAsync(_permission, context.HttpContext.RequestAborted);
+        // Write permissions (role/assignment/platform membership management) use fresh access
+        // that bypasses the cache, so a permission just revoked is not still honored through a
+        // remembered copy. Read permissions use the cached path for performance.
+        bool allowed;
+        if (RequiresFreshAuthority(_permission))
+        {
+            var freshAccess = await ((IFreshAccessSource)_access)
+                .GetFreshAccessAsync(userId, _scopeContext.Current!.Value, context.HttpContext.RequestAborted);
+            allowed = freshAccess.Has(_permission);
+        }
+        else
+        {
+            allowed = await _access.HasPermissionAsync(_permission, context.HttpContext.RequestAborted);
+        }
 
         if (!allowed)
             return AccessErrors.Denied.ToHttpResult();
 
         return await next(context);
     }
+
+    /// <summary>
+    /// Write permissions require fresh authority: changing roles or assignments is decided on the
+    /// person's permissions right now, not from a remembered copy.
+    /// </summary>
+    private static bool RequiresFreshAuthority(string permission)
+        => permission is AccessPermissionNames.RolesManage
+            or AccessPermissionNames.AssignmentsManage
+            or AccessPermissionNames.PlatformMembersManage;
 }

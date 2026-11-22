@@ -1,6 +1,6 @@
+using System.Diagnostics;
 using System.Net;
 using System.Security.Claims;
-using System.Text.Json;
 using CoreKit.Tenant.Resolution;
 
 namespace CoreKit.Tenant.Resolution;
@@ -115,12 +115,31 @@ public sealed class TenantResolutionMiddleware
 
     private static async Task WriteErrorAsync(HttpContext context, TenantError error)
     {
-        context.Response.StatusCode = Endpoints.TenantResultExtensions.StatusCodeFor(error.Kind);
-        context.Response.ContentType = "application/json";
+        var (statusCode, title) = error.Kind switch
+        {
+            TenantErrorKind.Validation => (StatusCodes.Status400BadRequest, "Invalid request"),
+            TenantErrorKind.Unauthorized => (StatusCodes.Status401Unauthorized, "Unauthorized"),
+            TenantErrorKind.Forbidden => (StatusCodes.Status403Forbidden, "Forbidden"),
+            TenantErrorKind.NotFound => (StatusCodes.Status404NotFound, "Not found"),
+            TenantErrorKind.Conflict => (StatusCodes.Status409Conflict, "Conflict"),
+            _ => (StatusCodes.Status500InternalServerError, "Internal server error")
+        };
 
-        await context.Response.WriteAsync(
-            JsonSerializer.Serialize(new { code = error.Code, message = error.Message }),
-            context.RequestAborted);
+        var traceId = Activity.Current?.Id ?? context.TraceIdentifier;
+
+        context.Response.StatusCode = statusCode;
+        context.Response.ContentType = "application/problem+json";
+
+        await context.Response.WriteAsJsonAsync(new
+        {
+            type = $"https://dastarkhwan.platform/errors/{error.Code}",
+            title = title,
+            status = statusCode,
+            detail = error.Message,
+            errorCode = error.Code,
+            instance = context.Request.Path,
+            traceId = traceId
+        }, context.RequestAborted);
     }
 
     private static Guid? GetUserId(ClaimsPrincipal user)

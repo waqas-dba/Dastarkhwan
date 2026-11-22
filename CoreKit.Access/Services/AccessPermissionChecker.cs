@@ -5,15 +5,29 @@ internal sealed class AccessPermissionChecker : IPermissionChecker
 {
     private readonly IAccessService _access;
     private readonly IAccessCurrentUser _actor;
+    private readonly IAccessScopeContext _scopeContext;
 
-    public AccessPermissionChecker(IAccessService access, IAccessCurrentUser actor)
+    public AccessPermissionChecker(IAccessService access, IAccessCurrentUser actor, IAccessScopeContext scopeContext)
     {
         _access = access;
         _actor = actor;
+        _scopeContext = scopeContext;
     }
 
     public Task<bool> HasPermissionAsync(string permission, CancellationToken ct = default)
         => _access.HasPermissionAsync(permission, ct);
+
+    public async Task<bool> HasFreshPermissionAsync(string permission, CancellationToken ct = default)
+    {
+        // Fail closed: no scope, no user, or not authenticated.
+        if (_scopeContext.Current is not { } scope || !scope.IsValid)
+            return false;
+        if (_actor.UserId is not { } userId || userId == Guid.Empty || !_actor.IsAuthenticated)
+            return false;
+
+        var freshAccess = await _access.GetFreshAccessAsync(userId, scope, ct);
+        return freshAccess.Has(permission);
+    }
 
     public async Task<bool> HasPlatformPermissionAsync(string permission, CancellationToken ct = default)
     {

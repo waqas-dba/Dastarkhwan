@@ -71,7 +71,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
         if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
 
-        if (!await _permissions.HasPermissionAsync(TenantPermissionNames.MembersManage, ct))
+        if (!await _permissions.HasFreshPermissionAsync(TenantPermissionNames.MembersManage, ct))
             return TenantErrors.Forbidden(TenantPermissionNames.MembersManage);
 
         // F1: Require an identified actor for ownership assignment.
@@ -159,7 +159,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
         if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
 
-        if (!await _permissions.HasPermissionAsync(TenantPermissionNames.MembersManage, ct))
+        if (!await _permissions.HasFreshPermissionAsync(TenantPermissionNames.MembersManage, ct))
             return TenantErrors.Forbidden(TenantPermissionNames.MembersManage);
 
         // F3: Load and track the tenant BEFORE reading the membership state, so the
@@ -226,7 +226,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
         if (await _guard.EnsureCanAccessAsync(tenantId, ct) is { } denied)
             return denied;
 
-        if (!await _permissions.HasPermissionAsync(TenantPermissionNames.MembersManage, ct))
+        if (!await _permissions.HasFreshPermissionAsync(TenantPermissionNames.MembersManage, ct))
             return TenantErrors.Forbidden(TenantPermissionNames.MembersManage);
 
         // F3: Load and track the tenant BEFORE the owner-count decision, so the

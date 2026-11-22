@@ -1,4 +1,6 @@
-﻿namespace CoreKit.Tenant.Services;
+﻿using System.Threading;
+
+namespace CoreKit.Tenant.Services;
 
 public sealed class TenantPlatformAccess : ITenantPlatformAccess
 {
@@ -8,18 +10,19 @@ public sealed class TenantPlatformAccess : ITenantPlatformAccess
     public TenantPlatformAccess(ITenantActor actor) => _actor = actor;
 
     public Task<bool> IsGrantedAsync(CancellationToken ct = default)
-        => _grants > 0 ? Task.FromResult(true) : _actor.IsPlatformAdminAsync(ct);
+        => Interlocked.CompareExchange(ref _grants, 0, 0) > 0
+            ? Task.FromResult(true)
+            : _actor.IsPlatformAdminAsync(ct);
 
     public IDisposable Grant()
     {
-        _grants++;
+        Interlocked.Increment(ref _grants);
         return new GrantScope(this);
     }
 
     private void Release()
     {
-        if (_grants > 0)
-            _grants--;
+        Interlocked.Decrement(ref _grants);
     }
 
     private sealed class GrantScope : IDisposable

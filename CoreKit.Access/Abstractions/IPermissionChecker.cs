@@ -10,6 +10,13 @@ public interface IPermissionChecker
     Task<bool> HasPermissionAsync(string permission, CancellationToken ct = default);
 
     /// <summary>
+    /// Fresh permission check that bypasses the effective-access cache. Use for write operations
+    /// (role/assignment/platform membership management) so a permission just revoked is not still
+    /// honored through a remembered copy.
+    /// </summary>
+    Task<bool> HasFreshPermissionAsync(string permission, CancellationToken ct = default);
+
+    /// <summary>
     /// The same question, always answered against the fixed platform scope rather than the ambient
     /// request scope. Used by platform-level operations (for example Identity user management) that
     /// are not inside a tenant. Fail closed: no user, or no permission, means false.

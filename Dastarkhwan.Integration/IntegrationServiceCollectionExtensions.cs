@@ -89,6 +89,9 @@ public static class IntegrationServiceCollectionExtensions
         public Task<bool> HasPermissionAsync(string permission, CancellationToken ct = default)
             => _inner.HasPermissionAsync(permission, ct);
 
+        public Task<bool> HasFreshPermissionAsync(string permission, CancellationToken ct = default)
+            => _inner.HasFreshPermissionAsync(permission, ct);
+
         public Task<bool> HasPlatformPermissionAsync(string permission, CancellationToken ct = default)
             => _inner.HasPlatformPermissionAsync(permission, ct);
     }

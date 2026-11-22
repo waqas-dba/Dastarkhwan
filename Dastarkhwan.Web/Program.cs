@@ -18,6 +18,8 @@ using CoreKit.Tenant.Outbox;
 using Dastarkhwan.Integration;
 using Dastarkhwan.Integration.Endpoints;
 using Dastarkhwan.Web.ErrorHandling;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -37,6 +39,47 @@ else if (!builder.Services.Any(d => d.ServiceType == typeof(IIdentityEmailSender
     throw new InvalidOperationException(
         "A production IIdentityEmailSender must be registered before starting in non-Development environments.");
 }
+
+// CORS: read allowed origins from configuration. Development allows any origin;
+// production requires explicit configuration (empty list = no cross-origin access).
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? Array.Empty<string>();
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Default", policy =>
+    {
+        if (builder.Environment.IsDevelopment() && allowedOrigins.Length == 0)
+        {
+            policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+        }
+        else
+        {
+            foreach (var origin in allowedOrigins)
+                policy.WithOrigins(origin);
+            policy.AllowAnyMethod().AllowAnyHeader();
+        }
+    });
+});
+
+// HTTPS redirection and HSTS.
+builder.Services.AddHttpsRedirection(options =>
+{
+    options.RedirectStatusCode = StatusCodes.Status307TemporaryRedirect;
+    options.HttpsPort = null;
+});
+builder.Services.AddHsts(options =>
+{
+    options.MaxAge = TimeSpan.FromDays(90);
+    options.IncludeSubDomains = true;
+});
+
+// Forwarded headers: trust X-Forwarded-For and X-Forwarded-Proto from a reverse proxy.
+// Only configure when behind a proxy; the host sets ForwardedHeadersOptions.AllowedHosts.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 builder.Services.AddIdentity(builder.Configuration);
 
@@ -145,7 +188,11 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+app.UseForwardedHeaders();   // trust X-Forwarded-For / X-Forwarded-Proto from reverse proxy
+app.UseHsts();               // Strict-Transport-Security header
+app.UseHttpsRedirection();   // redirect HTTP to HTTPS
 app.UsePlatformExceptionHandler();   // centralized RFC 9457 Problem Details for all exceptions
+app.UseCors("Default");      // CORS before authentication
 app.UseIdentity();      // authentication -> rate limiter -> authorization
 app.UseTenant();   // after UseIdentity: it reads the tenant claim from the signed-in user
 app.MapIdentity();      // /identity/auth/..., /identity/users, /identity/roles, /identity/permissions

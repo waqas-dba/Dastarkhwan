@@ -10,7 +10,27 @@ public static class TenantResultExtensions
         => result.IsSuccess ? Results.Ok(result.Value) : result.Error!.ToHttpResult();
 
     public static IResult ToHttpResult(this TenantError error)
-        => Results.Json(new { code = error.Code, message = error.Message }, statusCode: StatusCodeFor(error.Kind));
+    {
+        var (statusCode, title) = error.Kind switch
+        {
+            TenantErrorKind.Validation => (StatusCodes.Status400BadRequest, "Invalid request"),
+            TenantErrorKind.Unauthorized => (StatusCodes.Status401Unauthorized, "Unauthorized"),
+            TenantErrorKind.Forbidden => (StatusCodes.Status403Forbidden, "Forbidden"),
+            TenantErrorKind.NotFound => (StatusCodes.Status404NotFound, "Not found"),
+            TenantErrorKind.Conflict => (StatusCodes.Status409Conflict, "Conflict"),
+            _ => (StatusCodes.Status500InternalServerError, "Internal server error")
+        };
+
+        return Results.Json(new
+        {
+            type = $"https://dastarkhwan.platform/errors/{error.Code}",
+            title = title,
+            status = statusCode,
+            detail = error.Message,
+            errorCode = error.Code,
+            instance = string.Empty
+        }, statusCode: statusCode, contentType: "application/problem+json");
+    }
 
     public static int StatusCodeFor(TenantErrorKind kind) => kind switch
     {

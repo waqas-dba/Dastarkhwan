@@ -227,5 +227,8 @@ public sealed class TenantMemberRemovedAccessCacheTests : IDisposable
 
         public Task<bool> HasPlatformPermissionAsync(string permission, CancellationToken ct = default)
             => Task.FromResult(_permissions.Contains(permission));
+
+        public Task<bool> HasFreshPermissionAsync(string permission, CancellationToken ct = default)
+            => Task.FromResult(_permissions.Contains(permission));
     }
 }

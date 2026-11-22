@@ -128,11 +128,11 @@ public sealed class AccessAuditActorTests : IDisposable
         var scratch = await PostgresScratchDb.TryCreateAsync(_output);
         if (scratch is null)
         {
-            // Optional mode: PostgreSQL is not available. No assertions are executed so this
-            // is never mistaken for a passing test. In required mode
-            // (COREKIT_REQUIRE_POSTGRES=1) TryCreateAsync throws above, failing the test.
-            _output.WriteLine("Skipped: PostgreSQL migration test infrastructure unavailable; no assertions executed.");
-            return;
+            // Optional mode: PostgreSQL is not available. Report a genuine framework-recognized
+            // skip so a missing optional PostgreSQL never produces a falsely passing test. In
+            // required mode (COREKIT_REQUIRE_POSTGRES=1) TryCreateAsync throws above, failing
+            // the test with a clear error instead of skipping.
+            Assert.Skip("PostgreSQL migration test infrastructure unavailable: ConnectionStrings__Access is not set or a scratch database could not be created. Set COREKIT_REQUIRE_POSTGRES=1 to require PostgreSQL and fail instead of skipping.");
         }
 
         await using (scratch)
@@ -151,18 +151,26 @@ public sealed class AccessAuditActorTests : IDisposable
             // Migrate to the state just before the actor-schema migration: no ActorType / ActorUserId / ActorSource columns.
             migrator.Migrate("20261116043029_AddAccessMembershipStreamAndFreshness");
 
-            // Insert pre-existing historical rows. ActorUserId column does not exist yet, so it is omitted.
+            // Insert pre-existing historical rows. ActorUserId already exists (nullable); id1/id2 omit
+            // it (NULL -> Unknown), id3 sets it (non-null -> User).
             var scopeId = Guid.NewGuid();
             var id1 = Guid.NewGuid();
             var id2 = Guid.NewGuid();
+            // id3 carries a non-null ActorUserId so the backfill must classify it as User.
+            var id3 = Guid.NewGuid();
+            var actorUserId = Guid.NewGuid();
 
             await using (var insert = new NpgsqlCommand(@"
                 INSERT INTO ""ACCESS_AuditEntries"" (""Id"", ""ScopeType"", ""ScopeId"", ""Action"", ""Details"", ""OccurredAt"")
                 VALUES (@id1, 'tenant', @scopeId, 'access.role_created', 'historic', '2026-01-01 12:00:00+00'),
-                        (@id2, 'tenant', @scopeId, 'access.role_created', 'historic', '2026-01-01 12:00:00+00');", connection))
+                        (@id2, 'tenant', @scopeId, 'access.role_created', 'historic', '2026-01-01 12:00:00+00');
+                INSERT INTO ""ACCESS_AuditEntries"" (""Id"", ""ScopeType"", ""ScopeId"", ""Action"", ""Details"", ""OccurredAt"", ""ActorUserId"")
+                VALUES (@id3, 'tenant', @scopeId, 'access.role_created', 'historic with actor', '2026-01-01 12:00:00+00', @actorUserId);", connection))
             {
                 insert.Parameters.AddWithValue("@id1", id1);
                 insert.Parameters.AddWithValue("@id2", id2);
+                insert.Parameters.AddWithValue("@id3", id3);
+                insert.Parameters.AddWithValue("@actorUserId", actorUserId);
                 insert.Parameters.AddWithValue("@scopeId", scopeId);
                 await insert.ExecuteNonQueryAsync();
             }
@@ -206,6 +214,24 @@ public sealed class AccessAuditActorTests : IDisposable
                 Assert.Equal(AccessAuditEntry.ActorTypeUnknown, reader.GetString(0));
                 Assert.True(reader.IsDBNull(1));
                 Assert.True(reader.IsDBNull(2));
+            }
+
+            // id3 had a non-null ActorUserId, so the backfill must classify it as User;
+            // its ActorUserId is preserved and ActorSource stays null.
+            await using (var row3 = new NpgsqlCommand(@"
+                SELECT ""ActorType"", ""ActorUserId"", ""ActorSource"", ""Action"", ""Details"", ""ScopeType"", ""ScopeId"", ""OccurredAt""
+                FROM ""ACCESS_AuditEntries"" WHERE ""Id"" = @id;", connection))
+            {
+                row3.Parameters.AddWithValue("@id", id3);
+                await using var reader = await row3.ExecuteReaderAsync();
+                Assert.True(await reader.ReadAsync());
+                Assert.Equal(AccessAuditEntry.ActorTypeUser, reader.GetString(0));
+                Assert.Equal(actorUserId, reader.GetGuid(1));
+                Assert.True(reader.IsDBNull(2)); // ActorSource is NULL
+                Assert.Equal("access.role_created", reader.GetString(3));
+                Assert.Equal("historic with actor", reader.GetString(4));
+                Assert.Equal("tenant", reader.GetString(5));
+                Assert.Equal(scopeId, reader.GetGuid(6));
             }
 
             // Apply the check-constraint migration, then the whitespace corrective migration.

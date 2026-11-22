@@ -29,10 +29,6 @@ public sealed class AccessDbContext : DbContext
 
     public DbSet<AccessTenantState> TenantStates => Set<AccessTenantState>();
 
-    // Whitespace characters the database treats as blank when validating a system actor source.
-    // trim() alone only strips spaces (U+0020); this covers tab, carriage return and newline too.
-    private const string ActorSourceWhitespaceTrimChars = " \t\r\n";
-
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<AccessRole>(b =>
@@ -107,7 +103,7 @@ public sealed class AccessDbContext : DbContext
             b.HasCheckConstraint(
                 "CK_ACCESS_AuditEntries_Actor",
                 $@"(""ActorType"" = 'User' AND ""ActorUserId"" IS NOT NULL AND CAST(""ActorUserId"" AS VARCHAR(36)) <> '00000000-0000-0000-0000-000000000000' AND ""ActorSource"" IS NULL)
-    OR (""ActorType"" = 'System' AND ""ActorUserId"" IS NULL AND ""ActorSource"" IS NOT NULL AND length(trim(""ActorSource"", '{ActorSourceWhitespaceTrimChars}')) > 0)
+    OR (""ActorType"" = 'System' AND ""ActorUserId"" IS NULL AND ""ActorSource"" IS NOT NULL AND length(trim(""ActorSource"", chr(9)||chr(10)||chr(13)||' ')) > 0)
     OR (""ActorType"" = 'Unknown' AND ""ActorUserId"" IS NULL AND ""ActorSource"" IS NULL)");
         });
 

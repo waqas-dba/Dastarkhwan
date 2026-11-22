@@ -17,6 +17,7 @@ using CoreKit.Tenant.Persistence;
 using CoreKit.Tenant.Outbox;
 using Dastarkhwan.Integration;
 using Dastarkhwan.Integration.Endpoints;
+using Dastarkhwan.Web.Email;
 using Dastarkhwan.Web.ErrorHandling;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors.Infrastructure;
@@ -28,19 +29,6 @@ using System.Collections.Concurrent;
 using System.Net;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Development only: prints the verification token and keeps it for the Postman tests.
-// In a real app, register a sender that emails the link.
-if (builder.Environment.IsDevelopment())
-{
-    builder.Services.AddSingleton<DevEmailInbox>();
-    builder.Services.AddSingleton<IIdentityEmailSender, ConsoleEmailSender>();
-}
-else if (!builder.Services.Any(d => d.ServiceType == typeof(IIdentityEmailSender)))
-{
-    throw new InvalidOperationException(
-        "A production IIdentityEmailSender must be registered before starting in non-Development environments.");
-}
 
 // CORS: read allowed origins from configuration. Development allows any origin;
 // production requires explicit configuration (empty list = no cross-origin access).
@@ -96,6 +84,9 @@ builder.Services.AddHsts(options =>
      }
  });
 
+// Register HttpClient for SaaS email providers (SendGrid, Mailgun)
+builder.Services.AddHttpClient();
+
 builder.Services.AddIdentity(builder.Configuration);
 
 // Register Problem Details (RFC 9457).
@@ -139,6 +130,15 @@ builder.Services.AddScoped<CoreKit.Access.Abstractions.IAccessBootstrap, CoreKit
 builder.Services.AddTenantRateLimiting(builder.Configuration);
 builder.Services.AddAccessRateLimiting();
 
+// Register email sender based on environment and configuration
+builder.Services.AddEmailSender();
+
+// Register DevEmailInbox for development token retrieval
+if (builder.Environment.IsDevelopment())
+{
+    builder.Services.AddSingleton<DevEmailInbox>();
+}
+
 // The application declares what can be allowed, and the roles every new tenant starts with.
 builder.Services.AddAccessPermissions(p =>
 {
@@ -176,27 +176,38 @@ if (app.Environment.IsDevelopment())
     }
 }
 else
-{
-    // Production must never auto-migrate. Verify connectivity so an incompatible or
-    // unreachable database fails safely with an actionable diagnostic.
-    using (var scope = app.Services.CreateScope())
     {
-        var sp = scope.ServiceProvider;
-        foreach (var context in new DbContext[]
+        // Production must never auto-migrate. Verify connectivity so an incompatible or
+        // unreachable database fails safely with an actionable diagnostic.
+        using (var scope = app.Services.CreateScope())
         {
-            sp.GetRequiredService<IdentityDbContext>(),
-            sp.GetRequiredService<TenantDbContext>(),
-            sp.GetRequiredService<AccessDbContext>()
-        })
-        {
-            if (!await context.Database.CanConnectAsync())
+            var sp = scope.ServiceProvider;
+            foreach (var context in new DbContext[]
             {
-                throw new InvalidOperationException(
-                    $"Database for {context.GetType().Name} is not reachable. Apply migrations as a deployment step before starting the application.");
+                sp.GetRequiredService<IdentityDbContext>(),
+                sp.GetRequiredService<TenantDbContext>(),
+                sp.GetRequiredService<AccessDbContext>()
+            })
+            {
+                if (!await context.Database.CanConnectAsync())
+                {
+                    throw new InvalidOperationException(
+                        $"Database for {context.GetType().Name} is not reachable. Apply migrations as a deployment step before starting the application.");
+                }
+
+                // Check for pending migrations in production
+                var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
+                if (pendingMigrations.Any())
+                {
+                    var logger = sp.GetRequiredService<ILogger<Program>>();
+                    logger.LogError("Database {Context} has pending migrations: {Migrations}. Apply migrations before starting in production.",
+                        context.GetType().Name, string.Join(", ", pendingMigrations));
+                    throw new InvalidOperationException(
+                        $"Database for {context.GetType().Name} has pending migrations: {string.Join(", ", pendingMigrations)}. Apply migrations as a deployment step before starting the application.");
+                }
             }
         }
     }
-}
 
 // Access owns roles and permissions; the seeder only ensures the first administrator exists.
 await app.Services.SeedIdentityAsync();
@@ -254,34 +265,37 @@ app.MapTenants();  // /tenants, /tenants/current, /tenants/me, /tenants/{id}/set
 app.MapAccess();   // /access/me, /access/permissions, /access/roles, /access/users/{id}/roles, /access/audit
 
 // Demo endpoints, to see the modules guarding a host app's own routes.
-app.MapGet("/", () => "Identity + Tenant + Access sample host is running.");
+if (app.Environment.IsDevelopment())
+{
+    app.MapGet("/", () => "Identity + Tenant + Access sample host is running.");
 
-app.MapGet("/demo/public", () => "Anyone can read this.");
+    app.MapGet("/demo/public", () => "Anyone can read this.");
 
-app.MapGet("/demo/needs-login", () => "You are signed in.")
-   .RequireAuthorization();
+    app.MapGet("/demo/needs-login", () => "You are signed in.")
+        .RequireAuthorization();
 
-app.MapGet("/demo/needs-users-read", async (CoreKit.Access.Abstractions.IPermissionChecker checker, CancellationToken ct) =>
-        await checker.HasPlatformPermissionAsync(IdentityAccessPermissionNames.UsersRead, ct)
-            ? Results.Ok("You hold the identity.users.read permission.")
-            : Results.Forbid())
-   .RequireAuthorization();
+    app.MapGet("/demo/needs-users-read", async (CoreKit.Access.Abstractions.IPermissionChecker checker, CancellationToken ct) =>
+            await checker.HasPlatformPermissionAsync(IdentityAccessPermissionNames.UsersRead, ct)
+                ? Results.Ok("You hold the identity.users.read permission.")
+                : Results.Forbid())
+        .RequireAuthorization();
 
-// Works only when the request belongs to a tenant. A suspended tenant never gets this far.
-app.MapGet("/demo/needs-tenant", (ICurrentTenant tenant) => $"You are acting inside tenant {tenant.RequiredId}.")
-   .RequireAuthorization()
-   .RequireTenant();
+    // Works only when the request belongs to a tenant. A suspended tenant never gets this far.
+    app.MapGet("/demo/needs-tenant", (ICurrentTenant tenant) => $"You are acting inside tenant {tenant.RequiredId}.")
+        .RequireAuthorization()
+        .RequireTenant();
 
-// Tenant roles in action: a Cashier can sell but not refund; a Manager and the owner can do both.
-app.MapPost("/demo/sale", () => "Sale recorded.")
-   .RequireAuthorization()
-   .RequireTenant()
-   .RequireAccess("sales.create");
+    // Tenant roles in action: a Cashier can sell but not refund; a Manager and the owner can do both.
+    app.MapPost("/demo/sale", () => "Sale recorded.")
+        .RequireAuthorization()
+        .RequireTenant()
+        .RequireAccess("sales.create");
 
-app.MapPost("/demo/refund", () => "Refund issued.")
-   .RequireAuthorization()
-   .RequireTenant()
-   .RequireAccess("sales.refund");
+    app.MapPost("/demo/refund", () => "Refund issued.")
+        .RequireAuthorization()
+        .RequireTenant()
+        .RequireAccess("sales.refund");
+}
 
 // DEVELOPMENT ONLY: lets the Postman collection read the token that was "emailed".
 if (app.Environment.IsDevelopment())
@@ -316,56 +330,6 @@ public sealed class PermissionBasedIdentityAdminAuthorizer : IIdentityAdminAutho
         };
 
         return permission is not null && await _permissionChecker.HasPlatformPermissionAsync(permission, ct);
-    }
-}
-
-/// <summary>DEVELOPMENT ONLY. Remembers the latest verification and reset tokens per email so tests can read them.</summary>
-public sealed class DevEmailInbox
-{
-    private readonly ConcurrentDictionary<string, string> _tokens = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, string> _resetTokens = new(StringComparer.OrdinalIgnoreCase);
-
-    public void Store(string email, string token) => _tokens[email] = token;
-
-    public string? Get(string email) => _tokens.TryGetValue(email, out var token) ? token : null;
-
-    public void StoreReset(string email, string token) => _resetTokens[email] = token;
-
-    public string? GetReset(string email) => _resetTokens.TryGetValue(email, out var token) ? token : null;
-}
-
-/// <summary>DEVELOPMENT ONLY. Prints the tokens instead of mailing them. Never log tokens in production.</summary>
-public sealed class ConsoleEmailSender : IIdentityEmailSender
-{
-    private readonly ILogger<ConsoleEmailSender> _logger;
-    private readonly DevEmailInbox _inbox;
-
-    public ConsoleEmailSender(ILogger<ConsoleEmailSender> logger, DevEmailInbox inbox)
-    {
-        _logger = logger;
-        _inbox = inbox;
-    }
-
-    public Task SendEmailVerificationAsync(EmailVerificationMessage message, CancellationToken ct = default)
-    {
-        _inbox.Store(message.Email, message.Token);
-
-        _logger.LogWarning(
-            "DEV ONLY: verification token for {Email} is {Token} (expires {ExpiresAt:u})",
-            message.Email, message.Token, message.ExpiresAt);
-
-        return Task.CompletedTask;
-    }
-
-    public Task SendPasswordResetAsync(PasswordResetMessage message, CancellationToken ct = default)
-    {
-        _inbox.StoreReset(message.Email, message.Token);
-
-        _logger.LogWarning(
-            "DEV ONLY: password reset token for {Email} is {Token} (expires {ExpiresAt:u})",
-            message.Email, message.Token, message.ExpiresAt);
-
-        return Task.CompletedTask;
     }
 }
 

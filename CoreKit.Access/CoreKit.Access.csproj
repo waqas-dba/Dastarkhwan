@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CoreKit.Abstractions\CoreKit.Abstractions.csproj" />
     <InternalsVisibleTo Include="CoreKit.Access.Tests" />
   </ItemGroup>
 

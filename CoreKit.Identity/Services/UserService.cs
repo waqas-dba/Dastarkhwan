@@ -1,4 +1,5 @@
-﻿using CoreKit.Identity.Common;
+﻿using CoreKit.Abstractions.Identity;
+using CoreKit.Identity.Common;
 using CoreKit.Identity.Entities;
 using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Models;
@@ -24,6 +25,7 @@ public sealed class UserService : IUserService
     private readonly IPasswordHasher _hasher;
     private readonly ICurrentUserService _currentUser;
     private readonly TimeProvider _time;
+    private readonly IUserDeletionGuard _deletionGuard;
     private readonly IIdentityEventPublisher _eventPublisher;
 
     public UserService(
@@ -34,6 +36,7 @@ public sealed class UserService : IUserService
         IPasswordHasher hasher,
         ICurrentUserService currentUser,
         TimeProvider time,
+        IUserDeletionGuard deletionGuard,
         IIdentityEventPublisher eventPublisher)
     {
         _userRepository = userRepository;
@@ -43,6 +46,7 @@ public sealed class UserService : IUserService
         _hasher = hasher;
         _currentUser = currentUser;
         _time = time;
+        _deletionGuard = deletionGuard;
         _eventPublisher = eventPublisher;
     }
 
@@ -274,6 +278,9 @@ public sealed class UserService : IUserService
 
         if (await _administratorGuard.IsLastActiveAdministratorAsync(id, ct))
             return IdentityErrors.Conflict("The last active administrator cannot be deleted.");
+
+        if (!await _deletionGuard.CanDeleteUserAsync(id, ct))
+            return IdentityErrors.Conflict("Cannot delete a user who is an owner of an active tenant. Transfer ownership first.");
 
         await using var transaction = await _db.Database.BeginTransactionAsync(ct);
 

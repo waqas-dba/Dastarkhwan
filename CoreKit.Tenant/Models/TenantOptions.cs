@@ -41,4 +41,16 @@ public sealed class TenantResolutionOptions
     public string HeaderName { get; set; } = "X-Tenant-Id";
 
     public string ClaimType { get; set; } = TenantClaimTypes.TenantId;
+
+    /// <summary>
+    /// Path prefixes that should skip tenant resolution entirely (e.g., "/account", "/platform", "/health").
+    /// </summary>
+    public IReadOnlyList<string> ExcludedPathPrefixes { get; set; } = new[]
+    {
+        "/account",
+        "/platform",
+        "/health",
+        "/favicon.ico",
+        "/.well-known"
+    };
 }

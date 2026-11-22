@@ -101,10 +101,7 @@ public static class ServiceCollectionExtensions
             .ValidateOnStart();
 
         services.AddHttpContextAccessor();
-        services.AddMemoryCache(options =>
-        {
-            options.SizeLimit = 1024; // Limit total cache entries to prevent unbounded memory growth
-        });
+        services.AddMemoryCache();
 
         // Persistence: the only code that touches the DbContext.
         services.AddScoped<IUserRepository, UserRepository>();
@@ -113,7 +110,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
 
         // Focused collaborators.
-        services.AddScoped<IAdministratorGuard, AdministratorGuard>();
+        services.AddScoped<IAdministratorGuard>(sp => new AdministratorGuard(
+            sp.GetRequiredService<IPlatformAdministratorProvider>(),
+            sp.GetRequiredService<IUserRepository>(),
+            sp.GetRequiredService<IdentityDbContext>()));
         services.AddScoped<ISessionIssuer, SessionIssuer>();
         services.AddSingleton<ITokenService, TokenService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
@@ -195,11 +195,7 @@ public static class ServiceCollectionExtensions
                             }
 
                             currentSecVer = user.SecurityVersion;
-                            cache.Set(cacheKey, currentSecVer, new MemoryCacheEntryOptions
-                            {
-                                AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(30),
-                                Size = 1
-                            });
+                            cache.Set(cacheKey, currentSecVer, TimeSpan.FromSeconds(30));
                         }
 
                         if (currentSecVer != tokenSecVer)

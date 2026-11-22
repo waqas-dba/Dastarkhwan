@@ -1,7 +1,10 @@
 using System.Diagnostics;
 using System.Net;
 using System.Security.Claims;
-using CoreKit.Tenant.Resolution;
+using CoreKit.Abstractions.Errors;
+using CoreKit.Tenant.Settings;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Options;
 
 namespace CoreKit.Tenant.Resolution;
 
@@ -19,8 +22,13 @@ namespace CoreKit.Tenant.Resolution;
 public sealed class TenantResolutionMiddleware
 {
     private readonly RequestDelegate _next;
+    private readonly TenantResolutionOptions _options;
 
-    public TenantResolutionMiddleware(RequestDelegate next) => _next = next;
+    public TenantResolutionMiddleware(RequestDelegate next, IOptions<TenantResolutionOptions> options)
+    {
+        _next = next;
+        _options = options.Value;
+    }
 
     public async Task InvokeAsync(
         HttpContext context,
@@ -29,6 +37,14 @@ public sealed class TenantResolutionMiddleware
         ITenantInfoProvider provider,
         ITenantContextSetter setter)
     {
+        // Skip tenant resolution for excluded paths (account/platform routes, health checks, etc.)
+        var path = context.Request.Path.Value ?? string.Empty;
+        if (_options.ExcludedPathPrefixes.Any(prefix => path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+        {
+            await _next(context);
+            return;
+        }
+
         context.Items.Remove(TenantContextItemKeys.TenantId);
 
         var ct = context.RequestAborted;
@@ -115,31 +131,25 @@ public sealed class TenantResolutionMiddleware
 
     private static async Task WriteErrorAsync(HttpContext context, TenantError error)
     {
-        var (statusCode, title) = error.Kind switch
+        var (statusCode, title) = ProblemDetailsFactory.Map(error.Kind switch
         {
-            TenantErrorKind.Validation => (StatusCodes.Status400BadRequest, "Invalid request"),
-            TenantErrorKind.Unauthorized => (StatusCodes.Status401Unauthorized, "Unauthorized"),
-            TenantErrorKind.Forbidden => (StatusCodes.Status403Forbidden, "Forbidden"),
-            TenantErrorKind.NotFound => (StatusCodes.Status404NotFound, "Not found"),
-            TenantErrorKind.Conflict => (StatusCodes.Status409Conflict, "Conflict"),
-            _ => (StatusCodes.Status500InternalServerError, "Internal server error")
-        };
+            TenantErrorKind.Validation => ErrorKind.Validation,
+            TenantErrorKind.Unauthorized => ErrorKind.Unauthorized,
+            TenantErrorKind.Forbidden => ErrorKind.Forbidden,
+            TenantErrorKind.NotFound => ErrorKind.NotFound,
+            TenantErrorKind.Conflict => ErrorKind.Conflict,
+            _ => ErrorKind.Internal
+        });
 
-        var traceId = Activity.Current?.Id ?? context.TraceIdentifier;
+        var result = ProblemDetailsFactory.Create(
+            errorCode: error.Code,
+            title: title,
+            detail: error.Message,
+            statusCode: statusCode,
+            instance: context.Request.Path.Value,
+            traceId: Activity.Current?.Id ?? context.TraceIdentifier);
 
-        context.Response.StatusCode = statusCode;
-        context.Response.ContentType = "application/problem+json";
-
-        await context.Response.WriteAsJsonAsync(new
-        {
-            type = $"https://dastarkhwan.platform/errors/{error.Code}",
-            title = title,
-            status = statusCode,
-            detail = error.Message,
-            errorCode = error.Code,
-            instance = context.Request.Path,
-            traceId = traceId
-        }, context.RequestAborted);
+        await result.ExecuteAsync(context);
     }
 
     private static Guid? GetUserId(ClaimsPrincipal user)

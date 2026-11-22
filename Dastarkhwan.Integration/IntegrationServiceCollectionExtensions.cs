@@ -1,3 +1,4 @@
+using CoreKit.Abstractions.Identity;
 using CoreKit.Abstractions.IntegrationEvents;
 using CoreKit.Access.Abstractions;
 using CoreKit.Access.Extensions;
@@ -6,7 +7,9 @@ using CoreKit.Identity.IntegrationEvents;
 using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Constants;
 using CoreKit.Tenant.Outbox;
+using CoreKit.Tenant.Persistence;
 using Dastarkhwan.Integration.Authorization;
+using Dastarkhwan.Integration.Identity;
 using Dastarkhwan.Integration.Membership;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -79,6 +82,9 @@ public static class IntegrationServiceCollectionExtensions
 
         // Validate that a tenant owner user exists and is active in Identity.
         services.TryAddScoped<CoreKit.Tenant.Abstractions.IOwnerUserValidator, IdentityOwnerUserValidator>();
+
+        // Guard against deleting a user who is a tenant owner.
+        services.TryAddScoped<IUserDeletionGuard, UserDeletionGuard>();
 
         return services;
     }

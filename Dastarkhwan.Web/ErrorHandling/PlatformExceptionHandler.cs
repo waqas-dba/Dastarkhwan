@@ -1,3 +1,4 @@
+using CoreKit.Abstractions.Errors;
 using Dastarkhwan.Web.ErrorHandling;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -72,20 +73,15 @@ public sealed class PlatformExceptionMiddleware
             return;
         }
 
-        var problem = new Dictionary<string, object?>
-        {
-            ["type"] = $"https://dastarkhwan.platform/errors/{errorCode}",
-            ["title"] = title,
-            ["status"] = statusCode,
-            ["detail"] = detail,
-            ["instance"] = context.Request.Path,
-            ["errorCode"] = errorCode,
-            ["traceId"] = traceId
-        };
+        var result = ProblemDetailsFactory.Create(
+            errorCode: errorCode,
+            title: title,
+            detail: detail,
+            statusCode: statusCode,
+            instance: context.Request.Path.Value,
+            traceId: traceId);
 
-        context.Response.StatusCode = statusCode;
-        context.Response.ContentType = "application/problem+json";
-        await context.Response.WriteAsJsonAsync(problem);
+        await result.ExecuteAsync(context);
     }
 
     private static (int StatusCode, string Title, string ErrorCode, string Detail, LogLevel LogLevel, Exception? LogException) MapException(Exception exception)

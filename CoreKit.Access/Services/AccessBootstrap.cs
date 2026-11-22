@@ -58,13 +58,27 @@ public sealed class AccessBootstrap : IAccessBootstrap
             },
             ct);
 
+        var userAssignments = await _assignments.ListForUserForUpdateAsync(scope, userId, ct);
+        var alreadyAdmin = userAssignments.Any(a => a.RoleId == adminRoleId);
+
+        // Idempotent: if the target user is already an admin, nothing to do.
+        if (alreadyAdmin)
+        {
+            _cache.InvalidateUser(scope, userId);
+            return;
+        }
+
+        // If another admin exists, don't add a second one - log and return.
+        // This makes bootstrap safe to run on every startup.
         var hasOtherAdmin = await _db.Assignments
             .AnyAsync(a => a.RoleId == adminRoleId && a.UserId != userId, ct);
         if (hasOtherAdmin)
-            throw new InvalidOperationException("An active platform administrator already exists.");
-
-        var userAssignments = await _assignments.ListForUserForUpdateAsync(scope, userId, ct);
-        var alreadyAdmin = userAssignments.Any(a => a.RoleId == adminRoleId);
+        {
+            // Another admin already exists; target user is not an admin.
+            // This is not an error - just means bootstrap was already done for someone else.
+            _cache.InvalidateUser(scope, userId);
+            return;
+        }
 
         var member = await _db.PlatformMembers
             .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId, ct);
@@ -91,18 +105,15 @@ public sealed class AccessBootstrap : IAccessBootstrap
             member.JoinedAt = now;
         }
 
-        if (!alreadyAdmin)
+        _assignments.Add(new AccessAssignment
         {
-            _assignments.Add(new AccessAssignment
-            {
-                RoleId = adminRoleId,
-                UserId = userId,
-                ScopeType = scope.Type,
-                ScopeId = scope.Id,
-                MembershipGeneration = member.MembershipGeneration,
-                AssignedAt = now
-            });
-        }
+            RoleId = adminRoleId,
+            UserId = userId,
+            ScopeType = scope.Type,
+            ScopeId = scope.Id,
+            MembershipGeneration = member.MembershipGeneration,
+            AssignedAt = now
+        });
 
         // Trusted deployment operation: the operator is the deployment, not the target user. The target
         // user id is recorded in the details only; it never establishes operator authority.

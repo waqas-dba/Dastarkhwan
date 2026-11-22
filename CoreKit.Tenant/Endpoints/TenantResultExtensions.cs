@@ -1,4 +1,7 @@
-﻿namespace CoreKit.Tenant.Endpoints;
+﻿using CoreKit.Abstractions.Errors;
+using Microsoft.AspNetCore.Http;
+
+namespace CoreKit.Tenant.Endpoints;
 
 /// <summary>The one place that turns a TenantError into an HTTP status code.</summary>
 public static class TenantResultExtensions
@@ -11,25 +14,22 @@ public static class TenantResultExtensions
 
     public static IResult ToHttpResult(this TenantError error)
     {
-        var (statusCode, title) = error.Kind switch
+        var (statusCode, title) = ProblemDetailsFactory.Map(error.Kind switch
         {
-            TenantErrorKind.Validation => (StatusCodes.Status400BadRequest, "Invalid request"),
-            TenantErrorKind.Unauthorized => (StatusCodes.Status401Unauthorized, "Unauthorized"),
-            TenantErrorKind.Forbidden => (StatusCodes.Status403Forbidden, "Forbidden"),
-            TenantErrorKind.NotFound => (StatusCodes.Status404NotFound, "Not found"),
-            TenantErrorKind.Conflict => (StatusCodes.Status409Conflict, "Conflict"),
-            _ => (StatusCodes.Status500InternalServerError, "Internal server error")
-        };
+            TenantErrorKind.Validation => ErrorKind.Validation,
+            TenantErrorKind.Unauthorized => ErrorKind.Unauthorized,
+            TenantErrorKind.Forbidden => ErrorKind.Forbidden,
+            TenantErrorKind.NotFound => ErrorKind.NotFound,
+            TenantErrorKind.Conflict => ErrorKind.Conflict,
+            _ => ErrorKind.Internal
+        });
 
-        return Results.Json(new
-        {
-            type = $"https://dastarkhwan.platform/errors/{error.Code}",
-            title = title,
-            status = statusCode,
-            detail = error.Message,
-            errorCode = error.Code,
-            instance = string.Empty
-        }, statusCode: statusCode, contentType: "application/problem+json");
+        return ProblemDetailsFactory.Create(
+            errorCode: error.Code,
+            title: title,
+            detail: error.Message,
+            statusCode: statusCode,
+            traceId: System.Diagnostics.Activity.Current?.Id);
     }
 
     public static int StatusCodeFor(TenantErrorKind kind) => kind switch

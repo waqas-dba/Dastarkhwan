@@ -17,6 +17,7 @@ using CoreKit.Tenant.Persistence;
 using CoreKit.Tenant.Outbox;
 using Dastarkhwan.Integration;
 using Dastarkhwan.Integration.Endpoints;
+using Dastarkhwan.Web.ErrorHandling;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -39,7 +40,10 @@ else if (!builder.Services.Any(d => d.ServiceType == typeof(IIdentityEmailSender
 
 builder.Services.AddIdentity(builder.Configuration);
 
-// Identity's admin-authorization port: the host decides what each operation means.
+// Register Problem Details (RFC 9457).
+builder.Services.AddProblemDetails();
+
+// The platform exception middleware is registered in the pipeline below.
 // Here we map identity.* operations to platform permissions checked through Access.
 builder.Services.AddScoped<IIdentityAdminAuthorizer>(sp =>
 {
@@ -141,6 +145,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+app.UsePlatformExceptionHandler();   // centralized RFC 9457 Problem Details for all exceptions
 app.UseIdentity();      // authentication -> rate limiter -> authorization
 app.UseTenant();   // after UseIdentity: it reads the tenant claim from the signed-in user
 app.MapIdentity();      // /identity/auth/..., /identity/users, /identity/roles, /identity/permissions

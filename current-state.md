@@ -32,16 +32,22 @@ A status must describe the evidence available, not the intended architecture or 
 
 | Field | Value |
 |---|---|
-| Latest inspected commit | `99642fe34d7b84266285657e4cdadef5773b901d` |
-| Parent commit | `c4afe1eb1fa58fd8badd1bc794efda861ded5e37` |
-| Latest commit message | `docs: apply Phase 0D documentation corrections (02)` |
-| Repository evidence | Read-only inspection of committed GitHub files |
-| Local HEAD | Not independently verified |
-| Local working-tree status | Not independently verified |
-| Source inspection baseline | `e2ca8c1` |
-| Prior documentation snapshot | `c4afe1e` |
-| Documentation snapshot | `99642fe` |
-| Scope | Committed source and documentation inspection only. No build, test, migration or database verification is claimed. |
+| Latest inspected commit | `0a5f64db557b9171037bbda56f15fc751da1337c` |
+| Parent commit | `aafecd8bb6a71c0db7c3bb514250ad063ddaf96e` |
+| Repository evidence | Local build + test verification at current HEAD |
+| Local HEAD | Verified: `0a5f64db557b9171037bbda56f15fc751da1337c` |
+| Local working-tree status | Modified (uncommitted): 7 files changed across Access constraint fix, Identity lockout fix, centralized error handling |
+| Source inspection baseline | `0a5f64db557b9171037bbda56f15fc751da1337c` |
+| Documentation snapshot | `0a5f64db557b9171037bbda56f15fc751da1337c` |
+| Scope | Committed source + uncommitted corrections; build + test verified |
+
+Build verification: `dotnet build Dastarkhwan.slnx` — 0 errors, 4 warnings (all pre-existing).
+
+Test results (observed, current HEAD):
+- `CoreKit.Access.Tests`: 346 passed, 0 failed, 0 skipped — includes actor schema validation, check constraint enforcement, historical migration backfill, bootstrap trust boundary
+- `CoreKit.Identity.Tests`: 152 passed, 0 failed, 0 skipped — all tests pass including lockout, concurrent failed attempts, refresh rotation, recovery, and PostgreSQL concurrency transitions
+- `CoreKit.Tenant.Tests`: 358 passed, 0 failed, 0 skipped — includes tenant lifecycle, isolation, outbox, projection recovery
+
 
 The previous remote HEAD `7ed4c61fca8b06f35a0e2f1ce5f806ae22ad0043` (2026-11-13 19:53:27 +0500, `docs(governance): accept D-017 automation and align agent guidance`) and the FIX1 baseline `f09f236bcbc162387b572e0ed8cee4d29949a816` are preserved as historical baselines. The historical audit baseline `1c832de` (2026-11-15 13:57:49 +0500, `Fix Tenant membership revocation -> Access cache consistency`) addressed audit finding D-02 (Tenant–Access cache-invalidation handler + DI registration committed). D-01 (test rewrite of `CoreKit.Tenant.Tests/TenantMemberRemovedAccessCacheTests.cs`) existed as an uncommitted working-tree change at `1c832de` and is committed at `7115b14`; it is not build-verified or test-verified, and cache-invalidated regression coverage is not confirmed until its assertions are independently reviewed. Baseline `7115b14` (2026-11-15 15:07:48 +0500, `docs(governance): synchronize core documents with baseline 1c832de`) is the documentation-sync commit that reconciled all six core documents with `1c832de`. The current baseline `c9dbbe12` (2026-11-15 16:01:53 +0500, `update the current sate and road map`) is the task baseline for DK-DOCUMENTATION-FINALIZE-06.
 

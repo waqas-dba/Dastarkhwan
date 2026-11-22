@@ -13,7 +13,7 @@ public interface ISessionIssuer
     /// is refused when the account is inactive, its security version moved on, or it became
     /// locked out after the login transition.
     /// </summary>
-    /// <param name="user">The user must be loaded with UserRoles and each UserRole's Role.</param>
+    /// <param name="user">The authenticated user entity.</param>
     /// <param name="expectedSecurityVersion">The version observed together with the verified password hash.</param>
     Task<IdentityResult<LoginResponse>> IssueForLoginAsync(
         User user, int expectedSecurityVersion, CancellationToken ct = default);
@@ -23,7 +23,7 @@ public interface ISessionIssuer
     /// <see cref="IssueForLoginAsync"/>, but an active login lockout does not block refresh:
     /// only credential-version and account-state guards apply.
     /// </summary>
-    /// <param name="user">The user must be loaded with UserRoles and each UserRole's Role.</param>
+    /// <param name="user">The authenticated user entity.</param>
     /// <param name="expectedSecurityVersion">The version observed when the refresh token was read.</param>
     Task<IdentityResult<LoginResponse>> IssueForRefreshAsync(
         User user, int expectedSecurityVersion, CancellationToken ct = default);

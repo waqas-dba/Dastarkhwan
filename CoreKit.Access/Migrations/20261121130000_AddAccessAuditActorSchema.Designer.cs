@@ -3,6 +3,7 @@ using System;
 using CoreKit.Access.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -343,3 +344,4 @@ namespace CoreKit.Access.Migrations
         }
     }
 }
+

@@ -69,19 +69,14 @@ public sealed class AuthService : IAuthService
 
         var now = Now();
 
-        // If account is locked, return immediately without further processing
+        // If account is already locked, refuse without incrementing: the counter already reflects
+        // the failed attempts that established the lockout.
         if (user.LockoutEnd is { } lockoutEnd && lockoutEnd > now)
         {
             _logger.LogInformation("Login blocked for user {UserId}: account is locked until {LockoutEnd}.", user.Id, lockoutEnd);
             return IdentityErrors.AccountLocked;
         }
 
-        // The lockout state, the failure counter and the credential version are transitioned by
-        // atomic, database-side statements (see IUserRepository). A snapshot taken here is never
-        // used to decide a transition: the SecurityVersion observed together with the password
-        // hash is carried into the authoritative transition, so a password change or reset that
-        // lands after the read makes the login fail with a version conflict instead of issuing a
-        // session from stale credentials.
         var check = _hasher.Verify(user.PasswordHash, password);
 
         if (check != PasswordCheckResult.Failed && user.IsActive)
@@ -140,17 +135,19 @@ public sealed class AuthService : IAuthService
             return IdentityErrors.InvalidCredentials;
         }
 
-        // Wrong password, or an inactive account: recorded by the atomic failed-login transition
-        // (FIX-03 behaviour: increments the counter, locks at five, never extends an active lockout).
+        // Wrong password, or an inactive account: recorded by the atomic failed-login transition.
+        // Every concurrent failed request that observed an unlocked account calls this, so no
+        // increment is lost: PostgreSQL row locks serialize the UPDATEs and each one reads the
+        // current counter value. A request that observes an already-locked account returns above.
         await _userRepository.RegisterFailedLoginAttemptAsync(
             user.Id, now, lockoutEnd: now.AddMinutes(15), threshold: 5, ct);
-
-        _logger.LogInformation("Login failed for user {UserId}.", user.Id);
 
         // After recording the failed attempt, check if the account is now locked
         var updatedUser = await _userRepository.FindByIdAsync(user.Id, ct);
         if (updatedUser is not null && updatedUser.LockoutEnd is { } newLockoutEnd && newLockoutEnd > now)
             return IdentityErrors.AccountLocked;
+
+        _logger.LogInformation("Login failed for user {UserId}.", user.Id);
 
         return IdentityErrors.InvalidCredentials;
     }

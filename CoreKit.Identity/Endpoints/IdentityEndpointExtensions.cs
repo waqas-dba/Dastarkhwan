@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Routing;
+﻿using CoreKit.Identity.Interfaces;
+using Microsoft.AspNetCore.Routing;
 
 namespace CoreKit.Identity.Endpoints;
 
@@ -55,6 +56,16 @@ public static class IdentityEndpointExtensions
 
         limited.MapPost("/resend-verification", async (ResendVerificationRequest r, IEmailVerificationService s, CancellationToken ct) =>
                 (await s.ResendByEmailAsync(r, ct)).ToHttpResult())
+            .AllowAnonymous();
+
+        // Password recovery. Both routes are anonymous and rate limited. forgot-password always answers
+        // success so it cannot be used to discover which emails have accounts.
+        limited.MapPost("/forgot-password", async (ForgotPasswordRequest r, IPasswordResetService s, CancellationToken ct) =>
+                (await s.RequestAsync(r, ct)).ToHttpResult())
+            .AllowAnonymous();
+
+        limited.MapPost("/reset-password", async (ResetPasswordRequest r, IPasswordResetService s, CancellationToken ct) =>
+                (await s.ResetAsync(r, ct)).ToHttpResult())
             .AllowAnonymous();
     }
 

@@ -29,3 +29,16 @@ public sealed class LoginResponse
 
     public UserDto User { get; set; } = null!;
 }
+
+public sealed class ForgotPasswordRequest
+{
+    public string Email { get; set; } = string.Empty;
+}
+
+public sealed class ResetPasswordRequest
+{
+    /// <summary>The token from the emailed link.</summary>
+    public string Token { get; set; } = string.Empty;
+
+    public string NewPassword { get; set; } = string.Empty;
+}

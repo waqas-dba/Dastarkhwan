@@ -36,6 +36,15 @@ public static class IdentityErrors
     public static IdentityError Forbidden(string message)
         => new(IdentityErrorKind.Forbidden, "forbidden", message);
 
+    /// <summary>One message for every password-reset token failure, so the response never says which part was wrong.</summary>
+    public static readonly IdentityError InvalidResetToken = new(
+        IdentityErrorKind.Validation, "auth.invalid_reset_token", "The password reset link is invalid or has expired.");
+
+    /// <summary>
+    /// No longer returned by login: a distinct "locked" answer would reveal which emails have accounts
+    /// (see F-04). Login answers <see cref="InvalidCredentials"/> for a locked account and records the
+    /// lockout in the server log. Kept only for callers that build their own account-management flows.
+    /// </summary>
     public static readonly IdentityError AccountLocked = new(
         IdentityErrorKind.Forbidden, "auth.account_locked", "The account is temporarily locked due to too many failed attempts. Please try again later.");
 }

@@ -21,6 +21,7 @@ public sealed class AuthService : IAuthService
     private readonly ISessionIssuer _sessions;
     private readonly ICurrentUserService _currentUser;
     private readonly IdentityEmailVerificationOptions _emailOptions;
+    private readonly IdentityLockoutOptions _lockoutOptions;
     private readonly TimeProvider _time;
     private readonly ILogger<AuthService> _logger;
 
@@ -32,6 +33,7 @@ public sealed class AuthService : IAuthService
         ISessionIssuer sessions,
         ICurrentUserService currentUser,
         IOptions<IdentityEmailVerificationOptions> emailOptions,
+        IOptions<IdentityLockoutOptions> lockoutOptions,
         TimeProvider time,
         ILogger<AuthService> logger)
     {
@@ -42,6 +44,7 @@ public sealed class AuthService : IAuthService
         _sessions = sessions;
         _currentUser = currentUser;
         _emailOptions = emailOptions.Value;
+        _lockoutOptions = lockoutOptions.Value;
         _time = time;
         _logger = logger;
     }
@@ -69,12 +72,15 @@ public sealed class AuthService : IAuthService
 
         var now = Now();
 
-        // If account is already locked, refuse without incrementing: the counter already reflects
-        // the failed attempts that established the lockout.
+        // A locked account answers exactly like a wrong password, after the same hashing work.
+        // A distinct "locked" answer would tell anyone who can send a few bad logins that an email has an
+        // account. The failure counter already reflects the attempts that established the lockout, so it is
+        // not incremented again. The lockout is recorded in the server log only.
         if (user.LockoutEnd is { } lockoutEnd && lockoutEnd > now)
         {
+            _ = _hasher.Verify(user.PasswordHash, password);
             _logger.LogInformation("Login blocked for user {UserId}: account is locked until {LockoutEnd}.", user.Id, lockoutEnd);
-            return IdentityErrors.AccountLocked;
+            return IdentityErrors.InvalidCredentials;
         }
 
         var check = _hasher.Verify(user.PasswordHash, password);
@@ -127,11 +133,11 @@ public sealed class AuthService : IAuthService
             // Do NOT increment again here.
             _logger.LogInformation("Login failed for user {UserId}: account inactive or locked.", user.Id);
             if (completion == LoginCompletion.Locked)
-                return IdentityErrors.AccountLocked;
+                return IdentityErrors.InvalidCredentials;
 
             // For inactive accounts, record the failed attempt (per lockout policy).
             await _userRepository.RegisterFailedLoginAttemptAsync(
-                user.Id, now, lockoutEnd: now.AddMinutes(15), threshold: 5, ct);
+                user.Id, now, lockoutEnd: now.AddMinutes(_lockoutOptions.DurationMinutes), threshold: _lockoutOptions.Threshold, ct);
             return IdentityErrors.InvalidCredentials;
         }
 
@@ -140,12 +146,7 @@ public sealed class AuthService : IAuthService
         // increment is lost: PostgreSQL row locks serialize the UPDATEs and each one reads the
         // current counter value. A request that observes an already-locked account returns above.
         await _userRepository.RegisterFailedLoginAttemptAsync(
-            user.Id, now, lockoutEnd: now.AddMinutes(15), threshold: 5, ct);
-
-        // After recording the failed attempt, check if the account is now locked
-        var updatedUser = await _userRepository.FindByIdAsync(user.Id, ct);
-        if (updatedUser is not null && updatedUser.LockoutEnd is { } newLockoutEnd && newLockoutEnd > now)
-            return IdentityErrors.AccountLocked;
+            user.Id, now, lockoutEnd: now.AddMinutes(_lockoutOptions.DurationMinutes), threshold: _lockoutOptions.Threshold, ct);
 
         _logger.LogInformation("Login failed for user {UserId}.", user.Id);
 

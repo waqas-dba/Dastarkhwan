@@ -17,4 +17,13 @@ public sealed class NullIdentityEmailSender : IIdentityEmailSender
 
         return Task.CompletedTask;
     }
+
+    public Task SendPasswordResetAsync(PasswordResetMessage message, CancellationToken ct = default)
+    {
+        _logger.LogWarning(
+            "No IIdentityEmailSender is registered, so the password reset email for user {UserId} was not sent.",
+            message.UserId);
+
+        return Task.CompletedTask;
+    }
 }

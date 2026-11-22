@@ -1,4 +1,5 @@
 ﻿using CoreKit.Identity.Repositories;
+using CoreKit.Identity.Security;
 
 namespace CoreKit.Identity.Extensions;
 
@@ -81,10 +82,23 @@ public static class ServiceCollectionExtensions
             .Validate(o => o.TokenHours is >= 1 and <= 168 && o.ResendCooldownSeconds >= 0,
                 "Identity:EmailVerification values are out of range.");
 
+        services.AddOptions<IdentityLockoutOptions>()
+            .Bind(configuration.GetSection(IdentityLockoutOptions.SectionName))
+            .Validate(o => o.Threshold is >= 1 and <= 100 && o.DurationMinutes is >= 1 and <= 1440,
+                "Identity:Lockout:Threshold must be 1 to 100 and Identity:Lockout:DurationMinutes must be 1 to 1440.")
+            .ValidateOnStart();
+
+        services.AddOptions<IdentityPasswordResetOptions>()
+            .Bind(configuration.GetSection(IdentityPasswordResetOptions.SectionName))
+            .Validate(o => o.TokenMinutes is >= 5 and <= 1440,
+                "Identity:PasswordReset:TokenMinutes must be 5 to 1440.")
+            .ValidateOnStart();
+
         services.AddHttpContextAccessor();
 
         // Persistence: the only code that touches the DbContext.
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IUserLockoutRepository, UserLockoutRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
         services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
 
@@ -94,8 +108,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ITokenService, TokenService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
 
+        // Password-reset tokens are signed with a key derived from the JWT signing key and a purpose label.
+        services.AddSingleton(sp =>
+            new PasswordResetTokenProtector(sp.GetRequiredService<IOptions<JwtOptions>>().Value.SigningKey));
+
         // Business services.
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IPasswordResetService, PasswordResetService>();
         services.AddScoped<IUserService, UserService>();
 
         services.TryAddSingleton<IIdentityEmailSender, NullIdentityEmailSender>();

@@ -18,6 +18,7 @@ public static class IdentityOutboxServiceCollectionExtensions
         services.Configure<IdentityOutboxOptions>(configuration.GetSection("Identity:Outbox"));
 
         services.TryAddScoped<IIdentityEventPublisher, IdentityOutboxPublisher>();
+        services.TryAddScoped<IdentityOutboxDispatcher>();
         services.TryAddSingleton<IIdentityOutboxTransport, NullIdentityOutboxTransport>();
 
         services.AddHostedService<IdentityOutboxPublisherService>();

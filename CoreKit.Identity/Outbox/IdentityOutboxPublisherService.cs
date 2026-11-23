@@ -7,16 +7,16 @@ namespace CoreKit.Identity.Outbox;
 
 public sealed class IdentityOutboxPublisherService : BackgroundService
 {
-    private readonly IdentityOutboxDispatcher _dispatcher;
+    private readonly IServiceProvider _services;
     private readonly IdentityOutboxOptions _options;
     private readonly ILogger<IdentityOutboxPublisherService> _logger;
 
     public IdentityOutboxPublisherService(
-        IdentityOutboxDispatcher dispatcher,
+        IServiceProvider services,
         IOptions<IdentityOutboxOptions> options,
         ILogger<IdentityOutboxPublisherService> logger)
     {
-        _dispatcher = dispatcher;
+        _services = services;
         _options = options.Value;
         _logger = logger;
     }
@@ -29,7 +29,9 @@ public sealed class IdentityOutboxPublisherService : BackgroundService
         {
             try
             {
-                await _dispatcher.DispatchPendingAsync(stoppingToken);
+                using var scope = _services.CreateScope();
+                var dispatcher = scope.ServiceProvider.GetRequiredService<IdentityOutboxDispatcher>();
+                await dispatcher.DispatchPendingAsync(stoppingToken);
             }
             catch (OperationCanceledException)
             {

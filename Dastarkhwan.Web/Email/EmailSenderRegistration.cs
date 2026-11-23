@@ -105,9 +105,19 @@ public static class EmailSenderRegistration
 
     private static bool IsPlaceholder(EmailOptions o)
     {
-        var values = new[] { o.Smtp.Username, o.Smtp.Password, o.SendGrid.ApiKey, o.Mailgun.ApiKey, o.BaseUrl };
-        return values.Any(v => !string.IsNullOrWhiteSpace(v) &&
-            (v.Contains("your-", StringComparison.OrdinalIgnoreCase) ||
-             v.Contains("example", StringComparison.OrdinalIgnoreCase)));
+        var provider = o.Provider?.ToLowerInvariant() ?? string.Empty;
+        return provider switch
+        {
+            "smtp" => IsPlaceholderValue(o.Smtp.Host) || IsPlaceholderValue(o.Smtp.FromEmail) ||
+                      IsPlaceholderValue(o.Smtp.Username) || IsPlaceholderValue(o.Smtp.Password),
+            "sendgrid" => IsPlaceholderValue(o.SendGrid.ApiKey) || IsPlaceholderValue(o.SendGrid.FromEmail),
+            "mailgun" => IsPlaceholderValue(o.Mailgun.ApiKey) || IsPlaceholderValue(o.Mailgun.FromEmail) || IsPlaceholderValue(o.Mailgun.Domain),
+            _ => false
+        };
     }
+
+    private static bool IsPlaceholderValue(string? v) =>
+        !string.IsNullOrWhiteSpace(v) &&
+        (v.Contains("your-", StringComparison.OrdinalIgnoreCase) ||
+         v.Contains("example", StringComparison.OrdinalIgnoreCase));
 }

@@ -28,6 +28,7 @@ Full responsibilities and coordination rules are defined in `ai-tasks.md`.
 3. `current-state.md` — implementation status and supporting evidence.
 4. `roadmap.md` — milestone order and acceptance criteria.
 5. `architecture.md` — target architecture and module boundaries.
+6. `product-requirements.md` — authoritative product requirements baseline (when present).
 6. `decisions.md` — accepted decisions and open questions.
 
 Read only the sections relevant to the assigned task.

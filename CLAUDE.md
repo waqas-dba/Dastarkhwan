@@ -6,6 +6,7 @@ Build a secure, maintainable modular application for food-item delivery and parc
 
 Do not add hotel, dine-in, or unrelated verticals without an approved decision.
 
+Product requirements baseline: `product-requirements.md`. Dine-in is included there as a proposed product direction; existing exclusion remains in force until Project Owner approves amendment.
 ## 2. Project source of truth
 
 - `roadmap.md` — milestone order and completion criteria.

@@ -106,14 +106,14 @@ public static class EmailSenderRegistration
     private static bool IsPlaceholder(EmailOptions o)
     {
         var provider = o.Provider?.ToLowerInvariant() ?? string.Empty;
-        return provider switch
+        return IsPlaceholderValue(o.BaseUrl) || (provider switch
         {
             "smtp" => IsPlaceholderValue(o.Smtp.Host) || IsPlaceholderValue(o.Smtp.FromEmail) ||
                       IsPlaceholderValue(o.Smtp.Username) || IsPlaceholderValue(o.Smtp.Password),
             "sendgrid" => IsPlaceholderValue(o.SendGrid.ApiKey) || IsPlaceholderValue(o.SendGrid.FromEmail),
             "mailgun" => IsPlaceholderValue(o.Mailgun.ApiKey) || IsPlaceholderValue(o.Mailgun.FromEmail) || IsPlaceholderValue(o.Mailgun.Domain),
             _ => false
-        };
+        });
     }
 
     private static bool IsPlaceholderValue(string? v) =>

@@ -21,14 +21,24 @@ public static class IdentityOutboxServiceCollectionExtensions
         services.TryAddScoped<IdentityOutboxDispatcher>();
         services.TryAddSingleton<IIdentityOutboxTransport, NullIdentityOutboxTransport>();
 
+        services.AddHostedService<IdentityOutboxTransportGuard>();
         services.AddHostedService<IdentityOutboxPublisherService>();
 
         return services;
     }
 
-    private sealed class NullIdentityOutboxTransport : IIdentityOutboxTransport
+    private sealed class IdentityOutboxTransportGuard : IHostedService
     {
-        public Task<IdentityOutboxDeliveryResult> DeliverAsync(IdentityOutboxEnvelope envelope, CancellationToken ct = default)
-            => Task.FromResult(IdentityOutboxDeliveryResult.RetryLater("No transport configured"));
+        private readonly IServiceProvider _services;
+        public IdentityOutboxTransportGuard(IServiceProvider services) => _services = services;
+        public Task StartAsync(CancellationToken ct)
+        {
+            using var scope = _services.CreateScope();
+            var transport = scope.ServiceProvider.GetRequiredService<IIdentityOutboxTransport>();
+            if (transport.GetType().Name.Contains("Null", StringComparison.Ordinal))
+                throw new InvalidOperationException("Identity outbox transport is not configured (NullIdentityOutboxTransport).");
+            return Task.CompletedTask;
+        }
+        public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
     }
 }

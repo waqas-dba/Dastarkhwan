@@ -108,6 +108,23 @@ internal sealed class GatedUserRepository : IUserRepository
     public Task<bool> UpdateAsync(User user, CancellationToken ct = default)
         => _inner.UpdateAsync(user, ct);
 
+    public Task<CredentialUpdateResult> TryDeactivateAndChangePasswordAsync(
+        Guid userId,
+        int expectedSecurityVersion,
+        string expectedCurrentHash,
+        string newHash,
+        DateTime now,
+        CancellationToken ct = default)
+    {
+        if (_beforeDeactivate is not null)
+            return _beforeDeactivate().ContinueWith(_ => _inner.TryDeactivateAndChangePasswordAsync(
+                userId, expectedSecurityVersion, expectedCurrentHash, newHash, now, ct)).Unwrap();
+        return _inner.TryDeactivateAndChangePasswordAsync(
+            userId, expectedSecurityVersion, expectedCurrentHash, newHash, now, ct);
+    }
+
     public Task DeleteAsync(User user, CancellationToken ct = default)
         => _inner.DeleteAsync(user, ct);
+
+    public void StageDelete(User user) => _inner.StageDelete(user);
 }

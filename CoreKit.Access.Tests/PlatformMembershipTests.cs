@@ -663,6 +663,9 @@ public sealed class PlatformMembershipTests : IDisposable
 
         public Task<IReadOnlyList<AccessRoleDto>> ListRolesAsync(AccessScope scope, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<AccessRoleDto>>(new List<AccessRoleDto>());
+
+        public Task<EffectiveAccess> GetFreshAccessAsync(Guid userId, AccessScope scope, CancellationToken ct = default)
+            => Task.FromResult(_access);
     }
 
 }

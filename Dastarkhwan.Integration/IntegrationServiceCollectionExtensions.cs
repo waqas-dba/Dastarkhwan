@@ -34,9 +34,6 @@ public static class IntegrationServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
-        services.TryAddScoped<ITenantOutboxTransport, TenantToAccessOutboxTransport>();
-        services.TryAddScoped<ITenantProjectionGateway, AccessTenantProjectionGateway>();
-
         // Identity outbox transport for durable account deletion events.
         // Identity registers NullIdentityOutboxTransport by default; replace it so cleanup actually runs.
         services.RemoveAll<IIdentityOutboxTransport>();
@@ -51,12 +48,7 @@ public static class IntegrationServiceCollectionExtensions
                 p.Add(permission.Name, permission.Description);
         });
 
-        // Tenant membership is exposed to Access through the projection-only adapter (ProjectionAccessMembership).
-        // The old direct adapter (TenantAccessMembership) is removed per D-019: Access uses its own membership
-        // projection as the authoritative source. Missing, stale, or untrusted projection data fails closed.
-        // Tenant adds its tenant claim to every access token Identity issues.
-        services.TryAddScoped<IAccessTokenClaimsContributor, TenantClaimsContributor>();
-
+        // Access queries Tenant membership directly through ITenantMembershipReader (see Access.Services.AccessService).
         // When a person leaves a tenant, clear their effective-authorization state in Access so a
         // cached tenant-scoped permission set cannot outlive the membership.
         services.TryAddScoped<IEventHandler<TenantMemberRemoved>, TenantMemberRemovedToAccessMaintenance>();
@@ -64,6 +56,9 @@ public static class IntegrationServiceCollectionExtensions
         // When an Identity user is deleted, clean up their Tenant membership rows and Access platform membership.
         services.TryAddScoped<IEventHandler<IdentityUserDeleted>, IdentityUserDeletedToTenantCleanup>();
         services.TryAddScoped<IEventHandler<IdentityUserDeleted>, IdentityUserDeletedToAccessCleanup>();
+
+        // Tenant adds its tenant claim to every access token Identity issues.
+        services.TryAddScoped<IAccessTokenClaimsContributor, TenantClaimsContributor>();
 
         // Bridge Tenant's current user abstraction to Identity's IAccessCurrentUser.
         services.TryAddScoped<ITenantCurrentUser>(sp =>

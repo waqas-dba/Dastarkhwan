@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UserSecretsId>dastarkhwan-admin-48e74c5d-160f-4702-b03c-2ada674f990f</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\CoreKit.Identity\CoreKit.Identity.csproj" />
+    <ProjectReference Include="..\CoreKit.Access\CoreKit.Access.csproj" />
+    <ProjectReference Include="..\CoreKit.Tenant\CoreKit.Tenant.csproj" />
+    <ProjectReference Include="..\Dastarkhwan.Integration\Dastarkhwan.Integration.csproj" />
+  </ItemGroup>
+
+</Project>

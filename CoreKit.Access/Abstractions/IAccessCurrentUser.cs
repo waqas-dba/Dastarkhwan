@@ -1,8 +1,8 @@
 namespace CoreKit.Access.Abstractions;
 
 /// <summary>
-/// Who is making this request. Access resolves this from the request context (for example a JWT claim),
-/// never from the database. It knows nothing about tenants, roles or permissions.
+/// Who is making this request. The identity module provides it from the validated token, so it never
+/// touches the database. It knows nothing about tenants, roles or permissions.
 /// </summary>
 public interface IAccessCurrentUser
 {

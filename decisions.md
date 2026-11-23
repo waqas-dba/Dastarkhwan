@@ -123,7 +123,7 @@ Use this log for decisions affecting product behavior, security, data, compatibi
 **Review trigger:** Evidence that a genuine cross-module contract is required by multiple modules and has no module-owned home — any such contract must not be placed in SharedKernel without a separate Owner decision.
 
 ## D-019 — Option B independent-module architecture and Integration foundation
-**Status:** Accepted  
+**Status:** Superseded (by D-020)  
 **Date:** 2026-11-17  
 **Decision:** `CoreKit.Identity`, `CoreKit.Access` and `CoreKit.Tenant` are independently reusable modules with zero direct CoreKit project references. `Dastarkhwan.Integration` references and coordinates the three modules through their public contracts. No SharedKernel. No cross-module adopter/plugin implementation pattern. No module accesses another module's private persistence. Tenant membership changes reach Access through the durable Tenant outbox and Access's membership-event consumer + projection, not through a direct Tenant-to-Access runtime membership lookup. Access uses its own membership projection as the authoritative Tenant membership source; missing, stale, quarantined or untrusted projection data fails closed.  
 **Context:** The current Tenant-to-Access project reference and runtime adapter arrangement (`TenantAccessScopeContext`, `TenantAccessMembership` registered in `TenantServiceCollectionExtensions`) conflict with the approved independent-module direction. `Dastarkhwan.Integration` does not exist and must be created as the composition layer.  
@@ -134,7 +134,22 @@ Use this log for decisions affecting product behavior, security, data, compatibi
 **Supersession:** Supersedes the D-018 statement that "`CoreKit.Tenant` and `CoreKit.Identity` each reference only `CoreKit.Access`" as it applies to both Tenant and Identity. D-018's No SharedKernel and module-owned contracts principles remain in force.  
 **Review trigger:** Evidence that the approved dependency graph cannot be achieved without a security or architecture decision not already approved; evidence that Access projection-based authorization cannot satisfy fail-closed requirements.
 
-## Decision template
+## D-020 — Direct Tenant-to-Access queries through Contracts
+**Status:** Accepted  
+**Date:** 2026-11-22  
+**Decision:** Access queries Tenant membership directly through the `ITenantMembershipReader` contract in `CoreKit.Tenant.Contracts`, rather than through a durable Access-owned membership projection. Tenant publishes membership changes through its outbox for external side effects only (emails, webhooks, accounting); Access does not maintain a separate projection cache. Access fails closed when Tenant is unavailable or the tenant is not found.  
+**Context:** D-019's projection subsystem (~6,000 lines: event consumer, snapshot installer, freshness recorder, heartbeat, quarantine, stream cursors, processed events) solves a distributed multi-instance problem that a single-product SaaS does not yet have. Direct queries through Contracts are simpler, have fewer failure modes, and remove startup projection rebuild latency.  
+**Alternatives considered:** (1) Retain D-019 projection-authoritative architecture — rejected, disproportionate complexity for a single instance. (2) SharedKernel bridge — rejected, contradicts D-018.  
+**Consequences:** Access references `CoreKit.Tenant.Contracts` (not Tenant implementation). Tenant outbox is used only for external side effects. `ITenantOutboxTransport` and `ITenantProjectionGateway` are removed. Membership changes are immediately consistent (within cache TTL) without outbox delivery delay.  
+**Supersession note (2026-11-23):** D-018 stated that cross-module contracts live in module-owned `Abstractions` namespaces; D-020 places `ITenantMembershipReader` in `CoreKit.Tenant.Contracts`. These are reconciled: **module-owned contract assemblies (`*.Contracts`) are the approved home for cross-module contracts; the `Abstractions` namespace within a module holds that module's own public API surface only.** `CoreKit.Access` is a leaf module with no cross-module contracts, so its `CoreKit.Access.Contracts` assembly is removed entirely (no Access-owned contract types remain — Access consumes `ITenantMembershipReader` from `CoreKit.Tenant.Contracts`). D-018's No SharedKernel and module-owned contract ownership principles remain in force.
+
+## D-021 — Remove Access projection subsystem and Access contracts assembly
+**Status:** Accepted  
+**Date:** 2026-11-23  
+**Decision:** Permanently remove the Access-owned membership projection subsystem (event consumer, snapshot installer, freshness recorder/heartbeat, quarantine, stream cursors, processed events, tenant-state projection, watermark, membership-projection entities and repositories, `IAccessMembershipAdapter`/`IProjectionMembershipAdapter`/`CompositeAccessMembership`/`IPermissionChecker` contracts, `AccessMembershipSource`/`MaxMembershipStalenessSeconds`/`MembershipHeartbeatSeconds` options) and the `CoreKit.Access.Contracts` assembly, as superseded by D-020.  
+**Context:** The projection subsystem was the D-019 architecture. D-020 replaced it with direct Tenant-to-Access queries through `ITenantMembershipReader`. The subsystem's ~6,000 lines, 6 EF Core migrations, and 2 test files (`AccessMembershipProjectionFlowTests`, `AccessMembershipProjectionPersistenceTests`, `ProjectionSourceSafetyTests`) are dead code that must be removed so the build is clean and the architecture is unambiguous.  
+**Consequences:** Access membership is resolved by `AccessService` calling `ITenantMembershipReader FINDASYNC` directly (D-020). `IAccessMembership`/`IAccessMembershipAdapter` remain as the in-process membership router used by `AccessAssignmentService` and platform-membership tests; the `DefaultAccessMembership` and `PlatformAccessMembership` adapters stay. `IAccessMembership` is registered as a single composite in composition roots. All projection migrations are dropped from the Access migration set and the model snapshot is regenerated.  
+**Review trigger:** Evidence that a future multi-instance deployment requires projection-based consistency; such a decision must be made explicitly and is not assumed.
 ### D-XXX — Title
 **Status:** Proposed / Accepted / Rejected / Superseded  
 **Date:** YYYY-MM-DD  

@@ -119,12 +119,8 @@ builder.Services.AddAccess(builder.Configuration);
  // Register the Dastarkhwan integration (cross-module wiring)
  builder.Services.AddDastarkhwanIntegration();
 
-// Register outbox publisher and projection recovery (opt-in, required for projection mode)
+// Register outbox publisher (for external side effects: emails, webhooks, etc.)
 builder.Services.AddTenantOutboxPublisher();
-builder.Services.AddTenantProjectionRecovery();
-
-// Register AccessBootstrap for trusted startup provisioning
-builder.Services.AddScoped<CoreKit.Access.Abstractions.IAccessBootstrap, CoreKit.Access.Services.AccessBootstrap>();
 
 // Register rate limiting for tenant and access write endpoints
 builder.Services.AddTenantRateLimiting(builder.Configuration);
@@ -212,34 +208,14 @@ else
 // Access owns roles and permissions; the seeder only ensures the first administrator exists.
 await app.Services.SeedIdentityAsync();
 
-// Bootstrap the Access projection from Tenant's authoritative membership data.
-// This runs with platform scope authorization and must complete before serving
-// authorization traffic in Projection mode.
+// Bootstrap the initial platform administrator (idempotent, trusted deployment operation).
+// The target user is the first Identity admin configured in IdentitySeedOptions.
 using (var scope = app.Services.CreateScope())
 {
-    // Grant platform access for the trusted startup recovery operation (no authenticated user yet).
+    // Grant platform access for the trusted startup operation (no authenticated user yet).
     var platformAccess = scope.ServiceProvider.GetRequiredService<CoreKit.Tenant.Services.TenantPlatformAccess>();
     using var _ = platformAccess.Grant();
 
-    var recovery = scope.ServiceProvider.GetRequiredService<TenantProjectionRecoveryService>();
-    var result = await recovery.RebuildAllAsync(CancellationToken.None);
-    if (result.Value.Failed.Count > 0)
-    {
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        logger.LogWarning("Projection bootstrap failed for {FailedCount} tenants: {FailedIds}",
-            result.Value.Failed.Count,
-            string.Join(", ", result.Value.Failed.Select(f => f.ToString())));
-    }
-    else
-    {
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        logger.LogInformation("Projection bootstrap complete: {Installed} installed, {Repaired} repaired, {Unchanged} unchanged, {Stale} ignored",
-            result.Value.Installed, result.Value.Repaired, result.Value.Unchanged, result.Value.IgnoredStale);
-}
-
-// Bootstrap the initial platform administrator (idempotent).
-    // This is a trusted deployment operation; the target user is the first Identity admin.
-    var bootstrap = scope.ServiceProvider.GetRequiredService<CoreKit.Access.Abstractions.IAccessBootstrap>();
     var config = scope.ServiceProvider.GetRequiredService<IOptions<CoreKit.Identity.Seeding.IdentitySeedOptions>>().Value;
     if (!string.IsNullOrWhiteSpace(config.AdminEmail))
     {
@@ -248,9 +224,11 @@ using (var scope = app.Services.CreateScope())
         var user = await userRepo.FindByNormalizedEmailAsync(normalizedEmail, CancellationToken.None);
         if (user is not null)
         {
+            var bootstrap = scope.ServiceProvider.GetRequiredService<CoreKit.Access.Abstractions.IAccessBootstrap>();
             await bootstrap.BootstrapInitialPlatformAdminAsync(user.Id, CancellationToken.None);
         }
     }
+}
 }
 
 app.UseForwardedHeaders();   // trust X-Forwarded-For / X-Forwarded-Proto from reverse proxy
@@ -265,6 +243,7 @@ app.MapTenants();  // /tenants, /tenants/current, /tenants/me, /tenants/{id}/set
 app.MapAccess();   // /access/me, /access/permissions, /access/roles, /access/users/{id}/roles, /access/audit
 
 // Demo endpoints, to see the modules guarding a host app's own routes.
+// These are development-only and are never registered in production.
 if (app.Environment.IsDevelopment())
 {
     app.MapGet("/", () => "Identity + Tenant + Access sample host is running.");

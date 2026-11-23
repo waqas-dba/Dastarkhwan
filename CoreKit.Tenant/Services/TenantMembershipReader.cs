@@ -60,6 +60,18 @@ public sealed class TenantMembershipReader : ITenantMembershipReader, ITenantMem
         return tenant?.LastEventSequence ?? 0;
     }
 
+    public async Task<IReadOnlyList<(Guid TenantId, bool IsOwner, long MembershipGeneration)>> ListForUserIncludingRemovedAsync(
+        Guid userId, CancellationToken ct = default)
+    {
+        if (userId == Guid.Empty)
+            return Array.Empty<(Guid, bool, long)>();
+
+        var members = await _members.ListForUserIncludingRemovedAsync(userId, ct);
+        return members
+            .Select(m => (m.TenantId, m.IsOwner, m.MembershipGeneration))
+            .ToList();
+    }
+
     private static string MakeKey(Guid tenantId, Guid userId)
         => $"{KeyPrefix}{tenantId:N}:{userId:N}";
 }

@@ -27,6 +27,17 @@ public static class IdentityOutboxServiceCollectionExtensions
         return services;
     }
 
+    /// <summary>
+    /// Default transport: drops every envelope. A host that wants durable delivery (for example the
+    /// Integration module's account-deletion handler) must replace this with a real implementation.
+    /// </summary>
+    private sealed class NullIdentityOutboxTransport : IIdentityOutboxTransport
+    {
+        public Task<IdentityOutboxDeliveryResult> DeliverAsync(
+            IdentityOutboxEnvelope envelope, CancellationToken ct = default)
+            => Task.FromResult(IdentityOutboxDeliveryResult.RetryLater("No transport configured"));
+    }
+
     private sealed class IdentityOutboxTransportGuard : IHostedService
     {
         private readonly IServiceProvider _services;

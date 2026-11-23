@@ -1,5 +1,6 @@
 using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Constants;
+using CoreKit.Tenant.Persistence;
 
 namespace CoreKit.Tenant.Extensions;
 
@@ -48,6 +49,12 @@ public static class TenantServiceCollectionExtensions
 
             var database = sp.GetRequiredService<IOptions<DatabaseOptions>>().Value;
             TenantDbContextConfigurator.Configure(options, connectionString, database);
+
+            // Row-level security interceptor: sets app.tenant_id before each command
+            // so PostgreSQL RLS policies filter rows by the current tenant.
+            var currentTenant = sp.GetService<ICurrentTenant>();
+            if (currentTenant is not null)
+                options.AddInterceptors(new TenantRowLevelSecurityInterceptor(currentTenant));
         });
 
         services.TryAddSingleton(TimeProvider.System);

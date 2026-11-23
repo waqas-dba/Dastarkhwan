@@ -94,7 +94,10 @@ internal sealed class TestEnv : IDisposable
 
         UserRepository = new UserRepository(Db);
         RefreshTokenRepository = new RefreshTokenRepository(Db);
-        AdministratorGuard = new AdministratorGuard(Array.Empty<Guid>());
+        AdministratorGuard = new AdministratorGuard(
+            new FakePlatformAdministratorProvider(),
+            UserRepository,
+            Db);
         CurrentUser = new FakeCurrentUserService();
 
         UserService = new UserService(
@@ -189,6 +192,15 @@ internal sealed class FakeTokenService : ITokenService
         => "hash-" + rawToken;
 }
 
+/// <summary>Minimal fake IPlatformAdministratorProvider for tests.</summary>
+internal sealed class FakePlatformAdministratorProvider : IPlatformAdministratorProvider
+{
+    public IReadOnlyList<Guid> AdminIds { get; set; } = Array.Empty<Guid>();
+
+    public Task<IReadOnlyList<Guid>> GetPlatformAdministratorUserIdsAsync(CancellationToken ct = default)
+        => Task.FromResult(AdminIds);
+}
+
 /// <summary>Minimal fake ISessionIssuer for tests: always succeeds, like the unguarded baseline.</summary>
 internal sealed class FakeSessionIssuer : ISessionIssuer
 {
@@ -197,7 +209,11 @@ internal sealed class FakeSessionIssuer : ISessionIssuer
         => Task.FromResult(IdentityResult.Success(Build(user)));
 
     public Task<IdentityResult<LoginResponse>> IssueForRefreshAsync(
-        User user, int expectedSecurityVersion, CancellationToken ct = default)
+        User user, int expectedSecurityVersion, Guid familyId, CancellationToken ct = default)
+        => Task.FromResult(IdentityResult.Success(Build(user)));
+
+    public Task<IdentityResult<LoginResponse>> RotateAsync(
+        User user, int expectedSecurityVersion, Guid oldTokenId, Guid familyId, CancellationToken ct = default)
         => Task.FromResult(IdentityResult.Success(Build(user)));
 
     private static LoginResponse Build(User user) => new()

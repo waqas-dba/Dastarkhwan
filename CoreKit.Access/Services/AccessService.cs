@@ -1,4 +1,7 @@
-﻿namespace CoreKit.Access.Services;
+﻿using CoreKit.Access.Services;
+using CoreKit.Tenant.Abstractions;
+
+namespace CoreKit.Access.Services;
 
 /// <summary>
 /// Permissions read from the database right now, never from the cache. Decisions that change who may do what
@@ -12,7 +15,7 @@ internal interface IFreshAccessSource
 
 internal sealed class AccessService : IAccessService, IFreshAccessSource
 {
-    private readonly IAccessMembership _membership;
+    private readonly ITenantMembershipReader _membershipReader;
     private readonly IAccessAssignmentRepository _assignments;
     private readonly IAccessRoleRepository _roles;
     private readonly IAccessCache _cache;
@@ -21,7 +24,7 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
     private readonly IAccessCurrentUser _actor;
 
     public AccessService(
-        IAccessMembership membership,
+        ITenantMembershipReader membershipReader,
         IAccessAssignmentRepository assignments,
         IAccessRoleRepository roles,
         IAccessCache cache,
@@ -29,7 +32,7 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
         IAccessScopeContext scopeContext,
         IAccessCurrentUser actor)
     {
-        _membership = membership;
+        _membershipReader = membershipReader;
         _assignments = assignments;
         _roles = roles;
         _cache = cache;
@@ -69,7 +72,10 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
 
     private async Task<EffectiveAccess> ResolveAsync(Guid userId, AccessScope scope, CancellationToken ct)
     {
-        var member = await _membership.FindAsync(scope, userId, ct);
+        // Access queries Tenant membership directly through the Tenant contracts interface,
+        // not through a durable projection. This keeps Access and Tenant loosely coupled
+        // while allowing Access to make authorization decisions based on current membership.
+        var member = await _membershipReader.FindAsync(scope.Id, userId, ct);
 
         if (member is null)
             return EffectiveAccess.None;

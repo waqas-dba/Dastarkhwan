@@ -1,34 +1,40 @@
 ﻿namespace CoreKit.Access.Services;
 
+using CoreKit.Access.Persistence;
+using CoreKit.Tenant.Abstractions;
+
 internal sealed class AccessMaintenance : IAccessMaintenance
 {
     private readonly AccessDbContext _db;
     private readonly IAccessRoleRepository _roles;
     private readonly IAccessAssignmentRepository _assignments;
     private readonly IAccessAuditRecorder _audit;
-    private readonly IAccessUnitOfWork _unitOfWork;
+    private readonly IAccessUnitOfWork _UnitOfWork;
     private readonly IAccessCache _cache;
     private readonly AccessCatalog _catalog;
     private readonly TimeProvider _time;
+    private readonly ITenantMembershipReader _tenants;
 
     public AccessMaintenance(
         AccessDbContext db,
         IAccessRoleRepository roles,
         IAccessAssignmentRepository assignments,
         IAccessAuditRecorder audit,
-        IAccessUnitOfWork unitOfWork,
+        IAccessUnitOfWork,
         IAccessCache cache,
         AccessCatalog catalog,
-        TimeProvider time)
+        TimeProvider time,
+        ITenantMembershipReader tenants)
     {
         _db = db;
         _roles = roles;
         _assignments = assignments;
         _audit = audit;
-        _unitOfWork = unitOfWork;
+        _UnitOfWork =UnitOfWork;
         _cache = cache;
         _catalog = catalog;
         _time = time;
+        _tenants = tenants;
     }
 
     public async Task RemoveUserAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
@@ -234,28 +240,17 @@ internal sealed class AccessMaintenance : IAccessMaintenance
         _cache.InvalidateUser(scope, userId);
     }
 
-    public async Task RemoveUserFromAllScopesAsync(Guid userId, CancellationToken ct = default)
+public async Task RemoveUserFromAllScopesAsync(Guid userId, CancellationToken ct = default)
     {
         if (userId == Guid.Empty)
             return;
 
-        // Get all tenant IDs from Access's membership projection (all tenants this user was a member of)
-        var tenantIds = await _db.MembershipProjections
-            .Where(mp => mp.UserId == userId)
-            .Select(mp => mp.TenantId)
-            .Distinct()
-            .ToListAsync(ct);
-
-        // Also get any additional tenant IDs from tenant states (in case projection is empty)
-        var stateTenantIds = await _db.TenantStates
-            .Select(ts => ts.TenantId)
-            .ToListAsync(ct);
-
-        // Combine and deduplicate
-        var allTenantIds = tenantIds.Concat(stateTenantIds).Distinct().ToList();
+        // Get all tenant IDs from the tenant module's membership reader (the authoritative source;
+        // Access holds no membership projection of its own).
+        var memberships = await _tenants.ListForUserIncludingRemovedAsync(userId, ct);
 
         // Remove from all tenant scopes
-        foreach (var tenantId in allTenantIds)
+        foreach (var (tenantId, _, _) in memberships)
         {
             var scope = AccessScope.ForTenant(tenantId);
             await _assignments.RemoveUserAsync(scope, userId, ct);
@@ -277,7 +272,7 @@ internal sealed class AccessMaintenance : IAccessMaintenance
         EnsureSaved(await _unitOfWork.SaveAsync(ct), "remove user from all scopes");
 
         // Invalidate cache for all affected scopes
-        foreach (var tenantId in allTenantIds)
+        foreach (var (tenantId, _, _) in memberships)
         {
             _cache.InvalidateUser(AccessScope.ForTenant(tenantId), userId);
         }

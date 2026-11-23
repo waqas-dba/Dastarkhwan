@@ -254,5 +254,8 @@ public sealed class RequireAccessFilterTests
 
         public Task<IReadOnlyList<AccessRoleDto>> ListRolesAsync(AccessScope scope, CancellationToken ct = default)
             => throw new NotSupportedException();
+
+        public Task<EffectiveAccess> GetFreshAccessAsync(Guid userId, AccessScope scope, CancellationToken ct = default)
+            => throw new NotSupportedException();
     }
 }

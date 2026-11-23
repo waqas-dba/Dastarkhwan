@@ -18,4 +18,12 @@ public interface ITenantMembershipReader
     /// whether its membership projection is current with Tenant's authoritative state.
     /// </summary>
     Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default);
+
+    /// <summary>
+    /// All tenants a user is or was a member of, including soft-deleted rows. Used by Access cleanup
+    /// when a user is deleted from Identity, so assignments in every tenant they ever belonged to
+    /// can be removed.
+    /// </summary>
+    Task<IReadOnlyList<(Guid TenantId, bool IsOwner, long MembershipGeneration)>> ListForUserIncludingRemovedAsync(
+        Guid userId, CancellationToken ct = default);
 }

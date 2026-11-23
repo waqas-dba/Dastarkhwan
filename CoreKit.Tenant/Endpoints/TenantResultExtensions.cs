@@ -20,6 +20,7 @@ public static class TenantResultExtensions
             statusCode: statusCode,
             title: title,
             type: $"https://dastarkhwan.platform/errors/{error.Code}",
+            instance: "/",
             extensions: new Dictionary<string, object?>
             {
                 ["errorCode"] = error.Code,

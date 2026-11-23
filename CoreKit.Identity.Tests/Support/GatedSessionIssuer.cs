@@ -30,9 +30,16 @@ internal sealed class GatedSessionIssuer : ISessionIssuer
     }
 
     public async Task<IdentityResult<LoginResponse>> IssueForRefreshAsync(
-        User user, int expectedSecurityVersion, CancellationToken ct = default)
+        User user, int expectedSecurityVersion, Guid familyId, CancellationToken ct = default)
     {
         await _beforeIssuance();
-        return await _inner.IssueForRefreshAsync(user, expectedSecurityVersion, ct);
+        return await _inner.IssueForRefreshAsync(user, expectedSecurityVersion, familyId, ct);
+    }
+
+    public async Task<IdentityResult<LoginResponse>> RotateAsync(
+        User user, int expectedSecurityVersion, Guid oldTokenId, Guid familyId, CancellationToken ct = default)
+    {
+        await _beforeIssuance();
+        return await _inner.RotateAsync(user, expectedSecurityVersion, oldTokenId, familyId, ct);
     }
 }

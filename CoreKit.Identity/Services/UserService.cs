@@ -275,13 +275,13 @@ public sealed class UserService : IUserService
         if (user is null)
             return IdentityErrors.NotFound("User");
 
+        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+
         if (await _administratorGuard.IsLastActiveAdministratorAsync(id, ct))
             return IdentityErrors.Conflict("The last active administrator cannot be deleted.");
 
         if (!await _deletionGuard.CanDeleteUserAsync(id, ct))
             return IdentityErrors.Conflict("Cannot delete a user who is an owner of an active tenant. Transfer ownership first.");
-
-        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
 
         _userRepository.StageDelete(user);
 

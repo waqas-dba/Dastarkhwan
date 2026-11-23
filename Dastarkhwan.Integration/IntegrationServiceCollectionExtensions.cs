@@ -37,8 +37,10 @@ public static class IntegrationServiceCollectionExtensions
         services.TryAddScoped<ITenantOutboxTransport, TenantToAccessOutboxTransport>();
         services.TryAddScoped<ITenantProjectionGateway, AccessTenantProjectionGateway>();
 
-        // Identity outbox transport for durable account deletion events
-        services.TryAddScoped<IIdentityOutboxTransport, IdentityOutboxTransport>();
+        // Identity outbox transport for durable account deletion events.
+        // Identity registers NullIdentityOutboxTransport by default; replace it so cleanup actually runs.
+        services.RemoveAll<IIdentityOutboxTransport>();
+        services.AddScoped<IIdentityOutboxTransport, IdentityOutboxTransport>();
 
         // Cross-module components moved from Tenant to Integration
 

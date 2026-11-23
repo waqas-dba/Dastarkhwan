@@ -23,6 +23,7 @@ public static class EmailSenderRegistration
             .Validate(o => !string.IsNullOrWhiteSpace(o.Provider), "Email:Provider must be configured.")
             .Validate(o => EmailOptions.ValidProviders.Contains(o.Provider, StringComparer.OrdinalIgnoreCase),
                 $"Email:Provider must be one of: {string.Join(", ", EmailOptions.ValidProviders)}")
+            .Validate(o => !IsPlaceholder(o), "Email configuration contains placeholder/example values.")
             .ValidateOnStart();
 
         services.AddScoped<IIdentityEmailSender>(sp =>
@@ -100,5 +101,13 @@ public static class EmailSenderRegistration
             sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<MailgunEmailSender>>(),
             sp.GetRequiredService<IOptions<EmailOptions>>(),
             httpClient);
+    }
+
+    private static bool IsPlaceholder(EmailOptions o)
+    {
+        var values = new[] { o.Smtp.Username, o.Smtp.Password, o.SendGrid.ApiKey, o.Mailgun.ApiKey, o.BaseUrl };
+        return values.Any(v => !string.IsNullOrWhiteSpace(v) &&
+            (v.Contains("your-", StringComparison.OrdinalIgnoreCase) ||
+             v.Contains("example", StringComparison.OrdinalIgnoreCase)));
     }
 }

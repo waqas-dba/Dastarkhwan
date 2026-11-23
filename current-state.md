@@ -288,3 +288,10 @@ The audit report `DK-FULL-APPLICATION-ARCHITECTURE-AUDIT-01` and remediation rep
 - Do not mark tests, builds, migrations or database operations complete unless the result was observed.
 - Never include passwords, tokens, signing keys, connection strings or secret values.
 - Keep this file concise. Detailed architectural rules belong in `architecture.md`, decisions in `decisions.md`, and work queues in `roadmap.md` and `ai-tasks.md`.
+
+## Applied fixes (HEAD a57f891)
+- N1: Identity outbox transport replaced (RemoveAll + AddScoped).
+- B6: last-admin check moved inside transaction.
+- M1: tenant exclusion prefixes corrected to /identity, /access, /tenants.
+- N3: email placeholder values rejected at startup.
+

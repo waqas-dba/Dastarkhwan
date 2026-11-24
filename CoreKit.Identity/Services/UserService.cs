@@ -1,6 +1,5 @@
-﻿using CoreKit.Identity.Common;
+using CoreKit.Identity.Common;
 using CoreKit.Identity.Entities;
-using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Models;
 using CoreKit.Identity.Normalization;
 using CoreKit.Identity.Persistence;
@@ -19,7 +18,7 @@ public sealed class UserService : IUserService
 {
     private readonly IUserRepository _userRepository;
     private readonly IdentityDbContext _db;
-    private readonly IIdentityAdminAuthorizer _authorizer;
+    private readonly CoreKit.Identity.Contracts.IIdentityAdminAuthorizer _authorizer;
     private readonly IAdministratorGuard _administratorGuard;
     private readonly IPasswordHasher _hasher;
     private readonly ICurrentUserService _currentUser;
@@ -30,7 +29,7 @@ public sealed class UserService : IUserService
     public UserService(
         IUserRepository userRepository,
         IdentityDbContext db,
-        IIdentityAdminAuthorizer authorizer,
+        CoreKit.Identity.Contracts.IIdentityAdminAuthorizer authorizer,
         IAdministratorGuard administratorGuard,
         IPasswordHasher hasher,
         ICurrentUserService currentUser,
@@ -51,7 +50,7 @@ public sealed class UserService : IUserService
 
     public async Task<IdentityResult<PagedResult<UserDto>>> ListAsync(UserListQuery query, CancellationToken ct = default)
     {
-        if (!await _authorizer.IsAllowedAsync(IdentityAdminOperation.ReadUsers, ct))
+        if (!await _authorizer.IsAllowedAsync(CoreKit.Identity.Contracts.IdentityAdminOperation.ReadUsers, ct))
             return IdentityErrors.AccessDenied("You cannot view users.");
 
         var page = Math.Max(query.Page, 1);
@@ -70,7 +69,7 @@ public sealed class UserService : IUserService
 
     public async Task<IdentityResult<UserDto>> GetAsync(Guid id, CancellationToken ct = default)
     {
-        if (!await _authorizer.IsAllowedAsync(IdentityAdminOperation.ReadUsers, ct))
+        if (!await _authorizer.IsAllowedAsync(CoreKit.Identity.Contracts.IdentityAdminOperation.ReadUsers, ct))
             return IdentityErrors.AccessDenied("You cannot view users.");
 
         return await LoadDtoAsync(id, ct);
@@ -88,7 +87,7 @@ public sealed class UserService : IUserService
 
     public async Task<IdentityResult<UserDto>> CreateAsync(CreateUserRequest request, CancellationToken ct = default)
     {
-        if (!await _authorizer.IsAllowedAsync(IdentityAdminOperation.CreateUsers, ct))
+        if (!await _authorizer.IsAllowedAsync(CoreKit.Identity.Contracts.IdentityAdminOperation.CreateUsers, ct))
             return IdentityErrors.AccessDenied("You cannot create users.");
 
         var email = request.Email?.Trim() ?? string.Empty;
@@ -146,7 +145,7 @@ public sealed class UserService : IUserService
 
     public async Task<IdentityResult<UserDto>> UpdateAsync(Guid id, UpdateUserRequest request, CancellationToken ct = default)
     {
-        if (!await _authorizer.IsAllowedAsync(IdentityAdminOperation.UpdateUsers, ct))
+        if (!await _authorizer.IsAllowedAsync(CoreKit.Identity.Contracts.IdentityAdminOperation.UpdateUsers, ct))
             return IdentityErrors.AccessDenied("You cannot update users.");
 
         if (_currentUser.UserId is not { } actorId)
@@ -270,7 +269,7 @@ public sealed class UserService : IUserService
 
     public async Task<Common.IdentityResult> DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        if (!await _authorizer.IsAllowedAsync(IdentityAdminOperation.DeleteUsers, ct))
+        if (!await _authorizer.IsAllowedAsync(CoreKit.Identity.Contracts.IdentityAdminOperation.DeleteUsers, ct))
             return IdentityErrors.AccessDenied("You cannot delete users.");
 
         if (_currentUser.UserId == id)

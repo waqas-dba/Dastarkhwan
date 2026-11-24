@@ -1,4 +1,4 @@
-namespace CoreKit.Identity.Tests.Support;
+using CoreKit.Identity.Contracts;
 
 /// <summary>Fixed clock so tests are deterministic.</summary>
 public sealed class FixedTimeProvider : TimeProvider

@@ -1,3 +1,4 @@
+using CoreKit.Identity.Contracts;
 using CoreKit.Identity.Repositories;
 using CoreKit.Identity.Security;
 using CoreKit.Identity.Settings;

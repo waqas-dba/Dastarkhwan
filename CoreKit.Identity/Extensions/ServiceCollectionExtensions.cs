@@ -1,7 +1,9 @@
 ﻿using CoreKit.Identity.Constants;
+using CoreKit.Identity.Persistence;
 using CoreKit.Identity.Repositories;
 using CoreKit.Identity.Security;
 using CoreKit.Identity.Outbox;
+using CoreKit.Identity.Services;
 using CoreKit.Abstractions.IntegrationEvents;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Caching.Memory;
@@ -43,6 +45,12 @@ public static class ServiceCollectionExtensions
 
             var database = sp.GetRequiredService<IOptions<DatabaseOptions>>().Value;
             IdentityDbContextConfigurator.Configure(options, connectionString, database);
+
+            // Row-level security interceptor: sets app.user_id before each command
+            // so PostgreSQL RLS policies filter rows by the current user.
+            var currentUser = sp.GetService<ICurrentUserService>();
+            if (currentUser is not null)
+                options.AddInterceptors(new IdentityRowLevelSecurityInterceptor(currentUser));
         });
 
         // TryAdd: a host or a test may register its own clock or hasher first.

@@ -57,8 +57,8 @@ public static class IntegrationServiceCollectionExtensions
         services.TryAddScoped<IEventHandler<TenantCreated>, TenantCreatedToAccessProvision>();
 
         // When an Identity user is deleted, clean up their Tenant membership rows and Access platform membership.
-        services.TryAddScoped<IEventHandler<IdentityUserDeleted>, IdentityUserDeletedToTenantCleanup>();
-        services.TryAddScoped<IEventHandler<IdentityUserDeleted>, IdentityUserDeletedToAccessCleanup>();
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IEventHandler<IdentityUserDeleted>, IdentityUserDeletedToTenantCleanup>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IEventHandler<IdentityUserDeleted>, IdentityUserDeletedToAccessCleanup>());
 
         // Tenant adds its tenant claim to every access token Identity issues.
         services.TryAddScoped<IAccessTokenClaimsContributor, TenantClaimsContributor>();

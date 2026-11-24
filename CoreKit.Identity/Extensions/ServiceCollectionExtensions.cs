@@ -46,11 +46,7 @@ public static class ServiceCollectionExtensions
             var database = sp.GetRequiredService<IOptions<DatabaseOptions>>().Value;
             IdentityDbContextConfigurator.Configure(options, connectionString, database);
 
-            // Row-level security interceptor: sets app.user_id before each command
-            // so PostgreSQL RLS policies filter rows by the current user.
-            var currentUser = sp.GetService<ICurrentUserService>();
-            if (currentUser is not null)
-                options.AddInterceptors(new IdentityRowLevelSecurityInterceptor(currentUser));
+            // RLS interceptors removed per P1A plan (defective PostgreSQL command construction).
         });
 
         // TryAdd: a host or a test may register its own clock or hasher first.

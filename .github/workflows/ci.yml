@@ -87,8 +87,8 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Build Admin host
-        run: dotnet build Dastarkhwan.Admin/Dastarkhwan.Admin.csproj
+      - name: Build solution
+        run: dotnet build Dastarkhwan.slnx
 
       - name: Run composed smoke test (Identity + Tenant + Access)
         run: |

@@ -1,4 +1,4 @@
-namespace CoreKit.Access.Abstractions;
+namespace CoreKit.Access.Contracts;
 
 /// <summary>
 /// Trusted one-time platform provisioning: bootstraps the initial platform administrator.

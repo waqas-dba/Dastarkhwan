@@ -192,6 +192,10 @@ public sealed class UserService : IUserService
             if (actorId == id)
                 return IdentityErrors.Forbidden("You cannot deactivate your own account.");
 
+            // Deactivation requires atomic check-and-act within a transaction to prevent
+            // race conditions with the last-admin guard.
+            await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+
             if (await _administratorGuard.IsLastActiveAdministratorAsync(id, ct))
                 return IdentityErrors.Conflict("The last active administrator cannot be deactivated.");
 
@@ -231,6 +235,8 @@ public sealed class UserService : IUserService
             {
                 user.IsActive = true;
             }
+
+            await transaction.CommitAsync(ct);
         }
 
         if (request.Password is not null)

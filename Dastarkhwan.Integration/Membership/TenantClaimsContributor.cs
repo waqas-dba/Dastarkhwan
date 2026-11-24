@@ -1,4 +1,4 @@
-using CoreKit.Access.Abstractions;
+using CoreKit.Access.Contracts;
 using CoreKit.Tenant.Constants;
 using CoreKit.Tenant.Persistence;
 using System.Security.Claims;

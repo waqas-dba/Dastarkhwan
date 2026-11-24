@@ -1,5 +1,8 @@
 ﻿namespace CoreKit.Access.Abstractions;
 
+using CoreKit.Access.Contracts;
+using CoreKit.Access.Models;
+
 /// <summary>Which roles people hold in the current scope.</summary>
 public interface IAccessAssignmentService
 {

@@ -1,1 +1,0 @@
-﻿namespace CoreKit.Access.Abstractions;

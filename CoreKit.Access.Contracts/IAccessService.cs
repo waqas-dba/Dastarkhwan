@@ -1,4 +1,4 @@
-﻿namespace CoreKit.Access.Abstractions;
+namespace CoreKit.Access.Contracts;
 
 /// <summary>What a person may do in a scope, resolved from membership and roles.</summary>
 public sealed record EffectiveAccess(
@@ -8,6 +8,36 @@ public sealed record EffectiveAccess(
         new(false, false, new HashSet<string>(StringComparer.Ordinal), Array.Empty<string>());
 
     public bool Has(string permission) => IsMember && (IsOwner || Permissions.Contains(permission));
+}
+
+/// <summary>Role DTO returned by Access queries.</summary>
+public sealed class AccessRoleDto
+{
+    public Guid Id { get; set; }
+
+    public string Name { get; set; } = null!;
+
+    public string? Description { get; set; }
+
+    public IReadOnlyList<string> Permissions { get; set; } = Array.Empty<string>();
+
+    /// <summary>How many people hold this role.</summary>
+    public int MemberCount { get; set; }
+
+    public DateTime CreatedAt { get; set; }
+
+    public DateTime? UpdatedAt { get; set; }
+
+    /// <summary>Changes on every update. Clients must send it back when updating to avoid lost changes.</summary>
+    public Guid ConcurrencyStamp { get; set; }
+}
+
+/// <summary>Permission DTO.</summary>
+public sealed class AccessPermissionDto
+{
+    public string Name { get; set; } = null!;
+
+    public string Description { get; set; } = null!;
 }
 
 public interface IAccessService

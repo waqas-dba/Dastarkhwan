@@ -1,4 +1,4 @@
-﻿namespace CoreKit.Access.Abstractions;
+namespace CoreKit.Access.Contracts;
 
 /// <summary>
 /// Housekeeping for trusted code such as a bridge reacting to events. It has no permission checks:

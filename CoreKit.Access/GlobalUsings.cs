@@ -12,6 +12,7 @@ global using CoreKit.Access.Abstractions;
 global using CoreKit.Access.Catalog;
 global using CoreKit.Access.Common;
 global using CoreKit.Access.Constants;
+global using CoreKit.Access.Contracts;
 global using CoreKit.Access.Entities;
 global using CoreKit.Access.Models;
 global using CoreKit.Access.Persistence;

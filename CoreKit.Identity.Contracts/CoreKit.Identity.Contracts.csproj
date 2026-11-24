@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\CoreKit.Abstractions\CoreKit.Abstractions.csproj" />
   </ItemGroup>
 
 </Project>

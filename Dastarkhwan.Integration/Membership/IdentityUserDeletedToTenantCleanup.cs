@@ -1,5 +1,5 @@
 using CoreKit.Abstractions.IntegrationEvents;
-using CoreKit.Identity.IntegrationEvents;
+using CoreKit.Identity.Contracts;
 using CoreKit.Tenant.Abstractions;
 using Microsoft.Extensions.Logging;
 

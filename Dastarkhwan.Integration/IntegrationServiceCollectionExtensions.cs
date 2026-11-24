@@ -1,9 +1,9 @@
 using CoreKit.Abstractions.IntegrationEvents;
 using CoreKit.Access.Abstractions;
+using CoreKit.Access.Contracts;
 using CoreKit.Access.Extensions;
+using CoreKit.Identity.Contracts;
 using CoreKit.Identity.Outbox;
-using CoreKit.Identity.IntegrationEvents;
-using CoreKit.Identity.Interfaces;
 using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Constants;
 using CoreKit.Tenant.Outbox;
@@ -52,6 +52,9 @@ public static class IntegrationServiceCollectionExtensions
         // When a person leaves a tenant, clear their effective-authorization state in Access so a
         // cached tenant-scoped permission set cannot outlive the membership.
         services.TryAddScoped<IEventHandler<TenantMemberRemoved>, TenantMemberRemovedToAccessMaintenance>();
+
+        // When a tenant is created, provision its default roles in Access.
+        services.TryAddScoped<IEventHandler<TenantCreated>, TenantCreatedToAccessProvision>();
 
         // When an Identity user is deleted, clean up their Tenant membership rows and Access platform membership.
         services.TryAddScoped<IEventHandler<IdentityUserDeleted>, IdentityUserDeletedToTenantCleanup>();

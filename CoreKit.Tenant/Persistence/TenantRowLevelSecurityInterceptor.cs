@@ -40,12 +40,33 @@ public sealed class TenantRowLevelSecurityInterceptor : DbCommandInterceptor
         return base.NonQueryExecuting(command, eventData, result);
     }
 
+    public override ValueTask<InterceptionResult<DbDataReader>> ReaderExecutingAsync(
+        DbCommand command,
+        CommandEventData eventData,
+        InterceptionResult<DbDataReader> result,
+        CancellationToken cancellationToken = default)
+    {
+        SetTenantContext(command);
+        return base.ReaderExecutingAsync(command, eventData, result, cancellationToken);
+    }
+
+    public override ValueTask<InterceptionResult<int>> NonQueryExecutingAsync(
+        DbCommand command,
+        CommandEventData eventData,
+        InterceptionResult<int> result,
+        CancellationToken cancellationToken = default)
+    {
+        SetTenantContext(command);
+        return base.NonQueryExecutingAsync(command, eventData, result, cancellationToken);
+    }
+
     private void SetTenantContext(DbCommand command)
     {
         if (_currentTenant.IsResolved && _currentTenant.Id is { } tenantId)
         {
-            command.Parameters.Add(new NpgsqlParameter("app_tenant_id", tenantId.ToString()));
-            command.CommandText = $"SET LOCAL app.tenant_id = '{tenantId}'; " + command.CommandText;
+            var param = new NpgsqlParameter("app_tenant_id", tenantId.ToString());
+            command.Parameters.Add(param);
+            command.CommandText = $"SET LOCAL app.tenant_id = @app_tenant_id; " + command.CommandText;
         }
     }
 }

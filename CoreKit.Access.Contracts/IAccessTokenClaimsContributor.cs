@@ -1,8 +1,10 @@
-namespace CoreKit.Access.Abstractions;
+using System.Security.Claims;
+
+namespace CoreKit.Access.Contracts;
 
 /// <summary>
 /// Lets another module add claims to the access token without Identity knowing about it.
-/// Register with services.AddScoped&lt;IAccessTokenClaimsContributor, YourContributor&gt;().
+/// Register with services.AddScoped<IAccessTokenClaimsContributor, YourContributor>().
 /// Claims named sub, jti, email, name, role or permission are ignored: only Identity sets those.
 /// </summary>
 public interface IAccessTokenClaimsContributor

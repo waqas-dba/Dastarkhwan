@@ -1,5 +1,7 @@
 namespace CoreKit.Access.Abstractions;
 
+using CoreKit.Access.Contracts;
+
 /// <summary>
 /// Manages platform membership: add, revoke, and membership lookup. Independent of role assignments.
 /// A platform member with no role assignments holds no permissions.

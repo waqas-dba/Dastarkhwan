@@ -1,6 +1,6 @@
 using CoreKit.Abstractions.IntegrationEvents;
-using CoreKit.Access.Abstractions;
-using CoreKit.Identity.IntegrationEvents;
+using CoreKit.Access.Contracts;
+using CoreKit.Identity.Contracts;
 using Microsoft.Extensions.Logging;
 
 namespace Dastarkhwan.Integration.Membership;

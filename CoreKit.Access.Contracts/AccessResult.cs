@@ -1,4 +1,4 @@
-﻿namespace CoreKit.Access.Common;
+namespace CoreKit.Access.Contracts;
 
 public enum AccessErrorKind
 {

@@ -1,4 +1,4 @@
-using CoreKit.Access.Common;
+using CoreKit.Access.Contracts;
 
 namespace CoreKit.Access.Abstractions;
 

@@ -1,5 +1,8 @@
 ﻿namespace CoreKit.Access.Abstractions;
 
+using CoreKit.Access.Contracts;
+using CoreKit.Access.Models;
+
 /// <summary>Roles of the current scope. The caller needs access.roles.read or access.roles.manage.</summary>
 public interface IAccessRoleService
 {

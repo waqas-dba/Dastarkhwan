@@ -62,6 +62,11 @@ public sealed class AccessDbContext : DbContext
             b.HasIndex(x => new { x.ScopeType, x.ScopeId, x.UserId });
             b.HasIndex(x => new { x.RoleId, x.ScopeType, x.ScopeId });
 
+            // Prevent duplicate assignment of the same role to the same user in the same scope.
+            // RoleId is globally unique, but this makes the constraint explicit at the scope level.
+            b.HasIndex(x => new { x.ScopeType, x.ScopeId, x.UserId, x.RoleId })
+                .IsUnique().HasDatabaseName("UX_ACCESS_Assignments_Scope_User_Role");
+
             b.HasOne(x => x.Role).WithMany()
                 .HasForeignKey(x => new { x.RoleId, x.ScopeType, x.ScopeId })
                 .HasPrincipalKey(x => new { x.Id, x.ScopeType, x.ScopeId })

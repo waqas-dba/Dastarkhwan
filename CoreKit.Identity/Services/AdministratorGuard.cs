@@ -2,6 +2,7 @@
 using CoreKit.Identity.Persistence;
 using CoreKit.Identity.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
 
 namespace CoreKit.Identity.Services;
@@ -30,28 +31,41 @@ public sealed class AdministratorGuard : IAdministratorGuard
 
     public async Task<bool> IsLastActiveAdministratorAsync(Guid userId, CancellationToken ct = default)
     {
-        // Acquire PostgreSQL transaction-level advisory lock to serialize the check
-        // This works across multiple app instances and is automatically released at transaction end
-        await _db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({AdminCheckLockKey})", ct);
+        // If we're already in a transaction, use its advisory lock.
+        // Otherwise, acquire a transaction-level advisory lock for the duration of this check.
+        var inTransaction = _db.Database.CurrentTransaction != null;
 
-        var adminUserIds = await _provider.GetPlatformAdministratorUserIdsAsync(ct);
-
-        // Filter out inactive Identity accounts. Access role holders may include users
-        // that have been deactivated in Identity; they should not count as active admins.
-        var activeAdminIds = new List<Guid>();
-        foreach (var adminId in adminUserIds)
+        if (!inTransaction)
         {
-            var user = await _userRepository.FindByIdAsync(adminId, ct);
-            if (user is not null && user.IsActive)
-            {
-                activeAdminIds.Add(adminId);
-            }
+            await _db.Database.ExecuteSqlRawAsync($"SELECT pg_advisory_xact_lock({AdminCheckLockKey})", ct);
         }
 
-        if (activeAdminIds.Count != 1)
-            return false;
+        try
+        {
+            var adminUserIds = await _provider.GetPlatformAdministratorUserIdsAsync(ct);
 
-        var soleAdminId = activeAdminIds[0];
-        return soleAdminId == userId;
+            // Filter out inactive Identity accounts. Access role holders may include users
+            // that have been deactivated in Identity; they should not count as active admins.
+            var activeAdminIds = new List<Guid>();
+            foreach (var adminId in adminUserIds)
+            {
+                var user = await _userRepository.FindByIdAsync(adminId, ct);
+                if (user is not null && user.IsActive)
+                {
+                    activeAdminIds.Add(adminId);
+                }
+            }
+
+            if (activeAdminIds.Count != 1)
+                return false;
+
+            var soleAdminId = activeAdminIds[0];
+            return soleAdminId == userId;
+        }
+        finally
+        {
+            // If we acquired our own lock, it's automatically released at the end of the implicit transaction
+            // from ExecuteSqlRawAsync. If we're in the caller's transaction, the lock is held until that commits/rolls back.
+        }
     }
 }

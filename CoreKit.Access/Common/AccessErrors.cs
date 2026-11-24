@@ -1,5 +1,7 @@
 ﻿namespace CoreKit.Access.Common;
 
+using CoreKit.Access.Contracts;
+
 public static class AccessErrors
 {
     public static readonly AccessError ScopeRequired = new(

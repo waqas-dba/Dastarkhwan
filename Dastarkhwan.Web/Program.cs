@@ -1,4 +1,4 @@
-using CoreKit.Access.Abstractions;
+using CoreKit.Access.Contracts;
 using CoreKit.Access.Constants;
 using CoreKit.Access.Endpoints;
 using CoreKit.Access.Extensions;
@@ -6,7 +6,7 @@ using CoreKit.Access.Persistence;
 using CoreKit.Identity.Constants;
 using CoreKit.Identity.Endpoints;
 using CoreKit.Identity.Extensions;
-using CoreKit.Identity.Interfaces;
+using CoreKit.Identity.Contracts;
 using CoreKit.Identity.Persistence;
 using CoreKit.Identity.Seeding;
 using CoreKit.Identity.Services;
@@ -98,23 +98,23 @@ builder.Services.AddIdentity(builder.Configuration);
 builder.Services.AddProblemDetails();
 
 // The platform exception middleware is registered in the pipeline below.
-// Here we map identity.* operations to platform permissions checked through Access.
-builder.Services.AddScoped<IIdentityAdminAuthorizer>(sp =>
-{
-    var permissionChecker = sp.GetRequiredService<CoreKit.Access.Abstractions.IPermissionChecker>();
-    return new PermissionBasedIdentityAdminAuthorizer(permissionChecker);
-});
-builder.Services.AddIdentitySeeding(builder.Configuration);
-builder.Services.AddTenant(builder.Configuration);
-builder.Services.AddAccess(builder.Configuration);
-
-// Wire Identity's IPlatformAdministratorProvider to Access's IAccessService
- // This keeps Identity independent of Access; the host (which references both) connects them.
- builder.Services.AddScoped<CoreKit.Identity.Interfaces.IPlatformAdministratorProvider>(sp =>
+ // Here we map identity.* operations to platform permissions checked through Access.
+ builder.Services.AddScoped<IIdentityAdminAuthorizer>(sp =>
  {
-     var access = sp.GetRequiredService<CoreKit.Access.Abstractions.IAccessService>();
-     return new AccessPlatformAdministratorProvider(access);
+     var permissionChecker = sp.GetRequiredService<CoreKit.Access.Contracts.IPermissionChecker>();
+     return new PermissionBasedIdentityAdminAuthorizer(permissionChecker);
  });
+ builder.Services.AddIdentitySeeding(builder.Configuration);
+ builder.Services.AddTenant(builder.Configuration);
+ builder.Services.AddAccess(builder.Configuration);
+
+ // Wire Identity's IPlatformAdministratorProvider to Access's IAccessService
+  // This keeps Identity independent of Access; the host (which references both) connects them.
+  builder.Services.AddScoped<IPlatformAdministratorProvider>(sp =>
+  {
+      var access = sp.GetRequiredService<IAccessService>();
+      return new AccessPlatformAdministratorProvider(access);
+  });
 
  // Register the Dastarkhwan integration (cross-module wiring)
  builder.Services.AddDastarkhwanIntegration();
@@ -160,78 +160,70 @@ builder.Services.AddAccessPermissions(p =>
 
 var app = builder.Build();
 
-// Development convenience: create or update the databases, then seed them.
-// In production, run migrations as a separate deployment step instead.
-if (app.Environment.IsDevelopment())
-{
-    using (var scope = app.Services.CreateScope())
-    {
-        await scope.ServiceProvider.GetRequiredService<IdentityDbContext>().Database.MigrateAsync();
-        await scope.ServiceProvider.GetRequiredService<TenantDbContext>().Database.MigrateAsync();
-        await scope.ServiceProvider.GetRequiredService<AccessDbContext>().Database.MigrateAsync();
-    }
-}
-else
-    {
-        // Production must never auto-migrate. Verify connectivity so an incompatible or
-        // unreachable database fails safely with an actionable diagnostic.
-        using (var scope = app.Services.CreateScope())
-        {
-            var sp = scope.ServiceProvider;
-            foreach (var context in new DbContext[]
-            {
-                sp.GetRequiredService<IdentityDbContext>(),
-                sp.GetRequiredService<TenantDbContext>(),
-                sp.GetRequiredService<AccessDbContext>()
-            })
-            {
-                if (!await context.Database.CanConnectAsync())
-                {
-                    throw new InvalidOperationException(
-                        $"Database for {context.GetType().Name} is not reachable. Apply migrations as a deployment step before starting the application.");
-                }
+ // Development convenience: create or update the databases, then seed them.
+ // In production, run migrations as a separate deployment step instead.
+ if (app.Environment.IsDevelopment())
+ {
+     using (var scope = app.Services.CreateScope())
+     {
+         await scope.ServiceProvider.GetRequiredService<IdentityDbContext>().Database.MigrateAsync();
+         await scope.ServiceProvider.GetRequiredService<TenantDbContext>().Database.MigrateAsync();
+         await scope.ServiceProvider.GetRequiredService<AccessDbContext>().Database.MigrateAsync();
+     }
+ }
+ else
+     {
+         // Production must never auto-migrate. Verify connectivity so an incompatible or
+         // unreachable database fails safely with an actionable diagnostic.
+         using (var scope = app.Services.CreateScope())
+         {
+             var sp = scope.ServiceProvider;
+             foreach (var context in new DbContext[]
+             {
+                 sp.GetRequiredService<IdentityDbContext>(),
+                 sp.GetRequiredService<TenantDbContext>(),
+                 sp.GetRequiredService<AccessDbContext>()
+             })
+             {
+                 if (!await context.Database.CanConnectAsync())
+                 {
+                     throw new InvalidOperationException(
+                         $"Database for {context.GetType().Name} is not reachable. Apply migrations as a deployment step before starting the application.");
+                 }
 
-                // Check for pending migrations in production
-                var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
-                if (pendingMigrations.Any())
-                {
-                    var logger = sp.GetRequiredService<ILogger<Program>>();
-                    logger.LogError("Database {Context} has pending migrations: {Migrations}. Apply migrations before starting in production.",
-                        context.GetType().Name, string.Join(", ", pendingMigrations));
-                    throw new InvalidOperationException(
-                        $"Database for {context.GetType().Name} has pending migrations: {string.Join(", ", pendingMigrations)}. Apply migrations as a deployment step before starting the application.");
-                }
-            }
-        }
-    }
+                 // Check for pending migrations in production
+                 var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
+                 if (pendingMigrations.Any())
+                 {
+                     var logger = sp.GetRequiredService<ILogger<Program>>();
+                     logger.LogError("Database {Context} has pending migrations: {Migrations}. Apply migrations before starting in production.",
+                         context.GetType().Name, string.Join(", ", pendingMigrations));
+                     throw new InvalidOperationException(
+                         $"Database for {context.GetType().Name} has pending migrations: {string.Join(", ", pendingMigrations)}. Apply migrations as a deployment step before starting the application.");
+                 }
+             }
+         }
+     }
 
-// Access owns roles and permissions; the seeder only ensures the first administrator exists.
-await app.Services.SeedIdentityAsync();
+ // Health endpoints (available in all environments)
+ app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
+ app.MapGet("/health/ready", async (
+     IdentityDbContext identity,
+     TenantDbContext tenant,
+     AccessDbContext access,
+     CancellationToken ct) =>
+ {
+     var reachable = await identity.Database.CanConnectAsync(ct)
+         && await tenant.Database.CanConnectAsync(ct)
+         && await access.Database.CanConnectAsync(ct);
+     return reachable ? Results.Ok(new { status = "ready" }) : Results.StatusCode(503);
+ });
 
-// Bootstrap the initial platform administrator (idempotent, trusted deployment operation).
-// The target user is the first Identity admin configured in IdentitySeedOptions.
-using (var scope = app.Services.CreateScope())
-{
-    // Grant platform access for the trusted startup operation (no authenticated user yet).
-    var platformAccess = scope.ServiceProvider.GetRequiredService<CoreKit.Tenant.Services.TenantPlatformAccess>();
-    using var _ = platformAccess.Grant();
+ // Access owns roles and permissions; the seeder only ensures the first administrator exists.
+ // Seeding/bootstrapping is done by Admin host to avoid startup race when both hosts run.
+ // Web only verifies DB connectivity via /health/ready.
 
-    var config = scope.ServiceProvider.GetRequiredService<IOptions<CoreKit.Identity.Seeding.IdentitySeedOptions>>().Value;
-    if (!string.IsNullOrWhiteSpace(config.AdminEmail))
-    {
-        var userRepo = scope.ServiceProvider.GetRequiredService<CoreKit.Identity.Interfaces.IUserRepository>();
-        var normalizedEmail = CoreKit.Identity.Normalization.IdentityNormalizer.NormalizeEmail(config.AdminEmail);
-        var user = await userRepo.FindByNormalizedEmailAsync(normalizedEmail, CancellationToken.None);
-        if (user is not null)
-        {
-            var bootstrap = scope.ServiceProvider.GetRequiredService<CoreKit.Access.Abstractions.IAccessBootstrap>();
-            await bootstrap.BootstrapInitialPlatformAdminAsync(user.Id, CancellationToken.None);
-        }
-    }
-}
-
-
-app.UseForwardedHeaders();   // trust X-Forwarded-For / X-Forwarded-Proto from reverse proxy
+ app.UseForwardedHeaders();   // trust X-Forwarded-For / X-Forwarded-Proto from reverse proxy
 app.UseHsts();               // Strict-Transport-Security header
 app.UseHttpsRedirection();   // redirect HTTP to HTTPS
 app.UsePlatformExceptionHandler();   // centralized RFC 9457 Problem Details for all exceptions
@@ -253,7 +245,7 @@ if (app.Environment.IsDevelopment())
     app.MapGet("/demo/needs-login", () => "You are signed in.")
         .RequireAuthorization();
 
-    app.MapGet("/demo/needs-users-read", async (CoreKit.Access.Abstractions.IPermissionChecker checker, CancellationToken ct) =>
+    app.MapGet("/demo/needs-users-read", async (CoreKit.Access.Contracts.IPermissionChecker checker, CancellationToken ct) =>
             await checker.HasPlatformPermissionAsync(IdentityAccessPermissionNames.UsersRead, ct)
                 ? Results.Ok("You hold the identity.users.read permission.")
                 : Results.Forbid())
@@ -290,9 +282,9 @@ app.Run();
 
 public sealed class PermissionBasedIdentityAdminAuthorizer : IIdentityAdminAuthorizer
 {
-    private readonly CoreKit.Access.Abstractions.IPermissionChecker _permissionChecker;
+    private readonly IPermissionChecker _permissionChecker;
 
-    public PermissionBasedIdentityAdminAuthorizer(CoreKit.Access.Abstractions.IPermissionChecker permissionChecker)
+    public PermissionBasedIdentityAdminAuthorizer(IPermissionChecker permissionChecker)
     {
         _permissionChecker = permissionChecker;
     }
@@ -313,24 +305,24 @@ public sealed class PermissionBasedIdentityAdminAuthorizer : IIdentityAdminAutho
 }
 
 /// <summary>Adapter: implements Identity's IPlatformAdministratorProvider using Access's IAccessService.</summary>
-internal sealed class AccessPlatformAdministratorProvider : CoreKit.Identity.Interfaces.IPlatformAdministratorProvider
+internal sealed class AccessPlatformAdministratorProvider : IPlatformAdministratorProvider
 {
-    private readonly CoreKit.Access.Abstractions.IAccessService _access;
+    private readonly IAccessService _access;
 
-    public AccessPlatformAdministratorProvider(CoreKit.Access.Abstractions.IAccessService access)
+    public AccessPlatformAdministratorProvider(IAccessService access)
     {
         _access = access;
     }
 
     public Task<IReadOnlyList<Guid>> GetPlatformAdministratorUserIdsAsync(CancellationToken ct = default)
     {
-        var platformScope = CoreKit.Access.Abstractions.AccessScope.ForPlatform(CoreKit.Access.Abstractions.AccessScope.PlatformId);
+        var platformScope = AccessScope.ForPlatform(AccessScope.PlatformId);
         return _access.ListUserIdsWithRoleAsync(platformScope, "Administrator", ct);
     }
 }
 
 /// <summary>Dispatches Identity integration events to all registered IEventHandler<T> implementations.</summary>
-internal sealed class DispatchingIdentityEventPublisher : CoreKit.Identity.Interfaces.IIdentityEventPublisher
+internal sealed class DispatchingIdentityEventPublisher : IIdentityEventPublisher
 {
     private readonly IServiceProvider _services;
 
@@ -340,7 +332,7 @@ internal sealed class DispatchingIdentityEventPublisher : CoreKit.Identity.Inter
     }
 
     public async Task PublishAsync<TEvent>(TEvent integrationEvent, CancellationToken ct = default)
-        where TEvent : CoreKit.Identity.Interfaces.IIdentityIntegrationEvent
+        where TEvent : IIdentityIntegrationEvent
     {
         foreach (var handler in _services.GetServices<CoreKit.Abstractions.IntegrationEvents.IEventHandler<TEvent>>())
         {

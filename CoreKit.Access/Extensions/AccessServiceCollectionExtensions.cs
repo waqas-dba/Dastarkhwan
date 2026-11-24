@@ -1,4 +1,7 @@
+using CoreKit.Access.Abstractions;
 using CoreKit.Access.Persistence;
+using CoreKit.Access.Services;
+using CoreKit.Tenant.Abstractions;
 
 namespace CoreKit.Access.Extensions;
 
@@ -76,6 +79,7 @@ public static class AccessServiceCollectionExtensions
         services.AddSingleton<IAccessCache, AccessCache>();
         services.AddScoped<IAccessAuditRecorder, AccessAuditRecorder>();
         services.AddScoped<IAccessService, AccessService>();
+        services.AddScoped<IAccessMembership, AccessMembership>();
         services.AddScoped<AccessGuard>();
         services.AddScoped<IAccessRoleService, AccessRoleService>();
         services.AddScoped<IAccessAssignmentService, AccessAssignmentService>();

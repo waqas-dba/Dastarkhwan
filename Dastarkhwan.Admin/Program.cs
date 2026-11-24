@@ -1,9 +1,9 @@
-using CoreKit.Access.Abstractions;
+using CoreKit.Access.Contracts;
 using CoreKit.Access.Endpoints;
 using CoreKit.Access.Extensions;
 using CoreKit.Identity.Endpoints;
 using CoreKit.Identity.Extensions;
-using CoreKit.Identity.Interfaces;
+using CoreKit.Identity.Contracts;
 using CoreKit.Identity.Persistence;
 using CoreKit.Identity.Seeding;
 using CoreKit.Tenant.Endpoints;
@@ -81,9 +81,9 @@ builder.Services.AddIdentity(builder.Configuration);
 builder.Services.AddProblemDetails();
 
 // Wire Identity's IPlatformAdministratorProvider to Access's IAccessService
-builder.Services.AddScoped<CoreKit.Identity.Interfaces.IPlatformAdministratorProvider>(sp =>
+builder.Services.AddScoped<IPlatformAdministratorProvider>(sp =>
 {
-    var access = sp.GetRequiredService<CoreKit.Access.Abstractions.IAccessService>();
+    var access = sp.GetRequiredService<IAccessService>();
     return new AdminPlatformAdministratorProvider(access);
 });
 
@@ -115,7 +115,7 @@ builder.Services.AddAccessPermissions(p =>
 });
 
 // Add access bootstrap for trusted startup provisioning
-builder.Services.AddScoped<CoreKit.Access.Abstractions.IAccessBootstrap, CoreKit.Access.Services.AccessBootstrap>();
+builder.Services.AddScoped<IAccessBootstrap, CoreKit.Access.Services.AccessBootstrap>();
 
 var app = builder.Build();
 
@@ -169,7 +169,7 @@ using (var scope = app.Services.CreateScope())
         var user = await userRepo.FindByNormalizedEmailAsync(normalizedEmail, CancellationToken.None);
         if (user is not null)
         {
-            var bootstrap = scope.ServiceProvider.GetRequiredService<CoreKit.Access.Abstractions.IAccessBootstrap>();
+            var bootstrap = scope.ServiceProvider.GetRequiredService<IAccessBootstrap>();
             await bootstrap.BootstrapInitialPlatformAdminAsync(user.Id, CancellationToken.None);
         }
     }
@@ -191,7 +191,7 @@ app.MapAccess();
 // Admin-only management endpoints
 app.MapPost("/admin/platform/members", async (
     AddPlatformMemberRequest req,
-    CoreKit.Access.Abstractions.IPermissionChecker checker,
+    IPermissionChecker checker,
     CancellationToken ct) =>
 {
     if (!await checker.HasPlatformPermissionAsync("tenants.platform", ct))
@@ -217,18 +217,18 @@ app.MapGet("/admin/health/ready", async (
 app.Run();
 
 // Admin platform administrator provider
-internal sealed class AdminPlatformAdministratorProvider : CoreKit.Identity.Interfaces.IPlatformAdministratorProvider
+internal sealed class AdminPlatformAdministratorProvider : IPlatformAdministratorProvider
 {
-    private readonly CoreKit.Access.Abstractions.IAccessService _access;
+    private readonly IAccessService _access;
 
-    public AdminPlatformAdministratorProvider(CoreKit.Access.Abstractions.IAccessService access)
+    public AdminPlatformAdministratorProvider(IAccessService access)
     {
         _access = access;
     }
 
     public Task<IReadOnlyList<Guid>> GetPlatformAdministratorUserIdsAsync(CancellationToken ct = default)
     {
-        var platformScope = CoreKit.Access.Abstractions.AccessScope.ForPlatform(CoreKit.Access.Abstractions.AccessScope.PlatformId);
+        var platformScope = AccessScope.ForPlatform(AccessScope.PlatformId);
         return _access.ListUserIdsWithRoleAsync(platformScope, "Administrator", ct);
     }
 }

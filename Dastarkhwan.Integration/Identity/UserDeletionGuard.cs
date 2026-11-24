@@ -1,4 +1,4 @@
-using CoreKit.Identity.Interfaces;
+using CoreKit.Identity.Contracts;
 using CoreKit.Tenant.Persistence;
 
 namespace Dastarkhwan.Integration.Identity;

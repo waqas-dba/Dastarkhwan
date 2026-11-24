@@ -1,5 +1,7 @@
 namespace CoreKit.Access.Abstractions;
 
+using CoreKit.Access.Contracts;
+
 /// <summary>
 /// Platform membership lookup for Access. A user is a platform member only when an
 /// AccessPlatformMember row exists with RevokedAt == null. Membership is independent

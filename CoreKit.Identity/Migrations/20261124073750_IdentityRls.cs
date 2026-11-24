@@ -1,11 +1,11 @@
-using Microsoft.EntityFrameworkCore.Migrations;
+﻿using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
 namespace CoreKit.Identity.Migrations
 {
     /// <inheritdoc />
-    public partial class AddIdentityRowLevelSecurity : Migration
+    public partial class IdentityRls : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -28,10 +28,6 @@ CREATE POLICY ""Identity_RefreshTokens_rls"" ON ""identity"".""Identity_RefreshT
 
 ALTER TABLE ""identity"".""Idenity_EmailVerificationTokens"" ENABLE ROW LEVEL SECURITY;
 CREATE POLICY ""Idenity_EmailVerificationTokens_rls"" ON ""identity"".""Idenity_EmailVerificationTokens""
-    USING (""UserId"" = NULLIF(current_setting('app.user_id', true), '')::uuid);
-
-ALTER TABLE ""identity"".""Identity_UserRoles"" ENABLE ROW LEVEL SECURITY;
-CREATE POLICY ""Identity_UserRoles_rls"" ON ""identity"".""Identity_UserRoles""
     USING (""UserId"" = NULLIF(current_setting('app.user_id', true), '')::uuid);
 
 ALTER TABLE ""identity"".""Identity_OutboxMessages"" ENABLE ROW LEVEL SECURITY;
@@ -60,9 +56,6 @@ ALTER TABLE ""identity"".""Identity_RefreshTokens"" DISABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS ""Idenity_EmailVerificationTokens_rls"" ON ""identity"".""Idenity_EmailVerificationTokens"";
 ALTER TABLE ""identity"".""Idenity_EmailVerificationTokens"" DISABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS ""Identity_UserRoles_rls"" ON ""identity"".""Identity_UserRoles"";
-ALTER TABLE ""identity"".""Identity_UserRoles"" DISABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS ""Identity_OutboxMessages_rls"" ON ""identity"".""Identity_OutboxMessages"";
 ALTER TABLE ""identity"".""Identity_OutboxMessages"" DISABLE ROW LEVEL SECURITY;

@@ -190,9 +190,13 @@ public sealed class FakeTenantMembershipReader : ITenantMembershipReader
     public Task<TenantMemberInfo?> FindAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
         => Task.FromResult(Members.TryGetValue((tenantId, userId), out var info) ? info : null);
 
-    public Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default)
-        => Task.FromResult(0L);
-
-    public Task<long> GetLastAppliedSequenceAsync(Guid tenantId, CancellationToken ct = default)
-        => Task.FromResult(0L);
+    public Task<IReadOnlyList<(Guid TenantId, bool IsOwner, long MembershipGeneration)>> ListForUserIncludingRemovedAsync(
+        Guid userId, CancellationToken ct = default)
+    {
+        var result = Members
+            .Where(kvp => kvp.Key.UserId == userId)
+            .Select(kvp => (kvp.Key.TenantId, kvp.Value.IsOwner, kvp.Value.MembershipGeneration))
+            .ToList();
+        return Task.FromResult<IReadOnlyList<(Guid TenantId, bool IsOwner, long MembershipGeneration)>>(result);
+    }
 }

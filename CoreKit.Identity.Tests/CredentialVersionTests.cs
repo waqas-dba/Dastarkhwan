@@ -1,4 +1,8 @@
 using CoreKit.Identity.Repositories;
+using CoreKit.Identity.Security;
+using CoreKit.Identity.Settings;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace CoreKit.Identity.Tests;
 
@@ -41,19 +45,24 @@ public sealed class CredentialVersionTests : IDisposable
             sessions ?? new FakeSessionIssuer(),
             currentUser ?? new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
+            _env.LockoutOptions,
             _env.Time,
             NullLogger<AuthService>.Instance);
     }
 
     private UserService CreateAdminService(IUserRepository? userRepository = null)
     {
+        var db = _env.NewContext();
         return new(
-            userRepository ?? new UserRepository(_env.NewContext()),
+            userRepository ?? new UserRepository(db),
+            db,
             _env.Authorizer,
             _env.AdministratorGuard,
             _env.Hasher,
             OwnerCurrentUser(),
-            _env.Time);
+            _env.Time,
+            _env.UserDeletionGuard,
+            _env.EventPublisher);
     }
 
     private FakeCurrentUserService OwnerCurrentUser()
@@ -130,6 +139,7 @@ public sealed class CredentialVersionTests : IDisposable
             CreateRealSessionIssuer(db),
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
+            _env.LockoutOptions,
             _env.Time,
             NullLogger<AuthService>.Instance);
     }
@@ -245,6 +255,7 @@ public sealed class CredentialVersionTests : IDisposable
             gatedSessions,
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
+            _env.LockoutOptions,
             _env.Time,
             NullLogger<AuthService>.Instance);
 
@@ -284,6 +295,7 @@ public sealed class CredentialVersionTests : IDisposable
             gatedSessions,
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
+            _env.LockoutOptions,
             _env.Time,
             NullLogger<AuthService>.Instance);
 
@@ -497,14 +509,18 @@ public sealed class CredentialVersionTests : IDisposable
                 await releaseRehash.Task;
             });
         var stubHasher = new StubHasher(PasswordCheckResult.SuccessRehashNeeded);
-        var auth = new AuthService(
-            gatedRepo,
-            new RefreshTokenRepository(db),
-            stubHasher,
-            new FakeTokenService(),
+        var gatedSessions = new GatedSessionIssuer(
             CreateRealSessionIssuer(db),
+            async () => { await Task.Yield(); });
+        var auth = new AuthService(
+            new UserRepository(db),
+            new RefreshTokenRepository(db),
+            _env.Hasher,
+            new FakeTokenService(),
+            gatedSessions,
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
+            _env.LockoutOptions,
             _env.Time,
             NullLogger<AuthService>.Instance);
 
@@ -547,6 +563,7 @@ public sealed class CredentialVersionTests : IDisposable
                 }),
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
+            _env.LockoutOptions,
             _env.Time,
             NullLogger<AuthService>.Instance);
 
@@ -586,6 +603,7 @@ public sealed class CredentialVersionTests : IDisposable
                 }),
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
+            _env.LockoutOptions,
             _env.Time,
             NullLogger<AuthService>.Instance);
 

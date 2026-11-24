@@ -1,4 +1,5 @@
-﻿namespace CoreKit.Access.Tests;
+using CoreKit.Access.Contracts;
+namespace CoreKit.Access.Tests;
 
 public sealed class AccessAssignmentServiceTests : IDisposable
 {

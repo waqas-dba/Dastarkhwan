@@ -1,3 +1,4 @@
+using CoreKit.Access.Contracts;
 using CoreKit.Access.Abstractions;
 using CoreKit.Access.Services;
 using Microsoft.AspNetCore.Http;
@@ -51,3 +52,4 @@ public sealed class ClaimsAccessScopeContextTests
         Assert.Null(Create(http).Current);
     }
 }
+

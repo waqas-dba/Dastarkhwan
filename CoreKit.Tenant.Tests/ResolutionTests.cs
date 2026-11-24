@@ -1,5 +1,6 @@
 ﻿using CoreKit.Tenant.Resolution;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 
 namespace CoreKit.Tenant.Tests;
 
@@ -127,7 +128,8 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
             {
                 nextCalled = true;
                 return Task.CompletedTask;
-            });
+            },
+            Options.Create(new TenantResolutionOptions()));
         var membership = new TenantMembershipReader(_env.Members, _env.Tenants, new MemoryCache(new MemoryCacheOptions()), Options.Create(_env.Config));
 
         var options = Options.Create(_env.Config);
@@ -191,7 +193,9 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
         using var other = new TestEnv();
         other.Config.Resolution.TrustHeader = true;
         var bySlugTenant = other.AddTenant("Shop", "shop");
-        var middleware = new TenantResolutionMiddleware(_ => Task.CompletedTask);
+        var middleware = new TenantResolutionMiddleware(
+            _ => Task.CompletedTask,
+            Options.Create(new TenantResolutionOptions()));
         var membership = new TenantMembershipReader(other.Members, other.Tenants, new MemoryCache(new MemoryCacheOptions()), Options.Create(other.Config));
         var options = Options.Create(other.Config);
 
@@ -465,11 +469,13 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
             }, "test"));
 
         var nextCalled = false;
-        var middleware = new TenantResolutionMiddleware(_ =>
-        {
-            nextCalled = true;
-            return Task.CompletedTask;
-        });
+        var middleware = new TenantResolutionMiddleware(
+            _ =>
+            {
+                nextCalled = true;
+                return Task.CompletedTask;
+            },
+            Options.Create(new TenantResolutionOptions()));
         var membership = new NullMembershipReader();
 
         var options = Options.Create(_env.Config);
@@ -495,6 +501,10 @@ internal sealed class NullMembershipReader : ITenantMembershipReader
 {
     public Task<TenantMemberInfo?> FindAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
         => Task.FromResult<TenantMemberInfo?>(null);
+
+    public Task<IReadOnlyList<(Guid TenantId, bool IsOwner, long MembershipGeneration)>> ListForUserIncludingRemovedAsync(
+        Guid userId, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<(Guid TenantId, bool IsOwner, long MembershipGeneration)>>(new List<(Guid TenantId, bool IsOwner, long MembershipGeneration)>());
 
     public Task<TenantMember?> FindForUpdateAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
         => Task.FromResult<TenantMember?>(null);

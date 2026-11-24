@@ -1,3 +1,4 @@
+using CoreKit.Access.Contracts;
 using CoreKit.Access.Extensions;
 using CoreKit.Access.Services;
 using Microsoft.AspNetCore.Http;
@@ -49,3 +50,4 @@ public sealed class AccessOnlyRegistrationTests : IDisposable
         Assert.Null(scopeContext.Current);
     }
 }
+

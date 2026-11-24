@@ -1,4 +1,6 @@
-﻿namespace CoreKit.Access.Tests.Support;
+﻿using CoreKit.Access.Contracts;
+
+namespace CoreKit.Access.Tests.Support;
 
 public sealed class FixedTimeProvider : TimeProvider
 {
@@ -42,25 +44,6 @@ public sealed class FakeMembership : IAccessMembership
         Lookups++;
         return Task.FromResult(_members.TryGetValue((scope, userId), out var member) ? member : null);
     }
-}
-
-/// <summary>A projection repository that throws on every read, used to prove fail-closed behavior.</summary>
-public sealed class FailingProjectionRepository : IAccessMembershipProjectionRepository
-{
-    public Task<AccessMembershipProjection?> FindAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
-        => throw new InvalidOperationException("projection database is unavailable");
-
-    public Task<AccessMembershipProjection?> FindReadOnlyAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
-        => throw new InvalidOperationException("projection database is unavailable");
-
-    public Task<IReadOnlyList<AccessMembershipProjection>> ListByTenantAsync(Guid tenantId, CancellationToken ct = default)
-        => throw new InvalidOperationException("projection database is unavailable");
-
-    public Task<IReadOnlyList<AccessMembershipProjection>> ListByTenantForUpdateAsync(Guid tenantId, CancellationToken ct = default)
-        => throw new InvalidOperationException("projection database is unavailable");
-
-    public void Add(AccessMembershipProjection projection) => throw new InvalidOperationException();
-    public void Remove(AccessMembershipProjection projection) => throw new InvalidOperationException();
 }
 
 internal static class ResultAssert

@@ -1,3 +1,4 @@
+using CoreKit.Access.Contracts;
 using CoreKit.Access.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -135,3 +136,4 @@ public sealed class MigrationSnapshotTests
         return db.Model;
     }
 }
+

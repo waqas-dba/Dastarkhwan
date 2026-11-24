@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using CoreKit.Access.Contracts;
 using CoreKit.Access.Endpoints;
 using CoreKit.Access.Tests.Support;
 using Microsoft.AspNetCore.Builder;

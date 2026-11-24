@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using CoreKit.Access.Abstractions;
+using CoreKit.Access.Contracts;
 using CoreKit.Access.Extensions;
 using CoreKit.Access.Services;
 using CoreKit.Tenant.Abstractions;
@@ -25,7 +25,9 @@ public sealed class TenantResolutionMiddlewareScopeContextTests
         membership.Members[(tenantId, userId)] = new TenantMemberInfo(false);
         var provider = new FakeTenantInfoProvider(new TenantInfo(tenantId, "Acme", "acme", TenantStatus.Active));
         var nextCalled = false;
-        var middleware = new TenantResolutionMiddleware(_ => { nextCalled = true; return Task.CompletedTask; });
+        var middleware = new TenantResolutionMiddleware(
+            _ => { nextCalled = true; return Task.CompletedTask; },
+            Options.Create(new TenantResolutionOptions()));
         var context = new DefaultHttpContext();
         context.User = Authenticated(userId);
         context.Items[AccessScopeContextItemKeys.TenantId] = Guid.NewGuid();
@@ -46,7 +48,9 @@ public sealed class TenantResolutionMiddlewareScopeContextTests
         var membership = new FakeTenantMembershipReader();
         var provider = new FakeTenantInfoProvider(new TenantInfo(tenantId, "Acme", "acme", TenantStatus.Active));
         var nextCalled = false;
-        var middleware = new TenantResolutionMiddleware(_ => { nextCalled = true; return Task.CompletedTask; });
+        var middleware = new TenantResolutionMiddleware(
+            _ => { nextCalled = true; return Task.CompletedTask; },
+            Options.Create(new TenantResolutionOptions()));
         var context = new DefaultHttpContext();
         context.Items[AccessScopeContextItemKeys.TenantId] = Guid.NewGuid();
         var strategies = new ITenantResolutionStrategy[] { new FixedStrategy(new TenantIdentifier(tenantId, null, "header")) };
@@ -65,7 +69,9 @@ public sealed class TenantResolutionMiddlewareScopeContextTests
         var setter = new TestTenantContextSetter();
         var membership = new FakeTenantMembershipReader();
         var provider = new FakeTenantInfoProvider(new TenantInfo(tenantId, "Acme", "acme", TenantStatus.Active));
-        var middleware = new TenantResolutionMiddleware(_ => Task.CompletedTask);
+        var middleware = new TenantResolutionMiddleware(
+            _ => Task.CompletedTask,
+            Options.Create(new TenantResolutionOptions()));
         var context = new DefaultHttpContext();
         var strategies = new ITenantResolutionStrategy[] { new FixedStrategy(new TenantIdentifier(tenantId, null, "header")) };
 
@@ -95,7 +101,7 @@ public sealed class TenantResolutionMiddlewareScopeContextTests
         Assert.IsType<ClaimsAccessScopeContext>(scopeContext);
         Assert.Null(scopeContext.Current);
 
-        var checker = scope.ServiceProvider.GetRequiredService<CoreKit.Access.Abstractions.IPermissionChecker>();
+        var checker = scope.ServiceProvider.GetRequiredService<CoreKit.Access.Contracts.IPermissionChecker>();
         Assert.False(await checker.HasPermissionAsync("sales.create"));
     }
 
@@ -108,7 +114,9 @@ public sealed class TenantResolutionMiddlewareScopeContextTests
         var membership = new FakeTenantMembershipReader();
         var provider = new FakeTenantInfoProvider(new TenantInfo(tenantId, "Acme", "acme", TenantStatus.Active));
         var nextCalled = false;
-        var middleware = new TenantResolutionMiddleware(_ => { nextCalled = true; return Task.CompletedTask; });
+        var middleware = new TenantResolutionMiddleware(
+            _ => { nextCalled = true; return Task.CompletedTask; },
+            Options.Create(new TenantResolutionOptions()));
         var context = new DefaultHttpContext();
         context.User = Authenticated(userId);
         context.Items[AccessScopeContextItemKeys.TenantId] = Guid.NewGuid();
@@ -126,7 +134,9 @@ public sealed class TenantResolutionMiddlewareScopeContextTests
     public async Task ClearsPreExistingScope_AndDoesNotSet_WhenTenantIsUnknown()
     {
         var setter = new TestTenantContextSetter();
-        var middleware = new TenantResolutionMiddleware(_ => Task.CompletedTask);
+        var middleware = new TenantResolutionMiddleware(
+            _ => Task.CompletedTask,
+            Options.Create(new TenantResolutionOptions()));
         var context = new DefaultHttpContext();
         context.Items[AccessScopeContextItemKeys.TenantId] = Guid.NewGuid();
         var strategies = new ITenantResolutionStrategy[] { new FixedStrategy(new TenantIdentifier(Guid.NewGuid(), null, "header")) };
@@ -143,7 +153,9 @@ public sealed class TenantResolutionMiddlewareScopeContextTests
     {
         var tenantId = Guid.NewGuid();
         var setter = new TestTenantContextSetter();
-        var middleware = new TenantResolutionMiddleware(_ => Task.CompletedTask);
+        var middleware = new TenantResolutionMiddleware(
+            _ => Task.CompletedTask,
+            Options.Create(new TenantResolutionOptions()));
         var context = new DefaultHttpContext();
         context.Items[AccessScopeContextItemKeys.TenantId] = Guid.NewGuid();
         var provider = new FakeTenantInfoProvider(new TenantInfo(tenantId, "Acme", "acme", TenantStatus.Suspended));
@@ -162,7 +174,9 @@ public sealed class TenantResolutionMiddlewareScopeContextTests
         var own = Guid.NewGuid();
         var other = Guid.NewGuid();
         var setter = new TestTenantContextSetter();
-        var middleware = new TenantResolutionMiddleware(_ => Task.CompletedTask);
+        var middleware = new TenantResolutionMiddleware(
+            _ => Task.CompletedTask,
+            Options.Create(new TenantResolutionOptions()));
         var context = new DefaultHttpContext();
         context.Items[AccessScopeContextItemKeys.TenantId] = Guid.NewGuid();
         var provider = new FakeTenantInfoProvider(
@@ -189,7 +203,9 @@ public sealed class TenantResolutionMiddlewareScopeContextTests
         var membership = new FakeTenantMembershipReader();
         var provider = new FakeTenantInfoProvider(new TenantInfo(tenantId, "Acme", "acme", TenantStatus.Active));
         var nextCalled = false;
-        var middleware = new TenantResolutionMiddleware(_ => { nextCalled = true; return Task.CompletedTask; });
+        var middleware = new TenantResolutionMiddleware(
+            _ => { nextCalled = true; return Task.CompletedTask; },
+            Options.Create(new TenantResolutionOptions()));
         var context = new DefaultHttpContext();
         context.User = new ClaimsPrincipal(new ClaimsIdentity(new[] { new Claim("sub", "not-a-guid") }, "test"));
         context.Items[AccessScopeContextItemKeys.TenantId] = Guid.NewGuid();
@@ -208,7 +224,9 @@ public sealed class TenantResolutionMiddlewareScopeContextTests
     {
         var setter = new TestTenantContextSetter();
         var nextCalled = false;
-        var middleware = new TenantResolutionMiddleware(_ => { nextCalled = true; return Task.CompletedTask; });
+        var middleware = new TenantResolutionMiddleware(
+            _ => { nextCalled = true; return Task.CompletedTask; },
+            Options.Create(new TenantResolutionOptions()));
         var context = new DefaultHttpContext();
         context.Items[AccessScopeContextItemKeys.TenantId] = Guid.NewGuid();
 

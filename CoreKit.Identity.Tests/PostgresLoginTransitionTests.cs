@@ -1,4 +1,8 @@
 using CoreKit.Identity.Repositories;
+using CoreKit.Identity.Security;
+using CoreKit.Identity.Settings;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Npgsql;
 using Xunit.Abstractions;
 
@@ -255,6 +259,7 @@ public sealed class PostgresLoginTransitionTests
             new FakeSessionIssuer(),
             new FakeCurrentUserService(),
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
+            Options.Create(new IdentityLockoutOptions { Threshold = 5, DurationMinutes = 15 }),
             new FixedTimeProvider(FixedNow),
             NullLogger<AuthService>.Instance);
 

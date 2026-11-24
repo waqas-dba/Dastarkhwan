@@ -1,4 +1,7 @@
-﻿using Microsoft.Extensions.Caching.Memory;
+﻿using CoreKit.Access.Contracts;
+using CoreKit.Access.Services;
+using CoreKit.Tenant.Abstractions;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace CoreKit.Access.Tests.Support;
 
@@ -41,6 +44,7 @@ internal sealed class TestEnv : IDisposable
         Audit = new AccessAuditRecorder(AuditRepo, User, Time);
         Access = new AccessService(Membership, Assignments, Roles, Cache, Catalog, ScopeContext, User);
         Guard = new AccessGuard(ScopeContext, User, Access);
+        TenantMembershipReader = new FakeTenantMembershipReader();
     }
 
     public static void DefaultCatalog(AccessCatalogBuilder b)
@@ -90,6 +94,8 @@ internal sealed class TestEnv : IDisposable
 
     public AccessGuard Guard { get; }
 
+    public ITenantMembershipReader TenantMembershipReader { get; }
+
     public DateTime UtcNow => Time.GetUtcNow().UtcDateTime;
 
     public AccessDbContext NewContext() => new(_dbOptions);
@@ -100,7 +106,7 @@ internal sealed class TestEnv : IDisposable
     public AccessAssignmentService CreateAssignmentService() => new(
         Guard, Membership, Roles, Assignments, Audit, UnitOfWork, Cache, Options.Create(Config), Time);
 
-    public AccessMaintenance CreateMaintenance() => new(Db, Roles, Assignments, Audit, UnitOfWork, Cache, Catalog, Time);
+    public AccessMaintenance CreateMaintenance() => new(Db, Roles, Assignments, Audit, UnitOfWork, Cache, Catalog, Time, TenantMembershipReader);
 
     /// <summary>Builds the trusted bootstrap service directly (it is not registered in the general DI container).</summary>
     public AccessBootstrap CreateBootstrap() => new(Db, Roles, Assignments, Audit, UnitOfWork, Cache, Catalog, Time);
@@ -189,4 +195,14 @@ internal sealed class TestEnv : IDisposable
         _memory.Dispose();
         _connection.Dispose();
     }
+}
+
+internal sealed class FakeTenantMembershipReader : ITenantMembershipReader
+{
+    public Task<TenantMemberInfo?> FindAsync(Guid tenantId, Guid userId, CancellationToken ct = default)
+        => Task.FromResult<TenantMemberInfo?>(null);
+
+    public Task<IReadOnlyList<(Guid TenantId, bool IsOwner, long MembershipGeneration)>> ListForUserIncludingRemovedAsync(
+        Guid userId, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<(Guid TenantId, bool IsOwner, long MembershipGeneration)>>(new List<(Guid TenantId, bool IsOwner, long MembershipGeneration)>());
 }

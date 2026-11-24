@@ -1,5 +1,5 @@
 using System.Security.Claims;
-using CoreKit.Access.Abstractions;
+using CoreKit.Access.Contracts;
 using CoreKit.Access.Constants;
 using CoreKit.Access.Entities;
 using CoreKit.Access.Extensions;
@@ -310,11 +310,13 @@ public sealed class Pr2VerificationIntegrationTests : IDisposable
         var setter = scopedProvider.GetRequiredService<ITenantContextSetter>();
 
         var nextCalled = false;
-        var middleware = new TenantResolutionMiddleware(_ =>
-        {
-            nextCalled = true;
-            return Task.CompletedTask;
-        });
+        var middleware = new TenantResolutionMiddleware(
+            _ =>
+            {
+                nextCalled = true;
+                return Task.CompletedTask;
+            },
+            Options.Create(new TenantResolutionOptions()));
 
         context.Response.Body = new MemoryStream();
         await middleware.InvokeAsync(context, membershipReader, strategies, provider, setter);

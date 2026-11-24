@@ -1,4 +1,8 @@
 using CoreKit.Identity.Repositories;
+using CoreKit.Identity.Security;
+using CoreKit.Identity.Settings;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 
 namespace CoreKit.Identity.Tests;
 
@@ -1057,6 +1061,7 @@ public sealed class UserServiceTests : IDisposable
             new FakeSessionIssuer(),
             currentUser,
             emailOptions,
+            _env.LockoutOptions,
             _env.Time,
             NullLogger<AuthService>.Instance);
     }

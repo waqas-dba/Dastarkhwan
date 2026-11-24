@@ -1,5 +1,5 @@
 ﻿using CoreKit.Tenant.Abstractions;
-using CoreKit.Access.Abstractions;
+using CoreKit.Access.Contracts;
 
 namespace CoreKit.Tenant.Tests.Support;
 

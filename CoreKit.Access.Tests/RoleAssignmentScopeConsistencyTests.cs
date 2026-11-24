@@ -1,3 +1,4 @@
+using CoreKit.Access.Contracts;
 using System.IO;
 using CoreKit.Access.Abstractions;
 using CoreKit.Access.Entities;
@@ -155,3 +156,4 @@ public class RoleAssignmentScopeConsistencyTests : IDisposable
         Assert.Equal(scopeA.Id, assignments[0].ScopeId);
     }
 }
+

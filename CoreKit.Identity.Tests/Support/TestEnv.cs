@@ -1,6 +1,9 @@
 using CoreKit.Identity.Constants;
+using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Repositories;
 using CoreKit.Identity.Security;
+using CoreKit.Identity.Settings;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -99,15 +102,18 @@ internal sealed class TestEnv : IDisposable
             UserRepository,
             Db);
         CurrentUser = new FakeCurrentUserService();
+        UserDeletionGuard = new FakeUserDeletionGuard();
+        EventPublisher = new FakeIdentityEventPublisher();
+        LockoutOptions = Options.Create(new IdentityLockoutOptions { Threshold = 5, DurationMinutes = 15 });
 
         UserService = new UserService(
-            UserRepository, Authorizer, AdministratorGuard, Hasher, CurrentUser, Time);
+            UserRepository, Db, Authorizer, AdministratorGuard, Hasher, CurrentUser, Time, UserDeletionGuard, EventPublisher);
 
         var emailOptions = Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false });
         AuthService = new AuthService(
             UserRepository, RefreshTokenRepository, Hasher,
             new FakeTokenService(), new FakeSessionIssuer(),
-            CurrentUser, emailOptions, Time,
+            CurrentUser, emailOptions, LockoutOptions, Time,
             NullLogger<AuthService>.Instance);
     }
 
@@ -126,6 +132,12 @@ internal sealed class TestEnv : IDisposable
     public IRefreshTokenRepository RefreshTokenRepository { get; }
 
     public IAdministratorGuard AdministratorGuard { get; }
+
+    public IUserDeletionGuard UserDeletionGuard { get; }
+
+    public IIdentityEventPublisher EventPublisher { get; }
+
+    public IOptions<IdentityLockoutOptions> LockoutOptions { get; }
 
     public IUserService UserService { get; }
 
@@ -233,4 +245,19 @@ internal sealed class FakeSessionIssuer : ISessionIssuer
             UpdatedAt = user.UpdatedAt
         }
     };
+}
+
+/// <summary>Minimal fake IUserDeletionGuard for tests: always allows deletion.</summary>
+internal sealed class FakeUserDeletionGuard : IUserDeletionGuard
+{
+    public Task<bool> CanDeleteUserAsync(Guid userId, CancellationToken ct = default)
+        => Task.FromResult(true);
+}
+
+/// <summary>Minimal fake IIdentityEventPublisher for tests: no-op.</summary>
+internal sealed class FakeIdentityEventPublisher : IIdentityEventPublisher
+{
+    public Task PublishAsync<TEvent>(TEvent integrationEvent, CancellationToken ct = default)
+        where TEvent : IIdentityIntegrationEvent
+        => Task.CompletedTask;
 }

@@ -1,3 +1,4 @@
+using CoreKit.Access.Contracts;
 using CoreKit.Access.Services;
 using CoreKit.Access.Tests.Support;
 using CoreKit.Access.Constants;
@@ -126,3 +127,4 @@ public sealed class AccessAuditLogTests : IDisposable
         Assert.Equal(5, pageSizeLarge.Items.Count);
     }
 }
+

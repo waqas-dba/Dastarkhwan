@@ -1,4 +1,5 @@
-﻿namespace CoreKit.Access.Tests;
+using CoreKit.Access.Contracts;
+namespace CoreKit.Access.Tests;
 
 public sealed class AccessRoleServiceReadTests : IDisposable
 {
@@ -837,3 +838,4 @@ internal sealed class CompetingWriterUnitOfWork : IAccessUnitOfWork
                 && entry.Entity.Action == AccessAuditActions.RoleUpdated);
     }
 }
+

@@ -1,4 +1,5 @@
-﻿global using System.Security.Claims;
+global using CoreKit.Access.Contracts;
+global using System.Security.Claims;
 global using CoreKit.Access.Abstractions;
 global using CoreKit.Access.Catalog;
 global using CoreKit.Access.Common;

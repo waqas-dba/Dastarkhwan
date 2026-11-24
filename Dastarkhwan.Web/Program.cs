@@ -229,7 +229,7 @@ using (var scope = app.Services.CreateScope())
         }
     }
 }
-}
+
 
 app.UseForwardedHeaders();   // trust X-Forwarded-For / X-Forwarded-Proto from reverse proxy
 app.UseHsts();               // Strict-Transport-Security header

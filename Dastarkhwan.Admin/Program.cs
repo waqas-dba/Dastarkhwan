@@ -5,15 +5,24 @@ using CoreKit.Identity.Endpoints;
 using CoreKit.Identity.Extensions;
 using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Persistence;
+using CoreKit.Identity.Seeding;
 using CoreKit.Tenant.Endpoints;
 using CoreKit.Tenant.Extensions;
 using CoreKit.Tenant.Persistence;
+using CoreKit.Tenant.Outbox;
 using Dastarkhwan.Integration;
 using Dastarkhwan.Integration.Endpoints;
+using Dastarkhwan.Web.Configuration;
+using Dastarkhwan.Web.Email;
+using Dastarkhwan.Web.ErrorHandling;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -59,8 +68,8 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         if (IPAddress.TryParse(proxy, out var address))
             options.KnownProxies.Add(address);
-        else if (IPNetwork.TryParse(proxy, out var network))
-            options.KnownNetworks.Add(network);
+        else if (System.Net.IPNetwork.TryParse(proxy, out var network))
+            options.KnownIPNetworks.Add(network);
     }
 });
 
@@ -138,7 +147,7 @@ else
 
             var pending = await context.Database.GetPendingMigrationsAsync();
             if (pending.Any())
-                throw new InvalidOperationException($"Database for {context.GetType().Name} has {pending.Count} pending migration(s).");
+                throw new InvalidOperationException($"Database for {context.GetType().Name} has {pending.Count()} pending migration(s).");
         }
     }
 }

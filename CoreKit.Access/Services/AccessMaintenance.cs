@@ -9,7 +9,7 @@ internal sealed class AccessMaintenance : IAccessMaintenance
     private readonly IAccessRoleRepository _roles;
     private readonly IAccessAssignmentRepository _assignments;
     private readonly IAccessAuditRecorder _audit;
-    private readonly IAccessUnitOfWork _UnitOfWork;
+    private readonly IAccessUnitOfWork _unitOfWork;
     private readonly IAccessCache _cache;
     private readonly AccessCatalog _catalog;
     private readonly TimeProvider _time;
@@ -20,7 +20,7 @@ internal sealed class AccessMaintenance : IAccessMaintenance
         IAccessRoleRepository roles,
         IAccessAssignmentRepository assignments,
         IAccessAuditRecorder audit,
-        IAccessUnitOfWork,
+        IAccessUnitOfWork unitOfWork,
         IAccessCache cache,
         AccessCatalog catalog,
         TimeProvider time,
@@ -30,7 +30,7 @@ internal sealed class AccessMaintenance : IAccessMaintenance
         _roles = roles;
         _assignments = assignments;
         _audit = audit;
-        _UnitOfWork =UnitOfWork;
+        _unitOfWork = unitOfWork;
         _cache = cache;
         _catalog = catalog;
         _time = time;

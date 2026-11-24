@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 
 namespace CoreKit.Tenant.Outbox;
 
@@ -7,7 +8,7 @@ public static class TenantOutboxServiceCollectionExtensions
 {
     /// <summary>
     /// Opt-in. Adds the background publisher. The host (or PR-5's Access adapter) must also register an
-    /// <see cref="ITenantOutboxTransport"/>; without one, delivery fails loudly and retries.
+    /// <see cref="ITenantOutboxTransport"/>; without one, a null transport is used that returns RetryLater.
     /// </summary>
     public static IServiceCollection AddTenantOutboxPublisher(
         this IServiceCollection services, Action<TenantOutboxOptions>? configure = null)
@@ -26,7 +27,22 @@ public static class TenantOutboxServiceCollectionExtensions
 
         services.TryAddSingleton(TimeProvider.System);
         services.TryAddSingleton<TenantOutboxDispatcher>();
+        
+        // Default transport: returns RetryLater. A host that wants durable delivery must replace this.
+        services.TryAddSingleton<ITenantOutboxTransport, NullTenantOutboxTransport>();
+        
         services.AddHostedService<TenantOutboxPublisherService>();
         return services;
+    }
+
+    /// <summary>
+    /// Default transport: returns RetryLater for every envelope. A host that wants durable delivery
+    /// (for example external side effects like emails, webhooks) must replace this with a real implementation.
+    /// </summary>
+    private sealed class NullTenantOutboxTransport : ITenantOutboxTransport
+    {
+        public Task<TenantOutboxDeliveryResult> DeliverAsync(
+            TenantOutboxEnvelope envelope, CancellationToken ct = default)
+            => Task.FromResult(TenantOutboxDeliveryResult.RetryLater("No transport configured"));
     }
 }

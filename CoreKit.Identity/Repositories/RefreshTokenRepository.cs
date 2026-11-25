@@ -67,41 +67,51 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
         }
     }
 
-    public async Task<bool> TryRevokeAsync(Guid tokenId, DateTime now, CancellationToken ct = default)
+    public async Task<bool> TryRevokeAsync(Guid tokenId, string reason, DateTime now, CancellationToken ct = default)
     {
         var changed = await _db.RefreshTokens
             .Where(t => t.Id == tokenId && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, (DateTime?)now), ct);
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(t => t.RevokedAt, (DateTime?)now)
+                .SetProperty(t => t.RevokedReason, reason), ct);
 
         return changed > 0;
     }
 
-    public async Task RevokeByHashAsync(string tokenHash, DateTime now, CancellationToken ct = default)
+    public async Task RevokeByHashAsync(string tokenHash, string reason, DateTime now, CancellationToken ct = default)
     {
         await _db.RefreshTokens
             .Where(t => t.TokenHash == tokenHash && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, (DateTime?)now), ct);
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(t => t.RevokedAt, (DateTime?)now)
+                .SetProperty(t => t.RevokedReason, reason), ct);
     }
 
-    public Task<int> RevokeAllForUserAsync(Guid userId, DateTime now, CancellationToken ct = default)
+    public Task<int> RevokeAllForUserAsync(Guid userId, string reason, DateTime now, CancellationToken ct = default)
         => _db.RefreshTokens
             .Where(t => t.UserId == userId && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, (DateTime?)now), ct);
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(t => t.RevokedAt, (DateTime?)now)
+                .SetProperty(t => t.RevokedReason, reason), ct);
 
     public async Task<bool> HasActiveTokenInFamilyAsync(Guid familyId, DateTime now, CancellationToken ct = default)
         => await _db.RefreshTokens
             .AnyAsync(t => t.FamilyId == familyId && t.RevokedAt == null && t.ExpiresAt > now, ct);
 
-    public async Task<int> RevokeAllInFamilyAsync(Guid familyId, DateTime now, CancellationToken ct = default)
-        => await _db.RefreshTokens
+    public Task<int> RevokeAllInFamilyAsync(Guid familyId, string reason, DateTime now, CancellationToken ct = default)
+        => _db.RefreshTokens
             .Where(t => t.FamilyId == familyId && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, (DateTime?)now), ct);
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(t => t.RevokedAt, (DateTime?)now)
+                .SetProperty(t => t.RevokedReason, reason), ct);
 
     public async Task<RotationResult> TryRotateAsync(
         Guid userId,
         Guid oldTokenId,
+        Guid familyId,
         int expectedSecurityVersion,
         DateTime now,
+        string reason,
         RefreshToken newToken,
         CancellationToken ct = default)
     {
@@ -125,15 +135,22 @@ public sealed class RefreshTokenRepository : IRefreshTokenRepository
                 return RotationResult.UserUnavailable;
             }
 
-            // Check if old token is still unrevoked (not replayed by another request)
+            // Revoke old token. If it was already revoked, this is replay.
             var oldTokenRevoked = await _db.RefreshTokens
                 .Where(t => t.Id == oldTokenId && t.RevokedAt == null)
-                .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, (DateTime?)now), ct);
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(t => t.RevokedAt, (DateTime?)now)
+                    .SetProperty(t => t.RevokedReason, reason), ct);
 
             if (oldTokenRevoked == 0)
             {
-                // Old token already revoked = replay detected
-                await transaction.RollbackAsync(ct);
+                // Old token already revoked = replay detected. Revoke the whole family.
+                await _db.RefreshTokens
+                    .Where(t => t.FamilyId == familyId && t.RevokedAt == null)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(t => t.RevokedAt, (DateTime?)now)
+                        .SetProperty(t => t.RevokedReason, RefreshTokenRevokedReasons.ReplayDetected), ct);
+                await transaction.CommitAsync(ct);
                 return RotationResult.ReplayDetected;
             }
 

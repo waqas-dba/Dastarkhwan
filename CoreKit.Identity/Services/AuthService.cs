@@ -172,12 +172,13 @@ public sealed class AuthService : IAuthService
         if (token.RevokedAt is not null)
         {
             // A token that was already used or revoked has come back. Whoever holds it may have copied it,
-            // so every session of this user is closed.
+            // so every session in its family is closed.
             _logger.LogWarning(
-                "A revoked refresh token was presented for user {UserId}. Revoking all of the user's refresh tokens.",
+                "A revoked refresh token was presented for user {UserId}. Revoking the token's family.",
                 token.UserId);
 
-            await _refreshTokenRepository.RevokeAllForUserAsync(token.UserId, now, ct);
+            await _refreshTokenRepository.RevokeAllInFamilyAsync(
+                token.FamilyId, RefreshTokenRevokedReasons.ReplayDetected, now, ct);
             return IdentityErrors.InvalidRefreshToken;
         }
 
@@ -186,13 +187,15 @@ public sealed class AuthService : IAuthService
 
         if (!token.User.IsActive)
         {
-            await _refreshTokenRepository.RevokeAllForUserAsync(token.UserId, now, ct);
+            await _refreshTokenRepository.RevokeAllForUserAsync(
+                token.UserId, RefreshTokenRevokedReasons.UserDeactivated, now, ct);
             return IdentityErrors.InvalidRefreshToken;
         }
 
         if (_emailOptions.RequireConfirmedEmail && !token.User.EmailConfirmed)
         {
-            await _refreshTokenRepository.RevokeAllForUserAsync(token.UserId, now, ct);
+            await _refreshTokenRepository.RevokeAllForUserAsync(
+                token.UserId, RefreshTokenRevokedReasons.PasswordChanged, now, ct);
             return IdentityEmailErrors.EmailNotConfirmed;
         }
 
@@ -220,8 +223,14 @@ public sealed class AuthService : IAuthService
 
         var tokenHash = _tokens.HashRefreshToken(request.RefreshToken.Trim());
 
-        // Signing out twice, or with an unknown token, is not an error.
-        await _refreshTokenRepository.RevokeByHashAsync(tokenHash, Now(), ct);
+        // Find the token so we can revoke its entire family. Signing out twice, or with an
+        // unknown token, is not an error.
+        var token = await _refreshTokenRepository.FindByHashWithUserAsync(tokenHash, ct);
+        if (token is not null)
+        {
+            await _refreshTokenRepository.RevokeAllInFamilyAsync(
+                token.FamilyId, RefreshTokenRevokedReasons.Logout, Now(), ct);
+        }
 
         return Common.IdentityResult.Success();
     }

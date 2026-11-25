@@ -59,8 +59,10 @@ public sealed class SessionIssuer : ISessionIssuer
             rotation = await _refreshTokenRepository.TryRotateAsync(
                 user.Id,
                 oldTokenId.Value,
+                tokenFamilyId,
                 expectedSecurityVersion,
                 now,
+                RefreshTokenRevokedReasons.Rotated,
                 new RefreshToken
                 {
                     Id = Guid.NewGuid(),

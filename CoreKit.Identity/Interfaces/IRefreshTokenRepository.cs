@@ -27,19 +27,19 @@ public interface IRefreshTokenRepository
     /// <summary>
     /// Atomic. Of two requests using the same token at the same moment, only one gets true.
     /// </summary>
-    Task<bool> TryRevokeAsync(Guid tokenId, DateTime now, CancellationToken ct = default);
+    Task<bool> TryRevokeAsync(Guid tokenId, string reason, DateTime now, CancellationToken ct = default);
 
     /// <summary>Revoking an unknown or already revoked token is not an error.</summary>
-    Task RevokeByHashAsync(string tokenHash, DateTime now, CancellationToken ct = default);
+    Task RevokeByHashAsync(string tokenHash, string reason, DateTime now, CancellationToken ct = default);
 
     /// <summary>Ends every session of a user in one statement.</summary>
-    Task<int> RevokeAllForUserAsync(Guid userId, DateTime now, CancellationToken ct = default);
+    Task<int> RevokeAllForUserAsync(Guid userId, string reason, DateTime now, CancellationToken ct = default);
 
     /// <summary>Returns true if any token in the family is unrevoked and not expired.</summary>
     Task<bool> HasActiveTokenInFamilyAsync(Guid familyId, DateTime now, CancellationToken ct = default);
 
     /// <summary>Revokes every unrevoked token in the family.</summary>
-    Task<int> RevokeAllInFamilyAsync(Guid familyId, DateTime now, CancellationToken ct = default);
+    Task<int> RevokeAllInFamilyAsync(Guid familyId, string reason, DateTime now, CancellationToken ct = default);
 
     /// <summary>
     /// Atomic refresh-token rotation: revokes the old token and issues the new one in a single transaction.
@@ -49,8 +49,10 @@ public interface IRefreshTokenRepository
     Task<RotationResult> TryRotateAsync(
         Guid userId,
         Guid oldTokenId,
+        Guid familyId,
         int expectedSecurityVersion,
         DateTime now,
+        string reason,
         RefreshToken newToken,
         CancellationToken ct = default);
 }

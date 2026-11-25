@@ -10,8 +10,10 @@ public static class RefreshTokenRevocation
     /// Ends every session of a user in one statement. Used after a password change, a deactivation
     /// and when a stolen token is detected.
     /// </summary>
-    public static Task<int> RevokeAllForUserAsync(IdentityDbContext db, Guid userId, DateTime now, CancellationToken ct)
+    public static Task<int> RevokeAllForUserAsync(IdentityDbContext db, Guid userId, string reason, DateTime now, CancellationToken ct)
         => db.RefreshTokens
             .Where(t => t.UserId == userId && t.RevokedAt == null)
-            .ExecuteUpdateAsync(s => s.SetProperty(t => t.RevokedAt, (DateTime?)now), ct);
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(t => t.RevokedAt, (DateTime?)now)
+                .SetProperty(t => t.RevokedReason, reason), ct);
 }

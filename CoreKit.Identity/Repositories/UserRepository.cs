@@ -206,7 +206,7 @@ public sealed class UserRepository : IUserRepository
         }
 
         if (revokeSessions)
-            await RefreshTokenRevocation.RevokeAllForUserAsync(_db, userId, now, ct);
+            await RefreshTokenRevocation.RevokeAllForUserAsync(_db, userId, RefreshTokenRevokedReasons.PasswordChanged, now, ct);
 
         await transaction.CommitAsync(ct);
 
@@ -243,7 +243,7 @@ public sealed class UserRepository : IUserRepository
             return exists ? CredentialUpdateResult.VersionConflict : CredentialUpdateResult.UserMissing;
         }
 
-        await RefreshTokenRevocation.RevokeAllForUserAsync(_db, userId, now, ct);
+        await RefreshTokenRevocation.RevokeAllForUserAsync(_db, userId, RefreshTokenRevokedReasons.UserDeactivated, now, ct);
 
         await transaction.CommitAsync(ct);
 
@@ -300,7 +300,7 @@ public sealed class UserRepository : IUserRepository
             return CredentialUpdateResult.HashConflict;
         }
 
-        await RefreshTokenRevocation.RevokeAllForUserAsync(_db, userId, now, ct);
+        await RefreshTokenRevocation.RevokeAllForUserAsync(_db, userId, RefreshTokenRevokedReasons.AdminPasswordChange, now, ct);
 
         await transaction.CommitAsync(ct);
 

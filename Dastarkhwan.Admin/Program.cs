@@ -6,6 +6,7 @@ using CoreKit.Identity.Extensions;
 using CoreKit.Identity.Contracts;
 using CoreKit.Identity.Persistence;
 using CoreKit.Identity.Seeding;
+using CoreKit.Tenant.Contracts;
 using CoreKit.Tenant.Endpoints;
 using CoreKit.Tenant.Extensions;
 using CoreKit.Tenant.Persistence;
@@ -158,7 +159,7 @@ await app.Services.SeedIdentityAsync();
 // Bootstrap the initial platform administrator (trusted deployment operation)
 using (var scope = app.Services.CreateScope())
 {
-    var platformAccess = scope.ServiceProvider.GetRequiredService<CoreKit.Tenant.Services.TenantPlatformAccess>();
+    var platformAccess = scope.ServiceProvider.GetRequiredService<CoreKit.Tenant.Contracts.ITenantPlatformAccess>();
     using var _ = platformAccess.Grant();
 
     var config = scope.ServiceProvider.GetRequiredService<IOptions<CoreKit.Identity.Seeding.IdentitySeedOptions>>().Value;

@@ -133,7 +133,7 @@ internal sealed class TestEnv : IDisposable
 
     public IAdministratorGuard AdministratorGuard { get; }
 
-    public IUserDeletionGuard UserDeletionGuard { get; }
+    public CoreKit.Identity.Contracts.IUserDeletionGuard UserDeletionGuard { get; }
 
     public IIdentityEventPublisher EventPublisher { get; }
 
@@ -248,7 +248,7 @@ internal sealed class FakeSessionIssuer : ISessionIssuer
 }
 
 /// <summary>Minimal fake IUserDeletionGuard for tests: always allows deletion.</summary>
-internal sealed class FakeUserDeletionGuard : IUserDeletionGuard
+internal sealed class FakeUserDeletionGuard : CoreKit.Identity.Contracts.IUserDeletionGuard
 {
     public Task<bool> CanDeleteUserAsync(Guid userId, CancellationToken ct = default)
         => Task.FromResult(true);

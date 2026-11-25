@@ -23,7 +23,7 @@ public sealed class UserService : IUserService
     private readonly IPasswordHasher _hasher;
     private readonly ICurrentUserService _currentUser;
     private readonly TimeProvider _time;
-    private readonly IUserDeletionGuard _deletionGuard;
+    private readonly CoreKit.Identity.Contracts.IUserDeletionGuard _deletionGuard;
     private readonly IIdentityEventPublisher _eventPublisher;
 
     public UserService(
@@ -34,7 +34,7 @@ public sealed class UserService : IUserService
         IPasswordHasher hasher,
         ICurrentUserService currentUser,
         TimeProvider time,
-        IUserDeletionGuard deletionGuard,
+        CoreKit.Identity.Contracts.IUserDeletionGuard deletionGuard,
         IIdentityEventPublisher eventPublisher)
     {
         _userRepository = userRepository;

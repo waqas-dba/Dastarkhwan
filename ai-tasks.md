@@ -430,7 +430,7 @@ These six sections are mandatory project-wide rules for all participating develo
 
 Read-only inspection (`git status`, `git log`, `git diff`, branch listing) is permitted.
 
-**Standing automation (D-017/D-008):** within an approved implementation task, stage only approved files, commit after required validation/review, and push to the already-authorized branch (no unrelated/pre-existing changes).
+**Standing automation (D-017/D-008):** within an approved implementation task, commit only tracked-file changes (no separate `git add` staging), then push to the already-authorized branch (no unrelated/pre-existing changes).
 
 **Always require separate explicit Project Owner approval:** branch create/switch, pull, merge, rebase, force-push, reset, clean, amend, cherry-pick, revert, history rewriting, and Git config/hook changes.
 
@@ -438,7 +438,7 @@ Read-only inspection (`git status`, `git log`, `git diff`, branch listing) is pe
 
 ### 15.3 Database and Destructive Operations
 
-- **Approved implementation tasks (D-017, in scope):** routine migration generation/SQL review and application to a positively identified development database (when included) with verification are authorized within scope/safeguards.
+- **Approved implementation tasks (D-017, in scope):** routine migration generation/SQL review and application to a positively identified development database (when included) with verification are authorized within scope/safeguards. For an approved runtime-audit task, CRUD and synthetic test-data operations against the positively identified isolated audit database (`dastarkhwan_runtime_audit`, role `dastarkhwan_audit`) are authorized; delete only records created by the current audit where cleanup is required.
 - **Always require separate explicit Project Owner approval:** production DB changes; DB deletion/recreation/destructive reset; data deletion or irreversible transformations; unapproved rollback/downgrade; DB credential/infrastructure changes; any uncertain-target or destructive operation.
 - Before such separately approved actions: explain purpose, expected changes, affected databases/tables/records, backup/rollback, alternatives with pros/cons, recommend safest approach, and wait for explicit approval.
 - Never assume a DB is development from name/environment variable alone. Never assume approval from earlier discussion/task. Never expose secrets.

@@ -118,13 +118,13 @@ Do not start frontend/UI work or later business workflows until their roadmap de
 
 ## 10. Git restrictions
 
-Git inspection commands are allowed. Standing automation for approved implementation tasks (D-017/D-008) authorizes scoped stage/commit/push to the already-authorized branch after required validation/review.
+Git inspection commands (`git status`, `git log`, `git diff`, branch listing) are allowed without approval.
 
-- Stage only approved task files; never include unrelated or pre-existing changes.
-- Stop and report if baseline differs or working tree contains unexpected/unrelated changes.
-- **Separate explicit Project Owner approval required:** branch creation/switching, pull, merge, rebase, force-push, reset, clean, amend, cherry-pick, revert, history rewriting, and Git config/hook changes.
-- AI may suggest commit messages and manual checkpoints, but the Project Owner retains final authority over repository history and acceptance.
-- Asking for approval does not authorize execution for separately protected actions.
+For an approved implementation or audit-remediation task, `git commit` of approved tracked-file changes and `git push` to the already-authorized branch are authorized after required validation/review. Do not perform a separate staging operation (`git add`); commit only changes that can be committed without staging (tracked-file modifications). If a new or untracked file requires staging, stop and ask the Project Owner to handle that step.
+
+Never include unrelated or pre-existing changes. Stop and report if `git status --short` shows unrelated changes.
+
+**Separate explicit Project Owner approval required:** branch creation/switching, pull, merge, rebase, force-push, reset, clean, amend, cherry-pick, revert, history rewriting, and Git config/hook changes. AI may suggest commit messages and manual checkpoints, but the Project Owner retains final authority over repository history and acceptance. Asking for approval does not authorize execution for separately protected actions.
 
 ## 11. Completion report
 

@@ -6,13 +6,13 @@ using CoreKit.Identity.Extensions;
 using CoreKit.Identity.Contracts;
 using CoreKit.Identity.Persistence;
 using CoreKit.Identity.Seeding;
-using CoreKit.Tenant.Contracts;
 using CoreKit.Tenant.Endpoints;
 using CoreKit.Tenant.Extensions;
 using CoreKit.Tenant.Persistence;
 using CoreKit.Tenant.Outbox;
 using Dastarkhwan.Integration;
 using Dastarkhwan.Integration.Endpoints;
+using Dastarkhwan.Web;
 using Dastarkhwan.Web.Configuration;
 using Dastarkhwan.Web.Email;
 using Dastarkhwan.Web.ErrorHandling;
@@ -88,6 +88,13 @@ builder.Services.AddScoped<IPlatformAdministratorProvider>(sp =>
     return new AdminPlatformAdministratorProvider(access);
 });
 
+// Wire Identity's IIdentityAdminAuthorizer to platform permission checks.
+builder.Services.AddScoped<CoreKit.Identity.Contracts.IIdentityAdminAuthorizer>(sp =>
+{
+    var permissionChecker = sp.GetRequiredService<CoreKit.Access.Contracts.IPermissionChecker>();
+    return new PermissionBasedIdentityAdminAuthorizer(permissionChecker);
+});
+
 builder.Services.AddIdentitySeeding(builder.Configuration);
 builder.Services.AddTenant(builder.Configuration);
 builder.Services.AddAccess(builder.Configuration);
@@ -159,7 +166,7 @@ await app.Services.SeedIdentityAsync();
 // Bootstrap the initial platform administrator (trusted deployment operation)
 using (var scope = app.Services.CreateScope())
 {
-    var platformAccess = scope.ServiceProvider.GetRequiredService<CoreKit.Tenant.Contracts.ITenantPlatformAccess>();
+    var platformAccess = scope.ServiceProvider.GetRequiredService<CoreKit.Tenant.Abstractions.ITenantPlatformAccess>();
     using var _ = platformAccess.Grant();
 
     var config = scope.ServiceProvider.GetRequiredService<IOptions<CoreKit.Identity.Seeding.IdentitySeedOptions>>().Value;

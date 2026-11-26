@@ -47,12 +47,14 @@ export class ApiClient {
   async post(path: string, body?: any): Promise<APIResponse> {
     return this.request.post(this.options.baseURL + path, {
       data: body,
+      headers: await this.headers(),
     });
   }
 
   async put(path: string, body?: any): Promise<APIResponse> {
     return this.request.put(this.options.baseURL + path, {
       data: body,
+      headers: await this.headers(),
     });
   }
 

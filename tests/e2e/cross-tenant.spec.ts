@@ -76,47 +76,47 @@ test.describe('Cross-Tenant Security', () => {
 
   test('should not allow tenant A user to access tenant B data', async () => {
     const res = await clientA.getTenant(tenantBId);
-    expect(res.status()).toBeIn([403, 404]);
+    expect(res.status()).toBe(403).or.toBe(404);
   });
 
   test('should not allow tenant A user to list tenant B members', async () => {
     const res = await clientA.listMembers(tenantBId);
-    expect(res.status()).toBeIn([403, 404]);
+    expect(res.status()).toBe(403).or.toBe(404);
   });
 
   test('should not allow tenant A user to add member to tenant B', async () => {
     const res = await clientA.addMember(tenantBId, userAId, false);
-    expect(res.status()).toBeIn([403, 404]);
+    expect(res.status()).toBe(403).or.toBe(404);
   });
 
   test('should not allow tenant A user to remove member from tenant B', async () => {
     const res = await clientA.removeMember(tenantBId, userBId);
-    expect(res.status()).toBeIn([403, 404]);
+    expect(res.status()).toBe(403).or.toBe(404);
   });
 
   test('should not allow tenant A user to set owner on tenant B', async () => {
     const res = await clientA.setOwner(tenantBId, userBId, true);
-    expect(res.status()).toBeIn([403, 404]);
+    expect(res.status()).toBe(403).or.toBe(404);
   });
 
   test('should not allow tenant A user to get tenant B audit log', async () => {
     const res = await clientA.getAuditLog(tenantBId);
-    expect(res.status()).toBeIn([403, 404]);
+    expect(res.status()).toBe(403).or.toBe(404);
   });
 
   test('should not allow tenant A user to update tenant B', async () => {
     const res = await clientA.updateTenant(tenantBId, { name: 'Hacked Tenant' });
-    expect(res.status()).toBeIn([403, 404]);
+    expect(res.status()).toBe(403).or.toBe(404);
   });
 
   test('should not allow tenant A user to delete tenant B', async () => {
     const res = await clientA.deleteTenant(tenantBId);
-    expect(res.status()).toBeIn([403, 404]);
+    expect(res.status()).toBe(403).or.toBe(404);
   });
 
   test('should not allow cross-tenant membership manipulation', async () => {
     const res = await clientA.addMember(tenantBId, userAId, false);
-    expect(res.status()).toBeIn([403, 404]);
+    expect(res.status()).toBe(403).or.toBe(404);
   });
 
   test('should allow tenant A user to access their own tenant data', async () => {

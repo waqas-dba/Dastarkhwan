@@ -1,0 +1,1263 @@
+{
+  "config": {
+    "argv": [
+      "C:\\Program Files\\nodejs\\node.exe",
+      "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\node_modules\\@playwright\\test\\cli.js",
+      "test",
+      "identity.spec.ts",
+      "--reporter=json"
+    ],
+    "configFile": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\playwright.config.ts",
+    "rootDir": "F:/Developer/waqas-dba/waqas-dba/Dastarkhwan/tests/e2e",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "F:/Developer/waqas-dba/waqas-dba/Dastarkhwan/tests/e2e/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "F:/Developer/waqas-dba/waqas-dba/Dastarkhwan/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "filteredProjects": [
+      {
+        "grep": {},
+        "grepInvert": null,
+        "outputDir": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "name": "",
+        "testDir": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e",
+        "snapshotDir": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e",
+        "testIgnore": [],
+        "testMatch": "**/*.@(spec|test).?(c|m)[jt]s?(x)",
+        "timeout": 30000,
+        "use": {
+          "baseURL": "https://localhost:53584",
+          "ignoreHTTPSErrors": true,
+          "extraHTTPHeaders": {
+            "Accept": "application/json"
+          },
+          "trace": "retain-on-failure",
+          "screenshot": "only-on-failure"
+        },
+        "dependencies": [],
+        "ignoreSnapshots": false,
+        "__projectId": ""
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "default",
+    "updateSourceMethod": "patch",
+    "version": "1.65.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "identity.spec.ts",
+      "file": "identity.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "Identity API",
+          "file": "identity.spec.ts",
+          "line": 12,
+          "column": 6,
+          "specs": [
+            {
+              "title": "login invalid credentials returns 401",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 839,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:14:52.825Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-5e20cf8d9f116a818dbd",
+              "file": "identity.spec.ts",
+              "line": 13,
+              "column": 3
+            },
+            {
+              "title": "me without token returns 401",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 74,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:14:53.789Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-a53852ffa5aaa961a7d4",
+              "file": "identity.spec.ts",
+              "line": 20,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Identity - Authentication",
+          "file": "identity.spec.ts",
+          "line": 26,
+          "column": 6,
+          "specs": [
+            {
+              "title": "valid login returns tokens and user",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 827,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:14:53.915Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-507a9eae78de1d8b43aa",
+              "file": "identity.spec.ts",
+              "line": 27,
+              "column": 3
+            },
+            {
+              "title": "login with wrong password returns 401",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 732,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:14:54.807Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-5f34fe237d83fd93793c",
+              "file": "identity.spec.ts",
+              "line": 35,
+              "column": 3
+            },
+            {
+              "title": "login with unknown email returns 401",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 736,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:14:55.588Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-3bd73305225137264991",
+              "file": "identity.spec.ts",
+              "line": 41,
+              "column": 3
+            },
+            {
+              "title": "login with missing password returns 401",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 148,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:14:56.373Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-49bae93b7d92c54b03f7",
+              "file": "identity.spec.ts",
+              "line": 47,
+              "column": 3
+            },
+            {
+              "title": "me with token returns current user",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 990,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:14:56.565Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-76197c15cc8a783e715f",
+              "file": "identity.spec.ts",
+              "line": 54,
+              "column": 3
+            },
+            {
+              "title": "me with malformed token returns 401",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 90,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:14:57.599Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-264a6f0ee021bcc28b9b",
+              "file": "identity.spec.ts",
+              "line": 63,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Identity - Tokens and sessions",
+          "file": "identity.spec.ts",
+          "line": 71,
+          "column": 6,
+          "specs": [
+            {
+              "title": "refresh rotates tokens",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 789,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:14:57.743Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-cd72c517d3d6701c4a05",
+              "file": "identity.spec.ts",
+              "line": 72,
+              "column": 3
+            },
+            {
+              "title": "reusing a rotated refresh token is rejected (replay)",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 958,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:14:58.591Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-7b59031019cc2e80dfed",
+              "file": "identity.spec.ts",
+              "line": 80,
+              "column": 3
+            },
+            {
+              "title": "logout then reusing refresh token is rejected",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 930,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:14:59.589Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-e5bcdeb05244db744981",
+              "file": "identity.spec.ts",
+              "line": 89,
+              "column": 3
+            },
+            {
+              "title": "refresh with invalid token returns 401",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 80,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:15:00.580Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-2000456710e67dfc4aec",
+              "file": "identity.spec.ts",
+              "line": 98,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Identity - User management",
+          "file": "identity.spec.ts",
+          "line": 105,
+          "column": 6,
+          "specs": [
+            {
+              "title": "admin creates, reads, updates and deletes a user",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 1002,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m201\u001b[39m\nReceived: \u001b[31m403\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m201\u001b[39m\nReceived: \u001b[31m403\u001b[39m\n    at F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts:112:32",
+                        "location": {
+                          "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                          "column": 32,
+                          "line": 112
+                        },
+                        "snippet": " \u001b[90m 110 |\u001b[39m     \u001b[36mconst\u001b[39m email \u001b[33m=\u001b[39m uniqueEmail(\u001b[32m'crud'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 111 |\u001b[39m     \u001b[36mconst\u001b[39m createRes \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m client\u001b[33m.\u001b[39mcreateUser(email\u001b[33m,\u001b[39m \u001b[33mTEST_PASSWORD\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'+15551234500'\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'CRUD User'\u001b[39m\u001b[33m,\u001b[39m \u001b[36mtrue\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 112 |\u001b[39m     expect(createRes\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBe(\u001b[35m201\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 113 |\u001b[39m     \u001b[36mconst\u001b[39m created \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m createRes\u001b[33m.\u001b[39mjson()\u001b[33m;\u001b[39m\n \u001b[90m 114 |\u001b[39m     \u001b[36mconst\u001b[39m id \u001b[33m=\u001b[39m created\u001b[33m.\u001b[39mid\u001b[33m;\u001b[39m\n \u001b[90m 115 |\u001b[39m     expect(id)\u001b[33m.\u001b[39mtoBeTruthy()\u001b[33m;\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                            "column": 32,
+                            "line": 112
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m201\u001b[39m\nReceived: \u001b[31m403\u001b[39m\n\n  110 |     const email = uniqueEmail('crud');\n  111 |     const createRes = await client.createUser(email, TEST_PASSWORD, '+15551234500', 'CRUD User', true);\n> 112 |     expect(createRes.status()).toBe(201);\n      |                                ^\n  113 |     const created = await createRes.json();\n  114 |     const id = created.id;\n  115 |     expect(id).toBeTruthy();\n    at F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts:112:32"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:15:00.728Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\test-results\\identity-Identity---User-m-e505f--updates-and-deletes-a-user\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\test-results\\identity-Identity---User-m-e505f--updates-and-deletes-a-user\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                        "column": 32,
+                        "line": 112
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-9c052929ede3cea0fea9",
+              "file": "identity.spec.ts",
+              "line": 106,
+              "column": 3
+            },
+            {
+              "title": "duplicate email returns 409",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 828,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m201\u001b[39m\nReceived: \u001b[31m403\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m201\u001b[39m\nReceived: \u001b[31m403\u001b[39m\n    at F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts:138:28",
+                        "location": {
+                          "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                          "column": 28,
+                          "line": 138
+                        },
+                        "snippet": " \u001b[90m 136 |\u001b[39m     \u001b[36mconst\u001b[39m email \u001b[33m=\u001b[39m uniqueEmail(\u001b[32m'dup'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 137 |\u001b[39m     \u001b[36mconst\u001b[39m first \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m client\u001b[33m.\u001b[39mcreateUser(email\u001b[33m,\u001b[39m \u001b[33mTEST_PASSWORD\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'+15551234501'\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'Dup One'\u001b[39m\u001b[33m,\u001b[39m \u001b[36mtrue\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 138 |\u001b[39m     expect(first\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBe(\u001b[35m201\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                            \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 139 |\u001b[39m     \u001b[36mconst\u001b[39m dup \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m client\u001b[33m.\u001b[39mcreateUser(email\u001b[33m,\u001b[39m \u001b[33mTEST_PASSWORD\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'+15551234502'\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'Dup Two'\u001b[39m\u001b[33m,\u001b[39m \u001b[36mtrue\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 140 |\u001b[39m     expect(dup\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBe(\u001b[35m409\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 141 |\u001b[39m   })\u001b[33m;\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                            "column": 28,
+                            "line": 138
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m201\u001b[39m\nReceived: \u001b[31m403\u001b[39m\n\n  136 |     const email = uniqueEmail('dup');\n  137 |     const first = await client.createUser(email, TEST_PASSWORD, '+15551234501', 'Dup One', true);\n> 138 |     expect(first.status()).toBe(201);\n      |                            ^\n  139 |     const dup = await client.createUser(email, TEST_PASSWORD, '+15551234502', 'Dup Two', true);\n  140 |     expect(dup.status()).toBe(409);\n  141 |   });\n    at F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts:138:28"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:15:04.071Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\test-results\\identity-Identity---User-m-312c0-duplicate-email-returns-409\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\test-results\\identity-Identity---User-m-312c0-duplicate-email-returns-409\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                        "column": 28,
+                        "line": 138
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-6520afc5e38d20d208ee",
+              "file": "identity.spec.ts",
+              "line": 133,
+              "column": 3
+            },
+            {
+              "title": "invalid email returns 400",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 916,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m400\u001b[39m\nReceived: \u001b[31m403\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m400\u001b[39m\nReceived: \u001b[31m403\u001b[39m\n    at F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts:147:26",
+                        "location": {
+                          "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                          "column": 26,
+                          "line": 147
+                        },
+                        "snippet": " \u001b[90m 145 |\u001b[39m     \u001b[36mawait\u001b[39m client\u001b[33m.\u001b[39mlogin(\u001b[33mADMIN_EMAIL\u001b[39m\u001b[33m,\u001b[39m \u001b[33mADMIN_PASSWORD\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 146 |\u001b[39m     \u001b[36mconst\u001b[39m res \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m client\u001b[33m.\u001b[39mcreateUser(\u001b[32m'not-an-email'\u001b[39m\u001b[33m,\u001b[39m \u001b[33mTEST_PASSWORD\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'+15551234503'\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'Bad Email'\u001b[39m\u001b[33m,\u001b[39m \u001b[36mtrue\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 147 |\u001b[39m     expect(res\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBe(\u001b[35m400\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                          \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 148 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 149 |\u001b[39m\n \u001b[90m 150 |\u001b[39m   test(\u001b[32m'short password returns 400'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ request }) \u001b[33m=>\u001b[39m {"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                            "column": 26,
+                            "line": 147
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m400\u001b[39m\nReceived: \u001b[31m403\u001b[39m\n\n  145 |     await client.login(ADMIN_EMAIL, ADMIN_PASSWORD);\n  146 |     const res = await client.createUser('not-an-email', TEST_PASSWORD, '+15551234503', 'Bad Email', true);\n> 147 |     expect(res.status()).toBe(400);\n      |                          ^\n  148 |   });\n  149 |\n  150 |   test('short password returns 400', async ({ request }) => {\n    at F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts:147:26"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:15:07.023Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\test-results\\identity-Identity---User-m-4feb6-t-invalid-email-returns-400\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\test-results\\identity-Identity---User-m-4feb6-t-invalid-email-returns-400\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                        "column": 26,
+                        "line": 147
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-4ca6d2b6851329259fb2",
+              "file": "identity.spec.ts",
+              "line": 143,
+              "column": 3
+            },
+            {
+              "title": "short password returns 400",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 888,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m400\u001b[39m\nReceived: \u001b[31m403\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m400\u001b[39m\nReceived: \u001b[31m403\u001b[39m\n    at F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts:154:26",
+                        "location": {
+                          "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                          "column": 26,
+                          "line": 154
+                        },
+                        "snippet": " \u001b[90m 152 |\u001b[39m     \u001b[36mawait\u001b[39m client\u001b[33m.\u001b[39mlogin(\u001b[33mADMIN_EMAIL\u001b[39m\u001b[33m,\u001b[39m \u001b[33mADMIN_PASSWORD\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m 153 |\u001b[39m     \u001b[36mconst\u001b[39m res \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m client\u001b[33m.\u001b[39mcreateUser(uniqueEmail(\u001b[32m'shortpw'\u001b[39m)\u001b[33m,\u001b[39m \u001b[32m'short'\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'+15551234504'\u001b[39m\u001b[33m,\u001b[39m \u001b[32m'Short PW'\u001b[39m\u001b[33m,\u001b[39m \u001b[36mtrue\u001b[39m)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 154 |\u001b[39m     expect(res\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBe(\u001b[35m400\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                          \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 155 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 156 |\u001b[39m\n \u001b[90m 157 |\u001b[39m   test(\u001b[32m'email is immutable on update'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ request }) \u001b[33m=>\u001b[39m {"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                            "column": 26,
+                            "line": 154
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m400\u001b[39m\nReceived: \u001b[31m403\u001b[39m\n\n  152 |     await client.login(ADMIN_EMAIL, ADMIN_PASSWORD);\n  153 |     const res = await client.createUser(uniqueEmail('shortpw'), 'short', '+15551234504', 'Short PW', true);\n> 154 |     expect(res.status()).toBe(400);\n      |                          ^\n  155 |   });\n  156 |\n  157 |   test('email is immutable on update', async ({ request }) => {\n    at F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts:154:26"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:15:09.988Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\test-results\\identity-Identity---User-m-a9b2e--short-password-returns-400\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\test-results\\identity-Identity---User-m-a9b2e--short-password-returns-400\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                        "column": 26,
+                        "line": 154
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-03ccf3727c07e8c037cb",
+              "file": "identity.spec.ts",
+              "line": 150,
+              "column": 3
+            },
+            {
+              "title": "email is immutable on update",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 987,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m400\u001b[39m\nReceived: \u001b[31m404\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m400\u001b[39m\nReceived: \u001b[31m404\u001b[39m\n    at F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts:164:26",
+                        "location": {
+                          "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                          "column": 26,
+                          "line": 164
+                        },
+                        "snippet": " \u001b[90m 162 |\u001b[39m     \u001b[36mconst\u001b[39m id \u001b[33m=\u001b[39m (\u001b[36mawait\u001b[39m createRes\u001b[33m.\u001b[39mjson())\u001b[33m.\u001b[39mid\u001b[33m;\u001b[39m\n \u001b[90m 163 |\u001b[39m     \u001b[36mconst\u001b[39m res \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m client\u001b[33m.\u001b[39mupdateUser(id\u001b[33m,\u001b[39m { email\u001b[33m:\u001b[39m uniqueEmail(\u001b[32m'changed'\u001b[39m) })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 164 |\u001b[39m     expect(res\u001b[33m.\u001b[39mstatus())\u001b[33m.\u001b[39mtoBe(\u001b[35m400\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                          \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 165 |\u001b[39m   })\u001b[33m;\u001b[39m\n \u001b[90m 166 |\u001b[39m\n \u001b[90m 167 |\u001b[39m   test(\u001b[32m'non-admin cannot list users'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ request }) \u001b[33m=>\u001b[39m {"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                            "column": 26,
+                            "line": 164
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBe\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m) // Object.is equality\u001b[22m\n\nExpected: \u001b[32m400\u001b[39m\nReceived: \u001b[31m404\u001b[39m\n\n  162 |     const id = (await createRes.json()).id;\n  163 |     const res = await client.updateUser(id, { email: uniqueEmail('changed') });\n> 164 |     expect(res.status()).toBe(400);\n      |                          ^\n  165 |   });\n  166 |\n  167 |   test('non-admin cannot list users', async ({ request }) => {\n    at F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts:164:26"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:15:12.978Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\test-results\\identity-Identity---User-m-cb155-mail-is-immutable-on-update\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\test-results\\identity-Identity---User-m-cb155-mail-is-immutable-on-update\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                        "column": 26,
+                        "line": 164
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-9f32f2f120ba9596fd9f",
+              "file": "identity.spec.ts",
+              "line": 157,
+              "column": 3
+            },
+            {
+              "title": "non-admin cannot list users",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 1447,
+                      "error": {
+                        "message": "Error: Login failed: 401 {\"type\":\"https://dastarkhwan.platform/errors/auth.invalid_credentials\",\"title\":\"Unauthorized\",\"status\":401,\"detail\":\"The email or password is incorrect.\",\"errorCode\":\"auth.invalid_credentials\",\"traceId\":\"00-2aafca6d8896cc0f0987a62c73aee770-4c01725aa9fa38ce-00\"}",
+                        "stack": "Error: Login failed: 401 {\"type\":\"https://dastarkhwan.platform/errors/auth.invalid_credentials\",\"title\":\"Unauthorized\",\"status\":401,\"detail\":\"The email or password is incorrect.\",\"errorCode\":\"auth.invalid_credentials\",\"traceId\":\"00-2aafca6d8896cc0f0987a62c73aee770-4c01725aa9fa38ce-00\"}\n    at ApiClient.login (F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\helpers\\apiClient.ts:91:15)\n    at F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts:174:5",
+                        "location": {
+                          "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\helpers\\apiClient.ts",
+                          "column": 15,
+                          "line": 91
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39mhelpers\\apiClient.ts:91\n\n \u001b[90m 89 |\u001b[39m           \u001b[36mcontinue\u001b[39m\u001b[33m;\u001b[39m\n \u001b[90m 90 |\u001b[39m         }\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 91 |\u001b[39m         \u001b[36mthrow\u001b[39m \u001b[36mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m`Login failed: ${res.status()} ${await res.text()}`\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m               \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 92 |\u001b[39m       } \u001b[36mcatch\u001b[39m (e) {\n \u001b[90m 93 |\u001b[39m         lastError \u001b[33m=\u001b[39m e \u001b[36mas\u001b[39m \u001b[33mError\u001b[39m\u001b[33m;\u001b[39m\n \u001b[90m 94 |\u001b[39m         \u001b[36mif\u001b[39m (i \u001b[33m<\u001b[39m retries \u001b[33m-\u001b[39m \u001b[35m1\u001b[39m \u001b[33m&&\u001b[39m \u001b[35m/rate limit/i\u001b[39m\u001b[33m.\u001b[39mtest(lastError\u001b[33m.\u001b[39mmessage)) {"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\helpers\\apiClient.ts",
+                            "column": 15,
+                            "line": 91
+                          },
+                          "message": "Error: Login failed: 401 {\"type\":\"https://dastarkhwan.platform/errors/auth.invalid_credentials\",\"title\":\"Unauthorized\",\"status\":401,\"detail\":\"The email or password is incorrect.\",\"errorCode\":\"auth.invalid_credentials\",\"traceId\":\"00-2aafca6d8896cc0f0987a62c73aee770-4c01725aa9fa38ce-00\"}\n\n   at helpers\\apiClient.ts:91\n\n  89 |           continue;\n  90 |         }\n> 91 |         throw new Error(`Login failed: ${res.status()} ${await res.text()}`);\n     |               ^\n  92 |       } catch (e) {\n  93 |         lastError = e as Error;\n  94 |         if (i < retries - 1 && /rate limit/i.test(lastError.message)) {\n    at ApiClient.login (F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\helpers\\apiClient.ts:91:15)\n    at F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts:174:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:15:16.158Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\test-results\\identity-Identity---User-m-672f7-non-admin-cannot-list-users\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\test-results\\identity-Identity---User-m-672f7-non-admin-cannot-list-users\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\helpers\\apiClient.ts",
+                        "column": 15,
+                        "line": 91
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-b883e5ba7fd0fe5d985b",
+              "file": "identity.spec.ts",
+              "line": 167,
+              "column": 3
+            },
+            {
+              "title": "list users without token returns 401",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 126,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:15:19.719Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-8945c4556ba16cf5028a",
+              "file": "identity.spec.ts",
+              "line": 179,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Identity - Password recovery",
+          "file": "identity.spec.ts",
+          "line": 186,
+          "column": 6,
+          "specs": [
+            {
+              "title": "forgot then reset password lets the user log in with the new password",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 919,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeTruthy\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mfalse\u001b[39m",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeTruthy\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mfalse\u001b[39m\n    at F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts:197:27",
+                        "location": {
+                          "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                          "column": 27,
+                          "line": 197
+                        },
+                        "snippet": " \u001b[90m 195 |\u001b[39m\n \u001b[90m 196 |\u001b[39m     \u001b[36mconst\u001b[39m tokenRes \u001b[33m=\u001b[39m \u001b[36mawait\u001b[39m admin\u001b[33m.\u001b[39mgetPasswordResetToken(email)\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 197 |\u001b[39m     expect(tokenRes\u001b[33m.\u001b[39mok())\u001b[33m.\u001b[39mtoBeTruthy()\u001b[33m;\u001b[39m\n \u001b[90m     |\u001b[39m                           \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 198 |\u001b[39m     \u001b[36mconst\u001b[39m token \u001b[33m=\u001b[39m (\u001b[36mawait\u001b[39m tokenRes\u001b[33m.\u001b[39mjson())\u001b[33m.\u001b[39mtoken\u001b[33m;\u001b[39m\n \u001b[90m 199 |\u001b[39m     expect(token)\u001b[33m.\u001b[39mtoBeTruthy()\u001b[33m;\u001b[39m\n \u001b[90m 200 |\u001b[39m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                            "column": 27,
+                            "line": 197
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeTruthy\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mfalse\u001b[39m\n\n  195 |\n  196 |     const tokenRes = await admin.getPasswordResetToken(email);\n> 197 |     expect(tokenRes.ok()).toBeTruthy();\n      |                           ^\n  198 |     const token = (await tokenRes.json()).token;\n  199 |     expect(token).toBeTruthy();\n  200 |\n    at F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts:197:27"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:15:19.981Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\test-results\\identity-Identity---Passwo-fa04c-og-in-with-the-new-password\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\test-results\\identity-Identity---Passwo-fa04c-og-in-with-the-new-password\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts",
+                        "column": 27,
+                        "line": 197
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-5767250b38c17c9d463b",
+              "file": "identity.spec.ts",
+              "line": 187,
+              "column": 3
+            },
+            {
+              "title": "reset with an invalid token returns 400",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 170,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:15:23.143Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-c01322499709532f4414",
+              "file": "identity.spec.ts",
+              "line": 210,
+              "column": 3
+            },
+            {
+              "title": "forgot password for unknown account still returns 204",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 74,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:15:23.437Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-8769c1309b6bf1c74a9c",
+              "file": "identity.spec.ts",
+              "line": 216,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Identity - Account lockout",
+          "file": "identity.spec.ts",
+          "line": 223,
+          "column": 6,
+          "specs": [
+            {
+              "title": "five failed attempts lock the account",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 4787,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:15:23.575Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-6f685a4d0e170d431230",
+              "file": "identity.spec.ts",
+              "line": 224,
+              "column": 3
+            }
+          ]
+        },
+        {
+          "title": "Identity - Email verification",
+          "file": "identity.spec.ts",
+          "line": 243,
+          "column": 6,
+          "specs": [
+            {
+              "title": "send and verify email confirms the address",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "",
+                  "projectName": "",
+                  "results": [
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 1375,
+                      "error": {
+                        "message": "Error: Login failed: 401 {\"type\":\"https://dastarkhwan.platform/errors/auth.invalid_credentials\",\"title\":\"Unauthorized\",\"status\":401,\"detail\":\"The email or password is incorrect.\",\"errorCode\":\"auth.invalid_credentials\",\"traceId\":\"00-f3f5a6021f131e45cd947d35c6aa9805-35e522834fe9376d-00\"}",
+                        "stack": "Error: Login failed: 401 {\"type\":\"https://dastarkhwan.platform/errors/auth.invalid_credentials\",\"title\":\"Unauthorized\",\"status\":401,\"detail\":\"The email or password is incorrect.\",\"errorCode\":\"auth.invalid_credentials\",\"traceId\":\"00-f3f5a6021f131e45cd947d35c6aa9805-35e522834fe9376d-00\"}\n    at ApiClient.login (F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\helpers\\apiClient.ts:91:15)\n    at F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts:251:5",
+                        "location": {
+                          "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\helpers\\apiClient.ts",
+                          "column": 15,
+                          "line": 91
+                        },
+                        "snippet": "\u001b[90m   at \u001b[39mhelpers\\apiClient.ts:91\n\n \u001b[90m 89 |\u001b[39m           \u001b[36mcontinue\u001b[39m\u001b[33m;\u001b[39m\n \u001b[90m 90 |\u001b[39m         }\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 91 |\u001b[39m         \u001b[36mthrow\u001b[39m \u001b[36mnew\u001b[39m \u001b[33mError\u001b[39m(\u001b[32m`Login failed: ${res.status()} ${await res.text()}`\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m               \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 92 |\u001b[39m       } \u001b[36mcatch\u001b[39m (e) {\n \u001b[90m 93 |\u001b[39m         lastError \u001b[33m=\u001b[39m e \u001b[36mas\u001b[39m \u001b[33mError\u001b[39m\u001b[33m;\u001b[39m\n \u001b[90m 94 |\u001b[39m         \u001b[36mif\u001b[39m (i \u001b[33m<\u001b[39m retries \u001b[33m-\u001b[39m \u001b[35m1\u001b[39m \u001b[33m&&\u001b[39m \u001b[35m/rate limit/i\u001b[39m\u001b[33m.\u001b[39mtest(lastError\u001b[33m.\u001b[39mmessage)) {"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\helpers\\apiClient.ts",
+                            "column": 15,
+                            "line": 91
+                          },
+                          "message": "Error: Login failed: 401 {\"type\":\"https://dastarkhwan.platform/errors/auth.invalid_credentials\",\"title\":\"Unauthorized\",\"status\":401,\"detail\":\"The email or password is incorrect.\",\"errorCode\":\"auth.invalid_credentials\",\"traceId\":\"00-f3f5a6021f131e45cd947d35c6aa9805-35e522834fe9376d-00\"}\n\n   at helpers\\apiClient.ts:91\n\n  89 |           continue;\n  90 |         }\n> 91 |         throw new Error(`Login failed: ${res.status()} ${await res.text()}`);\n     |               ^\n  92 |       } catch (e) {\n  93 |         lastError = e as Error;\n  94 |         if (i < retries - 1 && /rate limit/i.test(lastError.message)) {\n    at ApiClient.login (F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\helpers\\apiClient.ts:91:15)\n    at F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\identity.spec.ts:251:5"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-11-26T16:15:28.406Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\test-results\\identity-Identity---Email--b52fc--email-confirms-the-address\\error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\test-results\\identity-Identity---Email--b52fc--email-confirms-the-address\\trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "F:\\Developer\\waqas-dba\\waqas-dba\\Dastarkhwan\\tests\\e2e\\helpers\\apiClient.ts",
+                        "column": 15,
+                        "line": 91
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "bc384e94f5cb1e491b4d-00a4d82daab4d666fe84",
+              "file": "identity.spec.ts",
+              "line": 244,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-11-26T16:14:50.544Z",
+    "duration": 39620.244999999995,
+    "expected": 16,
+    "skipped": 0,
+    "unexpected": 8,
+    "flaky": 0
+  }
+}

@@ -1,0 +1,1036 @@
+
+Running 76 tests using 2 workers
+
+  x  1 [api] ΓÇ║ crosstenant\crosstenant.spec.js:20:3 ΓÇ║ Cross-Tenant Isolation ΓÇö Basic ΓÇ║ should reject unauthenticated cross-tenant access (472ms)
+  x  2 [api] ΓÇ║ access\access.spec.js:11:3 ΓÇ║ Access ΓÇö Roles and Permissions (authenticated user) ΓÇ║ should list permissions (may be empty or 403 for non-platform user) (512ms)
+  x  3 [api] ΓÇ║ access\access.spec.js:21:3 ΓÇ║ Access ΓÇö Roles and Permissions (authenticated user) ΓÇ║ should list roles (449ms)
+  x  4 [api] ΓÇ║ crosstenant\crosstenant.spec.js:28:3 ΓÇ║ Cross-Tenant Isolation ΓÇö Basic ΓÇ║ should reject access with invalid token (442ms)
+  x  5 [api] ΓÇ║ crosstenant\crosstenant.spec.js:38:3 ΓÇ║ Cross-Tenant Isolation ΓÇö Tenant ID Manipulation ΓÇ║ should not allow tenant A user to guess tenant B resources (404ms)
+  x  6 [api] ΓÇ║ access\access.spec.js:33:3 ΓÇ║ Access ΓÇö Roles and Permissions (authenticated user) ΓÇ║ should reject unauthenticated access to access endpoints (397ms)
+  x  7 [api] ΓÇ║ crosstenant\crosstenant.spec.js:48:3 ΓÇ║ Cross-Tenant Isolation ΓÇö Tenant ID Manipulation ΓÇ║ should not allow cross-tenant member access (405ms)
+  x  8 [api] ΓÇ║ access\access.spec.js:41:3 ΓÇ║ Access ΓÇö Roles and Permissions (authenticated user) ΓÇ║ should reject access to nonexistent role (394ms)
+  x  9 [api] ΓÇ║ access\access.spec.js:51:3 ΓÇ║ Access ΓÇö Roles and Permissions (authenticated user) ΓÇ║ should get my access info (419ms)
+  x  10 [api] ΓÇ║ crosstenant\crosstenant.spec.js:61:3 ΓÇ║ Cross-Tenant Isolation ΓÇö Same User ID Different Tenants ΓÇ║ should treat same user ID as different identities across tenants (397ms)
+  ok 12 [api] ΓÇ║ crosstenant\crosstenant.spec.js:78:3 ΓÇ║ Cross-Tenant Isolation ΓÇö Database Verification ΓÇ║ should verify no cross-tenant data in database (248ms)
+  ok 13 [api] ΓÇ║ database\database.spec.js:11:3 ΓÇ║ Database ΓÇö Schema and Constraints ΓÇ║ should verify Identity_Users table exists and is accessible (12ms)
+  ok 14 [api] ΓÇ║ database\database.spec.js:17:3 ΓÇ║ Database ΓÇö Schema and Constraints ΓÇ║ should verify Access tables exist (24ms)
+  ok 15 [api] ΓÇ║ database\database.spec.js:23:3 ΓÇ║ Database ΓÇö Schema and Constraints ΓÇ║ should verify Tenant tables exist (16ms)
+  ok 16 [api] ΓÇ║ database\database.spec.js:29:3 ΓÇ║ Database ΓÇö Schema and Constraints ΓÇ║ should verify no RLS is enabled on Identity tables (37ms)
+  x  11 [api] ΓÇ║ access\access.spec.js:65:3 ΓÇ║ Access ΓÇö Role CRUD (requires platform or tenant scope) ΓÇ║ should create a role (may require platform permission) (408ms)
+  ok 17 [api] ΓÇ║ database\database.spec.js:34:3 ΓÇ║ Database ΓÇö Schema and Constraints ΓÇ║ should verify no RLS is enabled on Tenant tables (16ms)
+  ok 18 [api] ΓÇ║ database\database.spec.js:39:3 ΓÇ║ Database ΓÇö Schema and Constraints ΓÇ║ should verify no RLS is enabled on Access tables (16ms)
+  ok 19 [api] ΓÇ║ database\database.spec.js:44:3 ΓÇ║ Database ΓÇö Schema and Constraints ΓÇ║ should verify no RLS policies exist (31ms)
+  x  20 [api] ΓÇ║ database\database.spec.js:51:3 ΓÇ║ Database ΓÇö Data Integrity ΓÇ║ should verify email uniqueness constraint via API (374ms)
+  x  21 [api] ΓÇ║ access\access.spec.js:88:3 ΓÇ║ Access ΓÇö Role CRUD (requires platform or tenant scope) ΓÇ║ should reject duplicate role name (403ms)
+  ok 22 [api] ΓÇ║ database\database.spec.js:62:3 ΓÇ║ Database ΓÇö Data Integrity ΓÇ║ should verify Identity_OutboxMessages table exists (320ms)
+  ok 23 [api] ΓÇ║ database\database.spec.js:68:3 ΓÇ║ Database ΓÇö Data Integrity ΓÇ║ should verify Tenant_OutboxMessages table exists (45ms)
+  ok 24 [api] ΓÇ║ database\database.spec.js:76:3 ΓÇ║ Database ΓÇö Migration History ΓÇ║ should verify Identity migrations have been applied (24ms)
+  ok 25 [api] ΓÇ║ database\database.spec.js:81:3 ΓÇ║ Database ΓÇö Migration History ΓÇ║ should verify Access migrations have been applied (22ms)
+  ok 26 [api] ΓÇ║ database\database.spec.js:86:3 ΓÇ║ Database ΓÇö Migration History ΓÇ║ should verify Tenant migrations have been applied (26ms)
+  ok 27 [api] ΓÇ║ database\database.spec.js:91:3 ΓÇ║ Database ΓÇö Migration History ΓÇ║ should verify Identity RLS migration was NOT applied (typo migration) (16ms)
+  x  28 [api] ΓÇ║ identity\identity.spec.js:11:3 ΓÇ║ Identity ΓÇö Registration ΓÇ║ should register a new user successfully (408ms)
+  x  29 [api] ΓÇ║ access\access.spec.js:104:3 ΓÇ║ Access ΓÇö Role CRUD (requires platform or tenant scope) ΓÇ║ should reject invalid role data (392ms)
+  x  30 [api] ΓÇ║ identity\identity.spec.js:28:3 ΓÇ║ Identity ΓÇö Registration ΓÇ║ should reject duplicate registration with same email (480ms)
+  x  31 [api] ΓÇ║ access\access.spec.js:118:3 ΓÇ║ Access ΓÇö Role CRUD (requires platform or tenant scope) ΓÇ║ should reject missing name field (387ms)
+  x  32 [api] ΓÇ║ identity\identity.spec.js:40:3 ΓÇ║ Identity ΓÇö Registration ΓÇ║ should reject registration with missing email (398ms)
+  x  33 [api] ΓÇ║ access\access.spec.js:133:3 ΓÇ║ Access ΓÇö Authorization Boundaries ΓÇ║ should require authentication for platform membership endpoints (414ms)
+  x  34 [api] ΓÇ║ identity\identity.spec.js:49:3 ΓÇ║ Identity ΓÇö Registration ΓÇ║ should reject registration with missing password (381ms)
+  x  35 [api] ΓÇ║ access\access.spec.js:143:3 ΓÇ║ Access ΓÇö Authorization Boundaries ΓÇ║ should require authentication for user role assignment (419ms)
+  x  36 [api] ΓÇ║ identity\identity.spec.js:58:3 ΓÇ║ Identity ΓÇö Registration ΓÇ║ should normalize email to lowercase (390ms)
+  x  37 [api] ΓÇ║ access\access.spec.js:155:3 ΓÇ║ Access ΓÇö Audit Log ΓÇ║ should list access audit entries (393ms)
+  x  38 [api] ΓÇ║ identity\identity.spec.js:72:3 ΓÇ║ Identity ΓÇö Login ΓÇ║ should login with valid credentials (396ms)
+  x  39 [api] ΓÇ║ access\access.spec.js:167:3 ΓÇ║ Access ΓÇö Permission Assignment ΓÇ║ should assign permissions to a role (409ms)
+  x  40 [api] ΓÇ║ identity\identity.spec.js:86:3 ΓÇ║ Identity ΓÇö Login ΓÇ║ should reject invalid password (386ms)
+  x  41 [api] ΓÇ║ access\access.spec.js:190:3 ΓÇ║ Access ΓÇö Permission Assignment ΓÇ║ should reject invalid permission assignment (394ms)
+  x  42 [api] ΓÇ║ identity\identity.spec.js:95:3 ΓÇ║ Identity ΓÇö Login ΓÇ║ should reject login for unknown email (395ms)
+  x  43 [api] ΓÇ║ access\access.spec.js:209:3 ΓÇ║ Access ΓÇö Permission Assignment ΓÇ║ should delete a role (424ms)
+  x  44 [api] ΓÇ║ identity\identity.spec.js:102:3 ΓÇ║ Identity ΓÇö Login ΓÇ║ should reject missing credentials (393ms)
+  ok 45 [api] ΓÇ║ outbox\outbox.spec.js:10:3 ΓÇ║ Outbox ΓÇö Identity Outbox ΓÇ║ should verify Identity outbox table exists (175ms)
+  x  47 [api] ΓÇ║ outbox\outbox.spec.js:16:3 ΓÇ║ Outbox ΓÇö Identity Outbox ΓÇ║ should verify no stuck pending Identity outbox messages (18ms)
+  x  46 [api] ΓÇ║ identity\identity.spec.js:109:3 ΓÇ║ Identity ΓÇö Login ΓÇ║ should return uniform response for unknown email (no enumeration) (425ms)
+  x  48 [api] ΓÇ║ outbox\outbox.spec.js:22:3 ΓÇ║ Outbox ΓÇö Identity Outbox ΓÇ║ should verify no pending outbox messages without a dispatcher running (167ms)
+  x  49 [api] ΓÇ║ identity\identity.spec.js:121:3 ΓÇ║ Identity ΓÇö Account Lockout ΓÇ║ should lock account after 5 failed login attempts (475ms)
+  ok 50 [api] ΓÇ║ outbox\outbox.spec.js:30:3 ΓÇ║ Outbox ΓÇö Tenant Outbox ΓÇ║ should verify Tenant outbox table exists (178ms)
+  ok 51 [api] ΓÇ║ outbox\outbox.spec.js:36:3 ΓÇ║ Outbox ΓÇö Tenant Outbox ΓÇ║ should verify Tenant outbox messages persist but publisher never started (81ms)
+  x  52 [api] ΓÇ║ outbox\outbox.spec.js:49:3 ΓÇ║ Outbox ΓÇö Tenant Outbox ΓÇ║ should not dispatch tenant outbox messages from Web host (29ms)
+  x  53 [api] ΓÇ║ identity\identity.spec.js:139:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should issue valid JWT access token (491ms)
+  x  54 [api] ΓÇ║ outbox\outbox.spec.js:58:3 ΓÇ║ Outbox ΓÇö Message Lifecycle ΓÇ║ should verify outbox status values (151ms)
+  x  55 [api] ΓÇ║ identity\identity.spec.js:149:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should reject request without authentication token (401ms)
+  x  56 [api] ΓÇ║ outbox\outbox.spec.js:65:3 ΓÇ║ Outbox ΓÇö Message Lifecycle ΓÇ║ should verify Tenant outbox status values (254ms)
+  x  57 [api] ΓÇ║ identity\identity.spec.js:157:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should refresh token and rotate (405ms)
+  x  58 [api] ΓÇ║ tenant\tenant.spec.js:18:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should list tenants (may be empty or 403 for non-platform user) (482ms)
+  x  59 [api] ΓÇ║ identity\identity.spec.js:174:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should detect refresh token replay (reuse of revoked token) (395ms)
+  x  60 [api] ΓÇ║ tenant\tenant.spec.js:28:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should create a tenant (requires platform permission) (416ms)
+  x  61 [api] ΓÇ║ identity\identity.spec.js:191:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should logout and invalidate refresh token (395ms)
+  x  62 [api] ΓÇ║ tenant\tenant.spec.js:47:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should reject invalid tenant data (393ms)
+  x  63 [api] ΓÇ║ identity\identity.spec.js:207:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should reject malformed token (401ms)
+  x  64 [api] ΓÇ║ tenant\tenant.spec.js:59:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should reject missing name field (391ms)
+  x  65 [api] ΓÇ║ identity\identity.spec.js:217:3 ΓÇ║ Identity ΓÇö Password Change ΓÇ║ should change password successfully (404ms)
+  x  66 [api] ΓÇ║ tenant\tenant.spec.js:69:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should get current tenant context (397ms)
+  x  67 [api] ΓÇ║ identity\identity.spec.js:236:3 ΓÇ║ Identity ΓÇö Password Change ΓÇ║ should reject wrong current password (400ms)
+  x  68 [api] ΓÇ║ tenant\tenant.spec.js:80:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should list user tenants (438ms)
+  x  69 [api] ΓÇ║ identity\identity.spec.js:248:3 ΓÇ║ Identity ΓÇö Password Reset (Recovery) ΓÇ║ should request password reset for known account (418ms)
+  x  70 [api] ΓÇ║ tenant\tenant.spec.js:92:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should reject unauthenticated access to tenant endpoints (405ms)
+  x  71 [api] ΓÇ║ identity\identity.spec.js:257:3 ΓÇ║ Identity ΓÇö Password Reset (Recovery) ΓÇ║ should not reveal account existence for unknown email (395ms)
+  x  72 [api] ΓÇ║ tenant\tenant.spec.js:109:3 ΓÇ║ Tenant ΓÇö Member Operations ΓÇ║ should reject unauthenticated member access (423ms)
+  x  73 [api] ΓÇ║ identity\identity.spec.js:266:3 ΓÇ║ Identity ΓÇö Account Deactivation ΓÇ║ should deactivate account and revoke sessions (408ms)
+  x  74 [api] ΓÇ║ tenant\tenant.spec.js:117:3 ΓÇ║ Tenant ΓÇö Member Operations ΓÇ║ should reject adding member to nonexistent tenant (399ms)
+  x  75 [api] ΓÇ║ identity\identity.spec.js:284:3 ΓÇ║ Identity ΓÇö Protected Endpoint Access ΓÇ║ should reject unauthorized access to protected endpoint (418ms)
+  x  76 [api] ΓÇ║ tenant\tenant.spec.js:139:3 ΓÇ║ Tenant ΓÇö Tenant Settings ΓÇ║ should reject unauthenticated settings access (376ms)
+
+
+  1) [api] ΓÇ║ access\access.spec.js:11:3 ΓÇ║ Access ΓÇö Roles and Permissions (authenticated user) ΓÇ║ should list permissions (may be empty or 403 for non-platform user) 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\access\access.spec.js:14:15
+
+  2) [api] ΓÇ║ access\access.spec.js:21:3 ΓÇ║ Access ΓÇö Roles and Permissions (authenticated user) ΓÇ║ should list roles 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\access\access.spec.js:24:15
+
+  3) [api] ΓÇ║ access\access.spec.js:33:3 ΓÇ║ Access ΓÇö Roles and Permissions (authenticated user) ΓÇ║ should reject unauthenticated access to access endpoints 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ GET http://localhost:53585/access/roles[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.get: connect ECONNREFUSED ::1:53585
+        at Object.get (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:55:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\access\access.spec.js:37:32
+
+  4) [api] ΓÇ║ access\access.spec.js:41:3 ΓÇ║ Access ΓÇö Roles and Permissions (authenticated user) ΓÇ║ should reject access to nonexistent role 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\access\access.spec.js:44:15
+
+  5) [api] ΓÇ║ access\access.spec.js:51:3 ΓÇ║ Access ΓÇö Roles and Permissions (authenticated user) ΓÇ║ should get my access info 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\access\access.spec.js:54:15
+
+  6) [api] ΓÇ║ access\access.spec.js:65:3 ΓÇ║ Access ΓÇö Role CRUD (requires platform or tenant scope) ΓÇ║ should create a role (may require platform permission) 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\access\access.spec.js:68:15
+
+  7) [api] ΓÇ║ access\access.spec.js:88:3 ΓÇ║ Access ΓÇö Role CRUD (requires platform or tenant scope) ΓÇ║ should reject duplicate role name 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\access\access.spec.js:91:15
+
+  8) [api] ΓÇ║ access\access.spec.js:104:3 ΓÇ║ Access ΓÇö Role CRUD (requires platform or tenant scope) ΓÇ║ should reject invalid role data 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\access\access.spec.js:107:15
+
+  9) [api] ΓÇ║ access\access.spec.js:118:3 ΓÇ║ Access ΓÇö Role CRUD (requires platform or tenant scope) ΓÇ║ should reject missing name field 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\access\access.spec.js:121:15
+
+  10) [api] ΓÇ║ access\access.spec.js:133:3 ΓÇ║ Access ΓÇö Authorization Boundaries ΓÇ║ should require authentication for platform membership endpoints 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/access/platform/members[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 49[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\access\access.spec.js:137:32
+
+  11) [api] ΓÇ║ access\access.spec.js:143:3 ΓÇ║ Access ΓÇö Authorization Boundaries ΓÇ║ should require authentication for user role assignment 
+
+    Error: apiRequestContext.put: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ PUT http://localhost:53585/access/users/00000000-0000-0000-0000-000000000000/roles[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 14[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.put: connect ECONNREFUSED ::1:53585
+        at Object.put (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:78:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\access\access.spec.js:147:32
+
+  12) [api] ΓÇ║ access\access.spec.js:155:3 ΓÇ║ Access ΓÇö Audit Log ΓÇ║ should list access audit entries ΓöÇΓöÇ
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\access\access.spec.js:158:15
+
+  13) [api] ΓÇ║ access\access.spec.js:167:3 ΓÇ║ Access ΓÇö Permission Assignment ΓÇ║ should assign permissions to a role 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\access\access.spec.js:170:15
+
+  14) [api] ΓÇ║ access\access.spec.js:190:3 ΓÇ║ Access ΓÇö Permission Assignment ΓÇ║ should reject invalid permission assignment 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\access\access.spec.js:193:15
+
+  15) [api] ΓÇ║ access\access.spec.js:209:3 ΓÇ║ Access ΓÇö Permission Assignment ΓÇ║ should delete a role ΓöÇΓöÇ
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\access\access.spec.js:212:15
+
+  16) [api] ΓÇ║ crosstenant\crosstenant.spec.js:20:3 ΓÇ║ Cross-Tenant Isolation ΓÇö Basic ΓÇ║ should reject unauthenticated cross-tenant access 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ GET http://localhost:53585/tenants/00000000-0000-0000-0000-000000000000[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.get: connect ECONNREFUSED ::1:53585
+        at Object.get (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:55:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\crosstenant\crosstenant.spec.js:24:32
+
+  17) [api] ΓÇ║ crosstenant\crosstenant.spec.js:28:3 ΓÇ║ Cross-Tenant Isolation ΓÇö Basic ΓÇ║ should reject access with invalid token 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ GET http://localhost:53585/tenants/00000000-0000-0000-0000-000000000000[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - Authorization: Bearer invalid-token[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.get: connect ECONNREFUSED ::1:53585
+        at Object.get (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:55:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\crosstenant\crosstenant.spec.js:32:32
+
+  18) [api] ΓÇ║ crosstenant\crosstenant.spec.js:38:3 ΓÇ║ Cross-Tenant Isolation ΓÇö Tenant ID Manipulation ΓÇ║ should not allow tenant A user to guess tenant B resources 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at createAuthenticatedUser (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\crosstenant\crosstenant.spec.js:13:13)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\crosstenant\crosstenant.spec.js:40:11
+
+  19) [api] ΓÇ║ crosstenant\crosstenant.spec.js:48:3 ΓÇ║ Cross-Tenant Isolation ΓÇö Tenant ID Manipulation ΓÇ║ should not allow cross-tenant member access 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at createAuthenticatedUser (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\crosstenant\crosstenant.spec.js:13:13)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\crosstenant\crosstenant.spec.js:50:11
+
+  20) [api] ΓÇ║ crosstenant\crosstenant.spec.js:61:3 ΓÇ║ Cross-Tenant Isolation ΓÇö Same User ID Different Tenants ΓÇ║ should treat same user ID as different identities across tenants 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at createAuthenticatedUser (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\crosstenant\crosstenant.spec.js:13:13)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\crosstenant\crosstenant.spec.js:63:11
+
+  21) [api] ΓÇ║ database\database.spec.js:51:3 ΓÇ║ Database ΓÇö Data Integrity ΓÇ║ should verify email uniqueness constraint via API 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 97[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\database\database.spec.js:55:33
+
+  22) [api] ΓÇ║ identity\identity.spec.js:11:3 ΓÇ║ Identity ΓÇö Registration ΓÇ║ should register a new user successfully 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:15:32
+
+  23) [api] ΓÇ║ identity\identity.spec.js:28:3 ΓÇ║ Identity ΓÇö Registration ΓÇ║ should reject duplicate registration with same email 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 94[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:33:33
+
+  24) [api] ΓÇ║ identity\identity.spec.js:40:3 ΓÇ║ Identity ΓÇö Registration ΓÇ║ should reject registration with missing email 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 27[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:43:32
+
+  25) [api] ΓÇ║ identity\identity.spec.js:49:3 ΓÇ║ Identity ΓÇö Registration ΓÇ║ should reject registration with missing password 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 40[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:52:32
+
+  26) [api] ΓÇ║ identity\identity.spec.js:58:3 ΓÇ║ Identity ΓÇö Registration ΓÇ║ should normalize email to lowercase 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 101[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:63:32
+
+  27) [api] ΓÇ║ identity\identity.spec.js:72:3 ΓÇ║ Identity ΓÇö Login ΓÇ║ should login with valid credentials 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:75:15
+
+  28) [api] ΓÇ║ identity\identity.spec.js:86:3 ΓÇ║ Identity ΓÇö Login ΓÇ║ should reject invalid password ΓöÇΓöÇΓöÇ
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:89:15
+
+  29) [api] ΓÇ║ identity\identity.spec.js:95:3 ΓÇ║ Identity ΓÇö Login ΓÇ║ should reject login for unknown email 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/login[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 71[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:98:32
+
+  30) [api] ΓÇ║ identity\identity.spec.js:102:3 ΓÇ║ Identity ΓÇö Login ΓÇ║ should reject missing credentials 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/login[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 2[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:105:32
+
+  31) [api] ΓÇ║ identity\identity.spec.js:109:3 ΓÇ║ Identity ΓÇö Login ΓÇ║ should return uniform response for unknown email (no enumeration) 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/login[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 67[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:112:32
+
+  32) [api] ΓÇ║ identity\identity.spec.js:121:3 ΓÇ║ Identity ΓÇö Account Lockout ΓÇ║ should lock account after 5 failed login attempts 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:124:15
+
+  33) [api] ΓÇ║ identity\identity.spec.js:139:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should issue valid JWT access token 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:142:15
+
+  34) [api] ΓÇ║ identity\identity.spec.js:149:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should reject request without authentication token 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ GET http://localhost:53585/Identity/auth/me[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.get: connect ECONNREFUSED ::1:53585
+        at Object.get (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:55:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:153:32
+
+  35) [api] ΓÇ║ identity\identity.spec.js:157:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should refresh token and rotate 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:160:15
+
+  36) [api] ΓÇ║ identity\identity.spec.js:174:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should detect refresh token replay (reuse of revoked token) 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:177:15
+
+  37) [api] ΓÇ║ identity\identity.spec.js:191:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should logout and invalidate refresh token 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:194:15
+
+  38) [api] ΓÇ║ identity\identity.spec.js:207:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should reject malformed token 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ GET http://localhost:53585/Identity/auth/me[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - Authorization: Bearer not-a-valid-jwt[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.get: connect ECONNREFUSED ::1:53585
+        at Object.get (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:55:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:211:32
+
+  39) [api] ΓÇ║ identity\identity.spec.js:217:3 ΓÇ║ Identity ΓÇö Password Change ΓÇ║ should change password successfully 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:220:15
+
+  40) [api] ΓÇ║ identity\identity.spec.js:236:3 ΓÇ║ Identity ΓÇö Password Change ΓÇ║ should reject wrong current password 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:239:15
+
+  41) [api] ΓÇ║ identity\identity.spec.js:248:3 ΓÇ║ Identity ΓÇö Password Reset (Recovery) ΓÇ║ should request password reset for known account 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:251:15
+
+  42) [api] ΓÇ║ identity\identity.spec.js:257:3 ΓÇ║ Identity ΓÇö Password Reset (Recovery) ΓÇ║ should not reveal account existence for unknown email 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/forgot-password[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 41[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:260:32
+
+  43) [api] ΓÇ║ identity\identity.spec.js:266:3 ΓÇ║ Identity ΓÇö Account Deactivation ΓÇ║ should deactivate account and revoke sessions 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:269:15
+
+  44) [api] ΓÇ║ identity\identity.spec.js:284:3 ΓÇ║ Identity ΓÇö Protected Endpoint Access ΓÇ║ should reject unauthorized access to protected endpoint 
+
+    Error: apiRequestContext.get: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ GET http://localhost:53585/Identity/users[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.get: connect ECONNREFUSED ::1:53585
+        at Object.get (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:55:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\identity\identity.spec.js:288:32
+
+  45) [api] ΓÇ║ outbox\outbox.spec.js:16:3 ΓÇ║ Outbox ΓÇö Identity Outbox ΓÇ║ should verify no stuck pending Identity outbox messages 
+
+    error: column "status" does not exist
+
+       at helpers\db-client.js:47
+
+      45 |  */
+      46 | async function count(sql, params = []) {
+    > 47 |   const result = await pool.query(sql, params);
+         |                  ^
+      48 |   return parseInt(result.rows[0].count, 10);
+      49 | }
+      50 |
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\node_modules\pg-pool\index.js:45:11
+        at count (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\db-client.js:47:18)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\outbox\outbox.spec.js:17:26
+
+  46) [api] ΓÇ║ outbox\outbox.spec.js:22:3 ΓÇ║ Outbox ΓÇö Identity Outbox ΓÇ║ should verify no pending outbox messages without a dispatcher running 
+
+    error: column "status" does not exist
+
+       at helpers\db-client.js:47
+
+      45 |  */
+      46 | async function count(sql, params = []) {
+    > 47 |   const result = await pool.query(sql, params);
+         |                  ^
+      48 |   return parseInt(result.rows[0].count, 10);
+      49 | }
+      50 |
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\node_modules\pg-pool\index.js:45:11
+        at count (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\db-client.js:47:18)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\outbox\outbox.spec.js:24:29
+
+  47) [api] ΓÇ║ outbox\outbox.spec.js:49:3 ΓÇ║ Outbox ΓÇö Tenant Outbox ΓÇ║ should not dispatch tenant outbox messages from Web host 
+
+    error: column "status" does not exist
+
+       at helpers\db-client.js:47
+
+      45 |  */
+      46 | async function count(sql, params = []) {
+    > 47 |   const result = await pool.query(sql, params);
+         |                  ^
+      48 |   return parseInt(result.rows[0].count, 10);
+      49 | }
+      50 |
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\node_modules\pg-pool\index.js:45:11
+        at count (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\db-client.js:47:18)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\outbox\outbox.spec.js:52:32
+
+  48) [api] ΓÇ║ outbox\outbox.spec.js:58:3 ΓÇ║ Outbox ΓÇö Message Lifecycle ΓÇ║ should verify outbox status values 
+
+    error: column "status" does not exist
+
+       at helpers\db-client.js:26
+
+      24 |  */
+      25 | async function query(sql, params = []) {
+    > 26 |   const result = await pool.query(sql, params);
+         |                  ^
+      27 |   return result.rows.map(row => Object.values(row));
+      28 | }
+      29 |
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\node_modules\pg-pool\index.js:45:11
+        at query (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\db-client.js:26:18)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\outbox\outbox.spec.js:59:22
+
+  49) [api] ΓÇ║ outbox\outbox.spec.js:65:3 ΓÇ║ Outbox ΓÇö Message Lifecycle ΓÇ║ should verify Tenant outbox status values 
+
+    error: column "status" does not exist
+
+       at helpers\db-client.js:26
+
+      24 |  */
+      25 | async function query(sql, params = []) {
+    > 26 |   const result = await pool.query(sql, params);
+         |                  ^
+      27 |   return result.rows.map(row => Object.values(row));
+      28 | }
+      29 |
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\node_modules\pg-pool\index.js:45:11
+        at query (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\db-client.js:26:18)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\outbox\outbox.spec.js:66:22
+
+  50) [api] ΓÇ║ tenant\tenant.spec.js:18:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should list tenants (may be empty or 403 for non-platform user) 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\tenant\tenant.spec.js:14:15
+
+  51) [api] ΓÇ║ tenant\tenant.spec.js:28:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should create a tenant (requires platform permission) 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\tenant\tenant.spec.js:14:15
+
+  52) [api] ΓÇ║ tenant\tenant.spec.js:47:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should reject invalid tenant data 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\tenant\tenant.spec.js:14:15
+
+  53) [api] ΓÇ║ tenant\tenant.spec.js:59:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should reject missing name field 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\tenant\tenant.spec.js:14:15
+
+  54) [api] ΓÇ║ tenant\tenant.spec.js:69:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should get current tenant context 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\tenant\tenant.spec.js:14:15
+
+  55) [api] ΓÇ║ tenant\tenant.spec.js:80:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should list user tenants 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\tenant\tenant.spec.js:14:15
+
+  56) [api] ΓÇ║ tenant\tenant.spec.js:92:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should reject unauthenticated access to tenant endpoints 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\tenant\tenant.spec.js:14:15
+
+  57) [api] ΓÇ║ tenant\tenant.spec.js:109:3 ΓÇ║ Tenant ΓÇö Member Operations ΓÇ║ should reject unauthenticated member access 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\tenant\tenant.spec.js:105:15
+
+  58) [api] ΓÇ║ tenant\tenant.spec.js:117:3 ΓÇ║ Tenant ΓÇö Member Operations ΓÇ║ should reject adding member to nonexistent tenant 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\tenant\tenant.spec.js:105:15
+
+  59) [api] ΓÇ║ tenant\tenant.spec.js:139:3 ΓÇ║ Tenant ΓÇö Tenant Settings ΓÇ║ should reject unauthenticated settings access 
+
+    Error: apiRequestContext.post: connect ECONNREFUSED ::1:53585
+    Call log:
+    [2m  - ΓåÆ POST http://localhost:53585/Identity/auth/register[22m
+    [2m    - user-agent: Playwright/1.49.0 (x64; windows 10.0) node/25.9[22m
+    [2m    - accept: application/json[22m
+    [2m    - accept-encoding: gzip,deflate,br[22m
+    [2m    - Content-Type: application/json[22m
+    [2m    - content-length: 95[22m
+
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\apiRequestContext.post: connect ECONNREFUSED ::1:53585
+        at Object.post (F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\helpers\api-client.js:66:22)
+        at F:\Developer\waqas-dba\waqas-dba\Dastarkhwan\e2e-tests\tests\tenant\tenant.spec.js:135:15
+
+  59 failed
+    [api] ΓÇ║ access\access.spec.js:11:3 ΓÇ║ Access ΓÇö Roles and Permissions (authenticated user) ΓÇ║ should list permissions (may be empty or 403 for non-platform user) 
+    [api] ΓÇ║ access\access.spec.js:21:3 ΓÇ║ Access ΓÇö Roles and Permissions (authenticated user) ΓÇ║ should list roles 
+    [api] ΓÇ║ access\access.spec.js:33:3 ΓÇ║ Access ΓÇö Roles and Permissions (authenticated user) ΓÇ║ should reject unauthenticated access to access endpoints 
+    [api] ΓÇ║ access\access.spec.js:41:3 ΓÇ║ Access ΓÇö Roles and Permissions (authenticated user) ΓÇ║ should reject access to nonexistent role 
+    [api] ΓÇ║ access\access.spec.js:51:3 ΓÇ║ Access ΓÇö Roles and Permissions (authenticated user) ΓÇ║ should get my access info 
+    [api] ΓÇ║ access\access.spec.js:65:3 ΓÇ║ Access ΓÇö Role CRUD (requires platform or tenant scope) ΓÇ║ should create a role (may require platform permission) 
+    [api] ΓÇ║ access\access.spec.js:88:3 ΓÇ║ Access ΓÇö Role CRUD (requires platform or tenant scope) ΓÇ║ should reject duplicate role name 
+    [api] ΓÇ║ access\access.spec.js:104:3 ΓÇ║ Access ΓÇö Role CRUD (requires platform or tenant scope) ΓÇ║ should reject invalid role data 
+    [api] ΓÇ║ access\access.spec.js:118:3 ΓÇ║ Access ΓÇö Role CRUD (requires platform or tenant scope) ΓÇ║ should reject missing name field 
+    [api] ΓÇ║ access\access.spec.js:133:3 ΓÇ║ Access ΓÇö Authorization Boundaries ΓÇ║ should require authentication for platform membership endpoints 
+    [api] ΓÇ║ access\access.spec.js:143:3 ΓÇ║ Access ΓÇö Authorization Boundaries ΓÇ║ should require authentication for user role assignment 
+    [api] ΓÇ║ access\access.spec.js:155:3 ΓÇ║ Access ΓÇö Audit Log ΓÇ║ should list access audit entries ΓöÇΓöÇΓöÇΓöÇ
+    [api] ΓÇ║ access\access.spec.js:167:3 ΓÇ║ Access ΓÇö Permission Assignment ΓÇ║ should assign permissions to a role 
+    [api] ΓÇ║ access\access.spec.js:190:3 ΓÇ║ Access ΓÇö Permission Assignment ΓÇ║ should reject invalid permission assignment 
+    [api] ΓÇ║ access\access.spec.js:209:3 ΓÇ║ Access ΓÇö Permission Assignment ΓÇ║ should delete a role ΓöÇΓöÇΓöÇΓöÇ
+    [api] ΓÇ║ crosstenant\crosstenant.spec.js:20:3 ΓÇ║ Cross-Tenant Isolation ΓÇö Basic ΓÇ║ should reject unauthenticated cross-tenant access 
+    [api] ΓÇ║ crosstenant\crosstenant.spec.js:28:3 ΓÇ║ Cross-Tenant Isolation ΓÇö Basic ΓÇ║ should reject access with invalid token 
+    [api] ΓÇ║ crosstenant\crosstenant.spec.js:38:3 ΓÇ║ Cross-Tenant Isolation ΓÇö Tenant ID Manipulation ΓÇ║ should not allow tenant A user to guess tenant B resources 
+    [api] ΓÇ║ crosstenant\crosstenant.spec.js:48:3 ΓÇ║ Cross-Tenant Isolation ΓÇö Tenant ID Manipulation ΓÇ║ should not allow cross-tenant member access 
+    [api] ΓÇ║ crosstenant\crosstenant.spec.js:61:3 ΓÇ║ Cross-Tenant Isolation ΓÇö Same User ID Different Tenants ΓÇ║ should treat same user ID as different identities across tenants 
+    [api] ΓÇ║ database\database.spec.js:51:3 ΓÇ║ Database ΓÇö Data Integrity ΓÇ║ should verify email uniqueness constraint via API 
+    [api] ΓÇ║ identity\identity.spec.js:11:3 ΓÇ║ Identity ΓÇö Registration ΓÇ║ should register a new user successfully 
+    [api] ΓÇ║ identity\identity.spec.js:28:3 ΓÇ║ Identity ΓÇö Registration ΓÇ║ should reject duplicate registration with same email 
+    [api] ΓÇ║ identity\identity.spec.js:40:3 ΓÇ║ Identity ΓÇö Registration ΓÇ║ should reject registration with missing email 
+    [api] ΓÇ║ identity\identity.spec.js:49:3 ΓÇ║ Identity ΓÇö Registration ΓÇ║ should reject registration with missing password 
+    [api] ΓÇ║ identity\identity.spec.js:58:3 ΓÇ║ Identity ΓÇö Registration ΓÇ║ should normalize email to lowercase 
+    [api] ΓÇ║ identity\identity.spec.js:72:3 ΓÇ║ Identity ΓÇö Login ΓÇ║ should login with valid credentials 
+    [api] ΓÇ║ identity\identity.spec.js:86:3 ΓÇ║ Identity ΓÇö Login ΓÇ║ should reject invalid password ΓöÇΓöÇΓöÇΓöÇΓöÇ
+    [api] ΓÇ║ identity\identity.spec.js:95:3 ΓÇ║ Identity ΓÇö Login ΓÇ║ should reject login for unknown email 
+    [api] ΓÇ║ identity\identity.spec.js:102:3 ΓÇ║ Identity ΓÇö Login ΓÇ║ should reject missing credentials ΓöÇ
+    [api] ΓÇ║ identity\identity.spec.js:109:3 ΓÇ║ Identity ΓÇö Login ΓÇ║ should return uniform response for unknown email (no enumeration) 
+    [api] ΓÇ║ identity\identity.spec.js:121:3 ΓÇ║ Identity ΓÇö Account Lockout ΓÇ║ should lock account after 5 failed login attempts 
+    [api] ΓÇ║ identity\identity.spec.js:139:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should issue valid JWT access token 
+    [api] ΓÇ║ identity\identity.spec.js:149:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should reject request without authentication token 
+    [api] ΓÇ║ identity\identity.spec.js:157:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should refresh token and rotate 
+    [api] ΓÇ║ identity\identity.spec.js:174:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should detect refresh token replay (reuse of revoked token) 
+    [api] ΓÇ║ identity\identity.spec.js:191:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should logout and invalidate refresh token 
+    [api] ΓÇ║ identity\identity.spec.js:207:3 ΓÇ║ Identity ΓÇö Tokens and Sessions ΓÇ║ should reject malformed token 
+    [api] ΓÇ║ identity\identity.spec.js:217:3 ΓÇ║ Identity ΓÇö Password Change ΓÇ║ should change password successfully 
+    [api] ΓÇ║ identity\identity.spec.js:236:3 ΓÇ║ Identity ΓÇö Password Change ΓÇ║ should reject wrong current password 
+    [api] ΓÇ║ identity\identity.spec.js:248:3 ΓÇ║ Identity ΓÇö Password Reset (Recovery) ΓÇ║ should request password reset for known account 
+    [api] ΓÇ║ identity\identity.spec.js:257:3 ΓÇ║ Identity ΓÇö Password Reset (Recovery) ΓÇ║ should not reveal account existence for unknown email 
+    [api] ΓÇ║ identity\identity.spec.js:266:3 ΓÇ║ Identity ΓÇö Account Deactivation ΓÇ║ should deactivate account and revoke sessions 
+    [api] ΓÇ║ identity\identity.spec.js:284:3 ΓÇ║ Identity ΓÇö Protected Endpoint Access ΓÇ║ should reject unauthorized access to protected endpoint 
+    [api] ΓÇ║ outbox\outbox.spec.js:16:3 ΓÇ║ Outbox ΓÇö Identity Outbox ΓÇ║ should verify no stuck pending Identity outbox messages 
+    [api] ΓÇ║ outbox\outbox.spec.js:22:3 ΓÇ║ Outbox ΓÇö Identity Outbox ΓÇ║ should verify no pending outbox messages without a dispatcher running 
+    [api] ΓÇ║ outbox\outbox.spec.js:49:3 ΓÇ║ Outbox ΓÇö Tenant Outbox ΓÇ║ should not dispatch tenant outbox messages from Web host 
+    [api] ΓÇ║ outbox\outbox.spec.js:58:3 ΓÇ║ Outbox ΓÇö Message Lifecycle ΓÇ║ should verify outbox status values 
+    [api] ΓÇ║ outbox\outbox.spec.js:65:3 ΓÇ║ Outbox ΓÇö Message Lifecycle ΓÇ║ should verify Tenant outbox status values 
+    [api] ΓÇ║ tenant\tenant.spec.js:18:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should list tenants (may be empty or 403 for non-platform user) 
+    [api] ΓÇ║ tenant\tenant.spec.js:28:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should create a tenant (requires platform permission) 
+    [api] ΓÇ║ tenant\tenant.spec.js:47:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should reject invalid tenant data 
+    [api] ΓÇ║ tenant\tenant.spec.js:59:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should reject missing name field 
+    [api] ΓÇ║ tenant\tenant.spec.js:69:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should get current tenant context 
+    [api] ΓÇ║ tenant\tenant.spec.js:80:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should list user tenants 
+    [api] ΓÇ║ tenant\tenant.spec.js:92:3 ΓÇ║ Tenant ΓÇö Tenant Lifecycle (authenticated user) ΓÇ║ should reject unauthenticated access to tenant endpoints 
+    [api] ΓÇ║ tenant\tenant.spec.js:109:3 ΓÇ║ Tenant ΓÇö Member Operations ΓÇ║ should reject unauthenticated member access 
+    [api] ΓÇ║ tenant\tenant.spec.js:117:3 ΓÇ║ Tenant ΓÇö Member Operations ΓÇ║ should reject adding member to nonexistent tenant 
+    [api] ΓÇ║ tenant\tenant.spec.js:139:3 ΓÇ║ Tenant ΓÇö Tenant Settings ΓÇ║ should reject unauthenticated settings access 
+  17 passed (1.6m)

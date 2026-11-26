@@ -1,4 +1,5 @@
 using CoreKit.Identity.Constants;
+using CoreKit.Identity.Contracts;
 using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Repositories;
 using CoreKit.Identity.Security;

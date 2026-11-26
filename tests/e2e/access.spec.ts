@@ -1,21 +1,16 @@
 import { test, expect } from '@playwright/test';
 import { ApiClient } from './helpers/apiClient';
+import { WEB_BASE_URL } from './helpers/config';
+import { ADMIN_EMAIL, ADMIN_PASSWORD } from './helpers/fixtures';
 
-const BASE_URL = 'http://localhost:53584';
+const BASE_URL = WEB_BASE_URL;
 
 test.describe('Access - Roles and Permissions', () => {
   let client: ApiClient;
 
   test.beforeEach(async ({ request }) => {
     client = new ApiClient(request, BASE_URL);
-    try {
-      await client.login('testuser@example.com', 'TestPass123!');
-    } catch {
-      const auditRes = await client.login('testuser@example.com', 'TestPass123!');
-      if (!auditRes.accessToken) {
-        throw new Error('Cannot login as admin');
-      }
-    }
+    await client.login(ADMIN_EMAIL, ADMIN_PASSWORD);
   });
 
   test('should list permissions', async () => {

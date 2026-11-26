@@ -29,6 +29,14 @@ coverage*.json
 coverage*.xml
 coverage*.info
 
+## Node / Playwright E2E artifacts
+node_modules/
+tests/e2e/node_modules/
+tests/e2e/playwright-report/
+tests/e2e/test-results/
+playwright-report/
+test-results/
+
 ## Local tooling / generated exports
 CodeExports/
 projectscode.ps1

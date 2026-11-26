@@ -1,21 +1,16 @@
 import { test, expect } from '@playwright/test';
 import { ApiClient } from './helpers/apiClient';
+import { ADMIN_BASE_URL } from './helpers/config';
+import { ADMIN_EMAIL, ADMIN_PASSWORD, uniqueEmail, TEST_PASSWORD } from './helpers/fixtures';
 
-const BASE_URL = 'http://localhost:53584';
+const BASE_URL = ADMIN_BASE_URL;
 
 test.describe('Admin - Platform Administration', () => {
   let client: ApiClient;
 
   test.beforeEach(async ({ request }) => {
     client = new ApiClient(request, BASE_URL);
-    try {
-      await client.login('testuser@example.com', 'TestPass123!');
-    } catch {
-      const auditRes = await client.login('testuser@example.com', 'TestPass123!');
-      if (!auditRes.accessToken) {
-        throw new Error('Cannot login as admin');
-      }
-    }
+    await client.login(ADMIN_EMAIL, ADMIN_PASSWORD);
   });
 
   test('should access admin health endpoint', async () => {
@@ -33,8 +28,8 @@ test.describe('Admin - Platform Administration', () => {
 
   test('should add platform member', async () => {
     const userRes = await client.createUser(
-      'platform-member-test@example.com',
-      'PlatformMemberPass123!',
+      uniqueEmail('platform-member'),
+      TEST_PASSWORD,
       '+15551000090',
       'Platform Member Test',
       true
@@ -48,8 +43,15 @@ test.describe('Admin - Platform Administration', () => {
   });
 
   test('should reject non-admin platform member addition', async ({ request }) => {
+    // Create a fresh non-platform-admin user, then attempt an admin-only operation.
+    const adminClient = new ApiClient(request, BASE_URL);
+    await adminClient.login(ADMIN_EMAIL, ADMIN_PASSWORD);
+    const email = uniqueEmail('nonadmin');
+    const createRes = await adminClient.createUser(email, TEST_PASSWORD, '+15551000091', 'Non Admin', true);
+    expect(createRes.ok()).toBeTruthy();
+
     const staffClient = new ApiClient(request, BASE_URL);
-    await staffClient.login('staff-a@example.com', 'TestPass123!');
+    await staffClient.login(email, TEST_PASSWORD);
     const res = await staffClient.addPlatformMemberAdmin('00000000-0000-0000-0000-000000000000');
     expect(res.status()).toBe(403);
   });

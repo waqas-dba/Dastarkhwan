@@ -8,6 +8,7 @@ export class ApiClient {
   private request: APIRequestContext;
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
+  private tenantId: string | null = null;
 
   constructor(request: APIRequestContext, baseURL: string) {
     this.request = request;
@@ -21,6 +22,11 @@ export class ApiClient {
     this.refreshToken = refreshToken ?? null;
   }
 
+  /** Sets the X-Tenant-Id header sent on every subsequent request. */
+  setTenantHeader(tenantId: string | null) {
+    this.tenantId = tenantId;
+  }
+
   clearAuth() {
     this.accessToken = null;
     this.refreshToken = null;
@@ -30,6 +36,9 @@ export class ApiClient {
     const h: Record<string, string> = {};
     if (this.accessToken) {
       h['Authorization'] = `Bearer ${this.accessToken}`;
+    }
+    if (this.tenantId) {
+      h['X-Tenant-Id'] = this.tenantId;
     }
     return { ...h, ...extra };
   }

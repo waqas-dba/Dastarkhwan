@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { ApiClient } from './helpers/apiClient';
+import { WEB_BASE_URL } from './helpers/config';
+import { ADMIN_EMAIL, ADMIN_PASSWORD, uniqueEmail, uniqueSlug, TEST_PASSWORD } from './helpers/fixtures';
 
-const BASE_URL = 'http://localhost:53584';
+const BASE_URL = WEB_BASE_URL;
 
 test.describe('Cross-Tenant Security', () => {
   let clientA: ApiClient;
@@ -11,38 +13,33 @@ test.describe('Cross-Tenant Security', () => {
   let tenantBId: string;
   let userAId: string;
   let userBId: string;
+  let userAEmail: string;
+  let userBEmail: string;
 
   test.beforeEach(async ({ request }) => {
     clientA = new ApiClient(request, BASE_URL);
     clientB = new ApiClient(request, BASE_URL);
     adminClient = new ApiClient(request, BASE_URL);
 
-    // Login as testuser
-    try {
-      await adminClient.login('testuser@example.com', 'TestPass123!');
-    } catch {
-      const auditRes = await adminClient.login('testuser@example.com', 'TestPass123!');
-      if (!auditRes.accessToken) {
-        throw new Error('Cannot login as admin');
-      }
-    }
+    // Login as the platform administrator.
+    await adminClient.login(ADMIN_EMAIL, ADMIN_PASSWORD);
 
     // Create tenant A
-    const tenantARes = await adminClient.createTenant('Tenant A', 'tenant-a-cross', true);
+    const tenantARes = await adminClient.createTenant(uniqueName('Tenant A'), uniqueSlug('tenant-a'), true);
     expect(tenantARes.ok()).toBeTruthy();
     const tenantAData = await tenantARes.json();
     tenantAId = tenantAData.id;
 
     // Create tenant B
-    const tenantBRes = await adminClient.createTenant('Tenant B', 'tenant-b-cross', true);
+    const tenantBRes = await adminClient.createTenant(uniqueName('Tenant B'), uniqueSlug('tenant-b'), true);
     expect(tenantBRes.ok()).toBeTruthy();
     const tenantBData = await tenantBRes.json();
     tenantBId = tenantBData.id;
 
     // Create user A and add to tenant A
     const userARes = await adminClient.createUser(
-      'cross-tenant-a@example.com',
-      'TestPass123!',
+      uniqueEmail('cross-a'),
+      TEST_PASSWORD,
       '+15551000090',
       'User A',
       true
@@ -50,13 +47,14 @@ test.describe('Cross-Tenant Security', () => {
     expect(userARes.ok()).toBeTruthy();
     const userAData = await userARes.json();
     userAId = userAData.id;
+    userAEmail = userAData.email;
 
     await adminClient.addMember(tenantAId, userAId, true);
 
     // Create user B and add to tenant B
     const userBRes = await adminClient.createUser(
-      'cross-tenant-b@example.com',
-      'TestPass123!',
+      uniqueEmail('cross-b'),
+      TEST_PASSWORD,
       '+15551000091',
       'User B',
       true
@@ -64,59 +62,60 @@ test.describe('Cross-Tenant Security', () => {
     expect(userBRes.ok()).toBeTruthy();
     const userBData = await userBRes.json();
     userBId = userBData.id;
+    userBEmail = userBData.email;
 
     await adminClient.addMember(tenantBId, userBId, true);
 
     // Login as tenant A user
-    await clientA.login('cross-tenant-a@example.com', 'TestPass123!');
+    await clientA.login(userAEmail, TEST_PASSWORD);
 
     // Login as tenant B user
-    await clientB.login('cross-tenant-b@example.com', 'TestPass123!');
+    await clientB.login(userBEmail, TEST_PASSWORD);
   });
 
   test('should not allow tenant A user to access tenant B data', async () => {
     const res = await clientA.getTenant(tenantBId);
-    expect(res.status()).toBe(403).or.toBe(404);
+    expect([403, 404]).toContain(res.status());
   });
 
   test('should not allow tenant A user to list tenant B members', async () => {
     const res = await clientA.listMembers(tenantBId);
-    expect(res.status()).toBe(403).or.toBe(404);
+    expect([403, 404]).toContain(res.status());
   });
 
   test('should not allow tenant A user to add member to tenant B', async () => {
     const res = await clientA.addMember(tenantBId, userAId, false);
-    expect(res.status()).toBe(403).or.toBe(404);
+    expect([403, 404]).toContain(res.status());
   });
 
   test('should not allow tenant A user to remove member from tenant B', async () => {
     const res = await clientA.removeMember(tenantBId, userBId);
-    expect(res.status()).toBe(403).or.toBe(404);
+    expect([403, 404]).toContain(res.status());
   });
 
   test('should not allow tenant A user to set owner on tenant B', async () => {
     const res = await clientA.setOwner(tenantBId, userBId, true);
-    expect(res.status()).toBe(403).or.toBe(404);
+    expect([403, 404]).toContain(res.status());
   });
 
   test('should not allow tenant A user to get tenant B audit log', async () => {
     const res = await clientA.getAuditLog(tenantBId);
-    expect(res.status()).toBe(403).or.toBe(404);
+    expect([403, 404]).toContain(res.status());
   });
 
   test('should not allow tenant A user to update tenant B', async () => {
     const res = await clientA.updateTenant(tenantBId, { name: 'Hacked Tenant' });
-    expect(res.status()).toBe(403).or.toBe(404);
+    expect([403, 404]).toContain(res.status());
   });
 
   test('should not allow tenant A user to delete tenant B', async () => {
     const res = await clientA.deleteTenant(tenantBId);
-    expect(res.status()).toBe(403).or.toBe(404);
+    expect([403, 404]).toContain(res.status());
   });
 
   test('should not allow cross-tenant membership manipulation', async () => {
     const res = await clientA.addMember(tenantBId, userAId, false);
-    expect(res.status()).toBe(403).or.toBe(404);
+    expect([403, 404]).toContain(res.status());
   });
 
   test('should allow tenant A user to access their own tenant data', async () => {

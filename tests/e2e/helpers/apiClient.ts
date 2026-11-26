@@ -32,7 +32,7 @@ export class ApiClient {
     this.refreshToken = null;
   }
 
-  private async headers(extra?: Record<string, string>): Promise<Record<string, string>> {
+  private headersSync(extra?: Record<string, string>): Record<string, string> {
     const h: Record<string, string> = {};
     if (this.accessToken) {
       h['Authorization'] = `Bearer ${this.accessToken}`;
@@ -43,10 +43,15 @@ export class ApiClient {
     return { ...h, ...extra };
   }
 
-  async get(path: string, params?: Record<string, string | number>): Promise<APIResponse> {
+  private async headers(extra?: Record<string, string>): Promise<Record<string, string>> {
+    return this.headersSync(extra);
+  }
+
+  async get(path: string, params?: Record<string, string | number | boolean | undefined | null>): Promise<APIResponse> {
     const url = new URL(this.options.baseURL + path);
     if (params) {
       for (const [key, value] of Object.entries(params)) {
+        if (value === undefined || value === null) continue;
         url.searchParams.append(key, String(value));
       }
     }
@@ -54,23 +59,33 @@ export class ApiClient {
   }
 
   async post(path: string, body?: any): Promise<APIResponse> {
-    return this.request.post(this.options.baseURL + path, {
-      data: body,
-      headers: await this.headers(),
-    });
+    return this.writeWithRetry(() =>
+      this.request.post(this.options.baseURL + path, { data: body, headers: this.headersSync() }),
+    );
   }
 
   async put(path: string, body?: any): Promise<APIResponse> {
-    return this.request.put(this.options.baseURL + path, {
-      data: body,
-      headers: await this.headers(),
-    });
+    return this.writeWithRetry(() =>
+      this.request.put(this.options.baseURL + path, { data: body, headers: this.headersSync() }),
+    );
   }
 
   async delete(path: string): Promise<APIResponse> {
-    return this.request.delete(this.options.baseURL + path, {
-      headers: await this.headers(),
-    });
+    return this.writeWithRetry(() =>
+      this.request.delete(this.options.baseURL + path, { headers: this.headersSync() }),
+    );
+  }
+
+  // The Access write policy is a hardcoded 20/min fixed window. A single suite run stays under it,
+  // but a boundary 429 is retried with backoff so one run never fails another.
+  private async writeWithRetry(send: () => Promise<APIResponse>, retries = 4): Promise<APIResponse> {
+    const backoffs = [2000, 5000, 10000, 20000];
+    let res = await send();
+    for (let i = 0; i < retries && res.status() === 429; i++) {
+      await new Promise(r => setTimeout(r, backoffs[i] ?? 20000));
+      res = await send();
+    }
+    return res;
   }
 
   async login(email: string, password: string, retries = 3): Promise<{ accessToken: string; refreshToken: string; user: any }> {
@@ -133,6 +148,27 @@ export class ApiClient {
     return this.post('/Identity/auth/reset-password', { token, newPassword });
   }
 
+  async sendVerification(): Promise<APIResponse> {
+    return this.post('/Identity/auth/send-verification');
+  }
+
+  async resendVerification(email: string): Promise<APIResponse> {
+    return this.post('/Identity/auth/resend-verification', { email });
+  }
+
+  async verifyEmail(token: string): Promise<APIResponse> {
+    return this.post('/Identity/auth/verify-email', { token });
+  }
+
+  // Development-only inbox (Web host) for token retrieval.
+  async getVerificationToken(email: string): Promise<APIResponse> {
+    return this.get('/dev/verification-token', { email });
+  }
+
+  async getPasswordResetToken(email: string): Promise<APIResponse> {
+    return this.get('/dev/password-reset-token', { email });
+  }
+
   // User management
   async getCurrentUser(): Promise<APIResponse> {
     return this.get('/Identity/auth/me');
@@ -171,16 +207,44 @@ export class ApiClient {
     return this.get('/access/roles');
   }
 
+  async getRole(id: string): Promise<APIResponse> {
+    return this.get(`/access/roles/${id}`);
+  }
+
   async createRole(name: string, description?: string, permissions?: string[]): Promise<APIResponse> {
     return this.post('/access/roles', { name, description, permissions: permissions || [] });
+  }
+
+  async updateRole(id: string, body: any): Promise<APIResponse> {
+    return this.put(`/access/roles/${id}`, body);
+  }
+
+  async setRolePermissions(id: string, permissions: string[], concurrencyStamp: string): Promise<APIResponse> {
+    return this.put(`/access/roles/${id}/permissions`, { permissions, concurrencyStamp });
+  }
+
+  async deleteRole(id: string): Promise<APIResponse> {
+    return this.delete(`/access/roles/${id}`);
+  }
+
+  async getUserRoles(userId: string): Promise<APIResponse> {
+    return this.get(`/access/users/${userId}/roles`);
   }
 
   async assignUserRoles(userId: string, roleIds: string[]): Promise<APIResponse> {
     return this.put(`/access/users/${userId}/roles`, { roleIds });
   }
 
+  async getAccessAudit(page = 1, pageSize = 50): Promise<APIResponse> {
+    return this.get('/access/audit', { page, pageSize });
+  }
+
   async addPlatformMember(userId: string): Promise<APIResponse> {
     return this.post('/access/platform/members', { userId });
+  }
+
+  async getPlatformMember(userId: string): Promise<APIResponse> {
+    return this.get(`/access/platform/members/${userId}`);
   }
 
   async revokePlatformMember(userId: string): Promise<APIResponse> {

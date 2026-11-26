@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { ApiClient } from './helpers/apiClient';
 import { WEB_BASE_URL } from './helpers/config';
-import { ADMIN_EMAIL, ADMIN_PASSWORD, uniqueEmail, uniqueSlug, TEST_PASSWORD } from './helpers/fixtures';
+import { ADMIN_EMAIL, ADMIN_PASSWORD, uniqueEmail, uniqueSlug, uniqueName, TEST_PASSWORD } from './helpers/fixtures';
 
 const BASE_URL = WEB_BASE_URL;
 

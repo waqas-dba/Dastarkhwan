@@ -1,6 +1,6 @@
 using CoreKit.Abstractions.IntegrationEvents;
 using CoreKit.Identity.Entities;
-using CoreKit.Identity.Interfaces;
+using CoreKit.Identity.Contracts;
 using CoreKit.Identity.Outbox;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;

@@ -195,7 +195,7 @@ public sealed class AuthService : IAuthService
         if (_emailOptions.RequireConfirmedEmail && !token.User.EmailConfirmed)
         {
             await _refreshTokenRepository.RevokeAllForUserAsync(
-                token.UserId, RefreshTokenRevokedReasons.PasswordChanged, now, ct);
+                token.UserId, RefreshTokenRevokedReasons.EmailNotConfirmed, now, ct);
             return IdentityEmailErrors.EmailNotConfirmed;
         }
 

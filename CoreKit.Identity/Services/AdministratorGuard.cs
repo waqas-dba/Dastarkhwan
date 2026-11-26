@@ -1,4 +1,4 @@
-﻿using CoreKit.Identity.Interfaces;
+﻿using CoreKit.Identity.Contracts;
 using CoreKit.Identity.Persistence;
 using CoreKit.Identity.Repositories;
 using Microsoft.EntityFrameworkCore;

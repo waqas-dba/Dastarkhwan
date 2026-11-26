@@ -9,7 +9,6 @@ using CoreKit.Identity.Seeding;
 using CoreKit.Tenant.Endpoints;
 using CoreKit.Tenant.Extensions;
 using CoreKit.Tenant.Persistence;
-using CoreKit.Tenant.Outbox;
 using Dastarkhwan.Integration;
 using Dastarkhwan.Integration.Endpoints;
 using Dastarkhwan.Web;
@@ -103,7 +102,6 @@ builder.Services.AddAccess(builder.Configuration);
 builder.Services.AddDastarkhwanIntegration();
 
 // Register outbox publisher for external side effects
-builder.Services.AddTenantOutboxPublisher();
 
 // Register rate limiting for ALL write endpoints (stricter than public host)
 builder.Services.AddTenantRateLimiting(builder.Configuration);

@@ -14,7 +14,6 @@ using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Endpoints;
 using CoreKit.Tenant.Extensions;
 using CoreKit.Tenant.Persistence;
-using CoreKit.Tenant.Outbox;
 using Dastarkhwan.Integration;
 using Dastarkhwan.Integration.Endpoints;
 using Dastarkhwan.Web.Configuration;
@@ -120,7 +119,6 @@ builder.Services.AddProblemDetails();
  builder.Services.AddDastarkhwanIntegration();
 
 // Register outbox publisher (for external side effects: emails, webhooks, etc.)
-builder.Services.AddTenantOutboxPublisher();
 
 // Register rate limiting for tenant and access write endpoints
 builder.Services.AddTenantRateLimiting(builder.Configuration);
@@ -321,32 +319,3 @@ internal sealed class AccessPlatformAdministratorProvider : IPlatformAdministrat
     }
 }
 
-/// <summary>Dispatches Identity integration events to all registered IEventHandler<T> implementations.</summary>
-internal sealed class DispatchingIdentityEventPublisher : IIdentityEventPublisher
-{
-    private readonly IServiceProvider _services;
-
-    public DispatchingIdentityEventPublisher(IServiceProvider services)
-    {
-        _services = services;
-    }
-
-    public async Task PublishAsync<TEvent>(TEvent integrationEvent, CancellationToken ct = default)
-        where TEvent : IIdentityIntegrationEvent
-    {
-        foreach (var handler in _services.GetServices<CoreKit.Abstractions.IntegrationEvents.IEventHandler<TEvent>>())
-        {
-            try
-            {
-                await handler.HandleAsync(integrationEvent, ct);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                // Log but don't fail the originating operation
-                var loggerFactory = _services.GetService<Microsoft.Extensions.Logging.ILoggerFactory>();
-                var logger = loggerFactory?.CreateLogger("IdentityEventDispatch");
-                logger?.LogError(ex, "Handler failed for {EventType}", typeof(TEvent).Name);
-            }
-        }
-    }
-}

@@ -85,9 +85,13 @@ public sealed class PlatformExceptionMiddleware
 
     private static (int StatusCode, string Title, string ErrorCode, string Detail, LogLevel LogLevel, Exception? LogException) MapException(Exception exception)
     {
-        return exception switch
-        {
-            ArgumentException argEx =>
+return exception switch
+            {
+                BadHttpRequestException badReqEx =>
+                    (StatusCodes.Status400BadRequest, "Bad request", ErrorCodes.InvalidRequest,
+                        "The request body is malformed or invalid.", LogLevel.Warning, badReqEx),
+
+                ArgumentException argEx =>
                 (StatusCodes.Status400BadRequest, "Invalid request", ErrorCodes.InvalidRequest,
                     "The request is invalid.", LogLevel.Warning, argEx),
 

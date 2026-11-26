@@ -9,5 +9,5 @@ public static class RefreshTokenRevokedReasons
     public const string PasswordChanged = "password_changed";
     public const string AdminPasswordChange = "admin_password_change";
     public const string UserDeactivated = "user_deactivated";
-    public const string LegacyCutover = "legacy_cutover";
+    public const string EmailNotConfirmed = "email_not_confirmed";
 }

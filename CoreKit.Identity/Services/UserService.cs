@@ -5,7 +5,7 @@ using CoreKit.Identity.Normalization;
 using CoreKit.Identity.Persistence;
 using CoreKit.Identity.Security;
 using CoreKit.Identity.Validation;
-using CoreKit.Identity.IntegrationEvents;
+using CoreKit.Identity.Contracts;
 
 namespace CoreKit.Identity.Services;
 

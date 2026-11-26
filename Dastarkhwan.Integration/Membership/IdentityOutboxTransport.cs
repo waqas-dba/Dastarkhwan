@@ -25,7 +25,7 @@ public sealed class IdentityOutboxTransport : IIdentityOutboxTransport
         ArgumentNullException.ThrowIfNull(envelope);
 
         // Deserialize the event to get the actual type
-        var eventType = Type.GetType($"CoreKit.Identity.IntegrationEvents.{envelope.EventType}, CoreKit.Identity");
+        var eventType = Type.GetType($"CoreKit.Identity.Contracts.{envelope.EventType}, CoreKit.Identity.Contracts");
         if (eventType == null)
         {
             _logger.LogWarning("Unknown Identity event type: {EventType}", envelope.EventType);
@@ -66,6 +66,7 @@ public sealed class IdentityOutboxTransport : IIdentityOutboxTransport
         if (!handled)
         {
             _logger.LogWarning("No handlers registered for Identity event {EventType}", envelope.EventType);
+            return IdentityOutboxDeliveryResult.RetryLater($"No handlers registered for event {envelope.EventType}");
         }
 
         return IdentityOutboxDeliveryResult.Accepted();

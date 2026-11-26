@@ -1,3 +1,4 @@
+using CoreKit.Access.Contracts;
 using CoreKit.Identity.Repositories;
 using CoreKit.Identity.Security;
 using CoreKit.Identity.Settings;
@@ -121,7 +122,8 @@ public sealed class CredentialVersionTests : IDisposable
         => new(
             new FakeTokenService(),
             new RefreshTokenRepository(db),
-            _env.Time);
+            _env.Time,
+            Enumerable.Empty<IAccessTokenClaimsContributor>());
 
     /// <summary>
     /// A login service whose session issuer really stores refresh tokens. Refresh tests need this

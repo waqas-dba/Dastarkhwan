@@ -30,6 +30,12 @@ public sealed class AccessRoleDto
 
     /// <summary>Changes on every update. Clients must send it back when updating to avoid lost changes.</summary>
     public Guid ConcurrencyStamp { get; set; }
+
+    /// <summary>The scope type this role belongs to (e.g., "Tenant", "Platform").</summary>
+    public string ScopeType { get; set; } = null!;
+
+    /// <summary>The scope ID this role belongs to.</summary>
+    public Guid ScopeId { get; set; }
 }
 
 /// <summary>Permission DTO.</summary>

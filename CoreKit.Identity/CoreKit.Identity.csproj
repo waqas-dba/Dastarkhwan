@@ -10,6 +10,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="..\CoreKit.Abstractions\CoreKit.Abstractions.csproj" />
+    <ProjectReference Include="..\CoreKit.Access.Contracts\CoreKit.Access.Contracts.csproj" />
     <ProjectReference Include="..\CoreKit.Identity.Contracts\CoreKit.Identity.Contracts.csproj" />
   </ItemGroup>
 

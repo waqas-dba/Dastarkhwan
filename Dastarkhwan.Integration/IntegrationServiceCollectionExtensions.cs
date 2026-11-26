@@ -61,7 +61,10 @@ public static class IntegrationServiceCollectionExtensions
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IEventHandler<IdentityUserDeleted>, IdentityUserDeletedToAccessCleanup>());
 
         // Tenant adds its tenant claim to every access token Identity issues.
-        services.TryAddScoped<IAccessTokenClaimsContributor, TenantClaimsContributor>();
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAccessTokenClaimsContributor, TenantClaimsContributor>());
+
+        // Add platform admin claim to access tokens for platform administrators.
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAccessTokenClaimsContributor, PlatformAdminClaimsContributor>());
 
         // Bridge Tenant's current user abstraction to Identity's IAccessCurrentUser.
         services.TryAddScoped<ITenantCurrentUser>(sp =>

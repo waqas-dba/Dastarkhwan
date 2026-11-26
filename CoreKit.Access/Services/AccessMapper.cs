@@ -12,6 +12,8 @@ internal static class AccessMapper
         MemberCount = memberCount,
         CreatedAt = role.CreatedAt,
         UpdatedAt = role.UpdatedAt,
-        ConcurrencyStamp = role.ConcurrencyStamp
+        ConcurrencyStamp = role.ConcurrencyStamp,
+        ScopeType = role.ScopeType,
+        ScopeId = role.ScopeId
     };
 }

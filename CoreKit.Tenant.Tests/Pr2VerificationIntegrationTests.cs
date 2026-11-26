@@ -15,6 +15,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace CoreKit.Tenant.Tests;
@@ -316,7 +317,8 @@ public sealed class Pr2VerificationIntegrationTests : IDisposable
                 nextCalled = true;
                 return Task.CompletedTask;
             },
-            Options.Create(new TenantResolutionOptions()));
+            Options.Create(new TenantResolutionOptions()),
+            NullLogger<TenantResolutionMiddleware>.Instance);
 
         context.Response.Body = new MemoryStream();
         await middleware.InvokeAsync(context, membershipReader, strategies, provider, setter);

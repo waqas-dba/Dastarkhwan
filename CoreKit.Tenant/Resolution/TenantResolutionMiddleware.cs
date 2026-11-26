@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Claims;
 using CoreKit.Tenant.Settings;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace CoreKit.Tenant.Resolution;
@@ -21,11 +22,13 @@ public sealed class TenantResolutionMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly TenantResolutionOptions _options;
+    private readonly ILogger<TenantResolutionMiddleware> _logger;
 
-    public TenantResolutionMiddleware(RequestDelegate next, IOptions<TenantResolutionOptions> options)
+    public TenantResolutionMiddleware(RequestDelegate next, IOptions<TenantResolutionOptions> options, ILogger<TenantResolutionMiddleware> logger)
     {
         _next = next;
         _options = options.Value;
+        _logger = logger;
     }
 
     public async Task InvokeAsync(
@@ -37,8 +40,11 @@ public sealed class TenantResolutionMiddleware
     {
         // Skip tenant resolution for excluded paths (account/platform routes, health checks, etc.)
         var path = context.Request.Path.Value ?? string.Empty;
+        _logger.LogInformation("TenantResolutionMiddleware invoked for path: {Path}", path);
+        
         if (_options.ExcludedPathPrefixes.Any(prefix => path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
         {
+            _logger.LogInformation("Path {Path} is excluded from tenant resolution", path);
             await _next(context);
             return;
         }
@@ -50,14 +56,23 @@ public sealed class TenantResolutionMiddleware
 
         foreach (var strategy in strategies.OrderBy(s => s.Order))
         {
+            _logger.LogInformation("Running tenant resolution strategy: {Strategy} (Order: {Order})", strategy.GetType().Name, strategy.Order);
             var identifier = await strategy.ResolveAsync(context, ct);
 
             if (identifier is not null)
+            {
+                _logger.LogInformation("Strategy {Strategy} returned identifier: {Identifier}", strategy.GetType().Name, identifier);
                 identifiers.Add(identifier);
+            }
+            else
+            {
+                _logger.LogInformation("Strategy {Strategy} returned null", strategy.GetType().Name);
+            }
         }
 
         if (identifiers.Count == 0)
         {
+            _logger.LogInformation("No tenant identifiers found, continuing without tenant");
             await _next(context);
             return;
         }
@@ -75,6 +90,7 @@ public sealed class TenantResolutionMiddleware
 
             if (info is null)
             {
+                _logger.LogWarning("Tenant not found for identifier: {Identifier}", identifier);
                 await WriteErrorAsync(context, TenantErrors.UnknownTenant);
                 return;
             }
@@ -84,6 +100,7 @@ public sealed class TenantResolutionMiddleware
 
         if (tenants.Select(t => t.Id).Distinct().Count() > 1)
         {
+            _logger.LogWarning("Multiple different tenant IDs found: {TenantIds}", string.Join(", ", tenants.Select(t => t.Id)));
             await WriteErrorAsync(context, TenantErrors.Mismatch);
             return;
         }
@@ -92,6 +109,7 @@ public sealed class TenantResolutionMiddleware
 
         if (tenant.Status != TenantStatus.Active)
         {
+            _logger.LogWarning("Tenant {TenantId} is not active: {Status}", tenant.Id, tenant.Status);
             await WriteErrorAsync(context, TenantErrors.ForStatus(tenant.Status));
             return;
         }
@@ -103,26 +121,31 @@ public sealed class TenantResolutionMiddleware
         if (context.User.Identity?.IsAuthenticated == true)
         {
             var userId = GetUserId(context.User);
+            _logger.LogInformation("Authenticated user ID: {UserId}", userId);
             if (userId is null)
             {
+                _logger.LogWarning("Invalid user identity - no user ID found in claims");
                 await WriteErrorAsync(context, TenantErrors.Forbidden("Invalid user identity."));
                 return;
             }
             var member = await membershipReader.FindAsync(tenant.Id, userId.Value, ct);
             if (member is null)
             {
+                _logger.LogWarning("User {UserId} is not a member of tenant {TenantId}", userId, tenant.Id);
                 await WriteErrorAsync(context, TenantErrors.Forbidden("You are not a member of this tenant."));
                 return;
             }
 
             setter.Set(tenant.Id);
             context.Items[TenantContextItemKeys.TenantId] = tenant.Id;
+            _logger.LogInformation("Tenant {TenantId} set for user {UserId}", tenant.Id, userId);
 
             await _next(context);
             return;
         }
 
         setter.Set(tenant.Id);
+        _logger.LogInformation("Tenant {TenantId} set for anonymous request", tenant.Id);
 
         await _next(context);
     }

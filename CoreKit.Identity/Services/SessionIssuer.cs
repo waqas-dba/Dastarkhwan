@@ -1,4 +1,5 @@
 ﻿using System.Security.Claims;
+using CoreKit.Access.Contracts;
 using CoreKit.Identity.Common;
 using CoreKit.Identity.Entities;
 using CoreKit.Identity.Interfaces;
@@ -11,15 +12,18 @@ public sealed class SessionIssuer : ISessionIssuer
     private readonly ITokenService _tokens;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly TimeProvider _time;
+    private readonly IEnumerable<IAccessTokenClaimsContributor> _claimsContributors;
 
     public SessionIssuer(
         ITokenService tokens,
         IRefreshTokenRepository refreshTokenRepository,
-        TimeProvider time)
+        TimeProvider time,
+        IEnumerable<IAccessTokenClaimsContributor> claimsContributors)
     {
         _tokens = tokens;
         _refreshTokenRepository = refreshTokenRepository;
         _time = time;
+        _claimsContributors = claimsContributors;
     }
 
     public Task<IdentityResult<LoginResponse>> IssueForLoginAsync(
@@ -43,7 +47,18 @@ public sealed class SessionIssuer : ISessionIssuer
         Guid? oldTokenId,
         CancellationToken ct)
     {
-        var accessToken = _tokens.CreateAccessToken(user);
+        // Collect extra claims from all registered contributors.
+        var extraClaims = new List<Claim>();
+        var roles = Array.Empty<string>();
+        var permissions = Array.Empty<string>();
+
+        foreach (var contributor in _claimsContributors)
+        {
+            var claims = await contributor.GetClaimsAsync(user.Id, roles, permissions, ct);
+            extraClaims.AddRange(claims);
+        }
+
+        var accessToken = _tokens.CreateAccessToken(user, extraClaims);
         var refreshToken = _tokens.CreateRefreshToken();
         var now = _time.GetUtcNow().UtcDateTime;
 

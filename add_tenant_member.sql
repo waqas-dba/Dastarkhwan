@@ -1,0 +1,2 @@
+INSERT INTO tenant."TENANT_Members" ("TenantId", "UserId", "IsOwner", "IsDefault", "JoinedAt", "MembershipGeneration") 
+VALUES ('29b5e251-9efe-48b5-8fb3-cc61629b883f', '453207bb-525b-49e4-be96-ec2088d1e7ac', true, true, NOW(), 1);

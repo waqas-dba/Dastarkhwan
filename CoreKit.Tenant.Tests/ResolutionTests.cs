@@ -1,5 +1,7 @@
 ﻿using CoreKit.Tenant.Resolution;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace CoreKit.Tenant.Tests;
@@ -129,7 +131,8 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
                 nextCalled = true;
                 return Task.CompletedTask;
             },
-            Options.Create(new TenantResolutionOptions()));
+            Options.Create(new TenantResolutionOptions()),
+            NullLogger<TenantResolutionMiddleware>.Instance);
         var membership = new TenantMembershipReader(_env.Members, _env.Tenants, new MemoryCache(new MemoryCacheOptions()), Options.Create(_env.Config));
 
         var options = Options.Create(_env.Config);
@@ -195,7 +198,8 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
         var bySlugTenant = other.AddTenant("Shop", "shop");
         var middleware = new TenantResolutionMiddleware(
             _ => Task.CompletedTask,
-            Options.Create(new TenantResolutionOptions()));
+            Options.Create(new TenantResolutionOptions()),
+            NullLogger<TenantResolutionMiddleware>.Instance);
         var membership = new TenantMembershipReader(other.Members, other.Tenants, new MemoryCache(new MemoryCacheOptions()), Options.Create(other.Config));
         var options = Options.Create(other.Config);
 
@@ -475,7 +479,8 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
                 nextCalled = true;
                 return Task.CompletedTask;
             },
-            Options.Create(new TenantResolutionOptions()));
+            Options.Create(new TenantResolutionOptions()),
+            NullLogger<TenantResolutionMiddleware>.Instance);
         var membership = new NullMembershipReader();
 
         var options = Options.Create(_env.Config);

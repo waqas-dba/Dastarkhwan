@@ -95,6 +95,7 @@ b.Add("tenants.members.manage", "Manage tenant members");
         services.AddScoped<IAccessRoleService, AccessRoleService>();
         services.AddScoped<IAccessAssignmentService, AccessAssignmentService>();
         services.AddScoped<IAccessMaintenance, AccessMaintenance>();
+        services.AddScoped<IAccessBootstrap, AccessBootstrap>();
         services.AddScoped<IAccessAuditLog, AccessAuditLog>();
 
         // Access's own view of the current user: reads from the HttpContext claims (Identity issues "sub").

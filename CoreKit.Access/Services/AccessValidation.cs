@@ -32,6 +32,7 @@ internal static class AccessValidation
     public static AccessError? ValidatePermissions(IEnumerable<string>? input, AccessCatalog catalog, out List<string> cleaned)
     {
         cleaned = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var raw in input ?? Enumerable.Empty<string>())
         {
@@ -43,7 +44,7 @@ internal static class AccessValidation
             if (!catalog.Contains(permission))
                 return AccessErrors.Validation($"The permission '{permission}' does not exist.");
 
-            if (!cleaned.Contains(permission))
+            if (seen.Add(permission))
                 cleaned.Add(permission);
         }
 

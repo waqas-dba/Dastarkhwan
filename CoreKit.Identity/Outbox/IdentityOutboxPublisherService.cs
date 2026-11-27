@@ -27,11 +27,12 @@ public sealed class IdentityOutboxPublisherService : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
+            int processed;
             try
             {
                 using var scope = _services.CreateScope();
                 var dispatcher = scope.ServiceProvider.GetRequiredService<IdentityOutboxDispatcher>();
-                await dispatcher.DispatchPendingAsync(stoppingToken);
+                processed = await dispatcher.DispatchPendingAsync(stoppingToken);
             }
             catch (OperationCanceledException)
             {
@@ -40,7 +41,10 @@ public sealed class IdentityOutboxPublisherService : BackgroundService
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error in Identity outbox publisher loop");
+                processed = 0;
             }
+
+            if (processed >= _options.BatchSize) continue;
 
             try
             {

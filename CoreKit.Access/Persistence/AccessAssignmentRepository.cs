@@ -79,8 +79,10 @@ internal sealed class AccessAssignmentRepository : IAccessAssignmentRepository
                 m.PlatformId == scope.Id && m.UserId == a.UserId && m.RevokedAt == null &&
                 m.MembershipGeneration == a.MembershipGeneration));
         }
-        else if (membershipGeneration is { } generation)
+        else
         {
+            if (membershipGeneration is not { } generation)
+                return Array.Empty<Guid>();
             query = query.Where(a => a.MembershipGeneration == generation);
         }
 

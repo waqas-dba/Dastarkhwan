@@ -60,7 +60,7 @@ public interface IAccessService
 
     /// <summary>User ids holding a role by name in a scope (current membership generation). Used by platform
     /// administration to find, for example, the active administrators of the platform.</summary>
-    Task<IReadOnlyList<Guid>> ListUserIdsWithRoleAsync(AccessScope scope, string roleName, CancellationToken ct = default);
+    Task<IReadOnlyList<Guid>> ListUserIdsWithRoleAsync(AccessScope scope, string roleName, long? membershipGeneration, CancellationToken ct = default);
 
     /// <summary>All roles of a scope (read-only, unguarded). For callers that have already authorized their
     /// operation, for example Identity user management validating role ids and detecting the Administrator role.</summary>
@@ -69,4 +69,15 @@ public interface IAccessService
     /// <summary>Fresh access for a user in a scope, bypassing any cache. Used for security-critical
     /// authorization decisions that must reflect the latest membership and role state.</summary>
     Task<EffectiveAccess> GetFreshAccessAsync(Guid userId, AccessScope scope, CancellationToken ct = default);
+}
+
+public static class AccessServiceCompatExtensions
+{
+    [Obsolete("Pass membershipGeneration for tenant scopes. Will be removed in v2.")]
+    public static Task<IReadOnlyList<Guid>> ListUserIdsWithRoleAsync(
+        this IAccessService service,
+        AccessScope scope,
+        string roleName,
+        CancellationToken ct = default)
+        => service.ListUserIdsWithRoleAsync(scope, roleName, null, ct);
 }

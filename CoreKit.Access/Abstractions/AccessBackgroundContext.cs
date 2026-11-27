@@ -76,7 +76,9 @@ public enum AccessBackgroundRunStatus
     NotAuthorized = 5,
 
     /// <summary>The requested execution context is malformed. The work did not run.</summary>
-    ContextInvalid = 6
+    ContextInvalid = 6,
+    /// <summary>The grant was already redeemed. Replay rejected.</summary>
+    GrantAlreadyConsumed = 7
 }
 
 /// <summary>
@@ -121,7 +123,21 @@ public interface IAccessBackgroundExecutor
     /// </summary>
     Task<AccessBackgroundRunStatus> RunAsSystemAsync(
         string jobKind,
+        string source,
         AccessScope? tenantScope,
         Func<IServiceProvider, CancellationToken, Task> work,
         CancellationToken ct = default);
+}
+
+public static class AccessBackgroundExecutorCompatExtensions
+{
+    [Obsolete("Pass a `source` argument to audit the caller. Will be removed in v2.")]
+    public static Task<AccessBackgroundRunStatus> RunAsSystemAsync(
+        this IAccessBackgroundExecutor executor,
+        string jobKind,
+        AccessScope? tenantScope,
+        Func<IServiceProvider, CancellationToken, Task> work,
+        CancellationToken ct = default)
+        => executor.RunAsSystemAsync(
+            jobKind, "legacy.RunAsSystemAsync", tenantScope, work, ct);
 }

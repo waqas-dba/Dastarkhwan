@@ -1,4 +1,5 @@
 ﻿using CoreKit.Access.Abstractions;
+using CoreKit.Access.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CoreKit.Access.Endpoints;
@@ -37,17 +38,20 @@ public sealed class RequireAccessFilter : IEndpointFilter
     private readonly IAccessScopeContext _scopeContext;
     private readonly IAccessCurrentUser _currentUser;
     private readonly IAccessService _access;
+    private readonly IAuthorityPolicy _authority;
 
     public RequireAccessFilter(
         string permission,
         IAccessScopeContext scopeContext,
         IAccessCurrentUser currentUser,
-        IAccessService access)
+        IAccessService access,
+        IAuthorityPolicy authority)
     {
         _permission = permission;
         _scopeContext = scopeContext;
         _currentUser = currentUser;
         _access = access;
+        _authority = authority;
     }
 
     public async ValueTask<object?> InvokeAsync(
@@ -66,11 +70,9 @@ public sealed class RequireAccessFilter : IEndpointFilter
         // that bypasses the cache, so a permission just revoked is not still honored through a
         // remembered copy. Read permissions use the cached path for performance.
         bool allowed;
-        if (AccessGuard.RequiresFreshAuthority(_permission))
+        if (_authority.RequiresFreshAuthority(_permission))
         {
-            if (_access is not IFreshAccessSource fresh)
-                return AccessErrors.Denied.ToHttpResult();
-            var freshAccess = await fresh.GetFreshAccessAsync(
+            var freshAccess = await _access.GetFreshAccessAsync(
                 userId, _scopeContext.Current!.Value, context.HttpContext.RequestAborted);
             allowed = freshAccess.Has(_permission);
         }
@@ -84,11 +86,4 @@ public sealed class RequireAccessFilter : IEndpointFilter
 
         return await next(context);
     }
-
-    /// <summary>
-    /// Write permissions require fresh authority: changing roles or assignments is decided on the
-    /// person's permissions right now, not from a remembered copy.
-    /// </summary>
-    private static bool RequiresFreshAuthority(string permission)
-        => AccessGuard.RequiresFreshAuthority(permission);
 }

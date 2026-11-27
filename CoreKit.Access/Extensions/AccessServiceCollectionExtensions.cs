@@ -1,7 +1,7 @@
 using CoreKit.Access.Abstractions;
 using CoreKit.Access.Persistence;
 using CoreKit.Access.Services;
-using CoreKit.Tenant.Abstractions;
+using Microsoft.Extensions.Hosting;
 
 namespace CoreKit.Access.Extensions;
 
@@ -70,6 +70,15 @@ b.Add("tenants.members.manage", "Manage tenant members");
             b.AddRoleTemplate("Owner", "Tenant owner with full tenant management access",
                 "tenants.read", "tenants.settings.read", "tenants.settings.update", "tenants.members.read", "tenants.members.manage");
         }));
+
+        // R8: composable authority policy.
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IAuthorityPolicyContributor, BuiltInAuthorityPolicyContributor>());
+        services.TryAddSingleton<IAuthorityPolicy, DefaultAuthorityPolicy>();
+
+        // C1: fail fast if the catalog is malformed.
+        services.TryAddEnumerable(
+            ServiceDescriptor.Singleton<IHostedService, AccessCatalogStartupCheck>());
 
         // Persistence
         services.AddScoped<IAccessUnitOfWork, AccessUnitOfWork>();

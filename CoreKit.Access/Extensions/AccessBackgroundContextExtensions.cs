@@ -1,4 +1,7 @@
+using CoreKit.Access.Contracts;
+using CoreKit.Access.Services;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace CoreKit.Access.Extensions;
 
@@ -68,6 +71,9 @@ public static class AccessBackgroundContextExtensions
         services.TryAddScoped<IAccessBackgroundGrantIssuer, AccessBackgroundGrantIssuer>();
         services.TryAddSingleton<IAccessBackgroundExecutor, AccessBackgroundExecutor>();
 
+        services.TryAddSingleton<IGrantStore, InMemoryGrantStore>();
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, GrantStoreStartupCheck>());
+
         services.TryAddEnumerable(ServiceDescriptor.Singleton<IHostedService, AccessBackgroundContextStartupCheck>());
 
         return services;
@@ -130,6 +136,36 @@ public static class AccessBackgroundContextExtensions
 /// a silently replaced wrapper would make background code look unauthenticated instead of reporting the wiring
 /// mistake.
 /// </summary>
+internal sealed class GrantStoreStartupCheck : IHostedService
+{
+    private readonly IServiceProvider _root;
+    private readonly IHostEnvironment _env;
+    private readonly ILogger<GrantStoreStartupCheck> _log;
+
+    public GrantStoreStartupCheck(IServiceProvider root, IHostEnvironment env, ILogger<GrantStoreStartupCheck> log)
+    {
+        _root = root;
+        _env = env;
+        _log = log;
+    }
+
+    public Task StartAsync(CancellationToken ct)
+    {
+        using var scope = _root.CreateScope();
+        var store = scope.ServiceProvider.GetRequiredService<IGrantStore>();
+        if (_env.IsProduction() && store is InMemoryGrantStore)
+        {
+            throw new InvalidOperationException(
+                "IGrantStore is InMemoryGrantStore, which defeats replay protection across " +
+                "restarts and instances. Register a durable IGrantStore (e.g., Redis or a DB " +
+                "table) before deploying to Production.");
+        }
+        _log.LogInformation("Access background grant store: {StoreType}.", store.GetType().Name);
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken ct) => Task.CompletedTask;
+}
 internal sealed class AccessBackgroundContextStartupCheck : IHostedService
 {
     private readonly IServiceProvider _root;

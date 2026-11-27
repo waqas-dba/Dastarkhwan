@@ -76,11 +76,10 @@ public sealed class AccessDbContext : DbContext
         modelBuilder.Entity<AccessPlatformMember>(b =>
         {
             b.ToTable("ACCESS_PlatformMembers");
-            b.HasKey(x => x.UserId);
+            b.HasKey(x => new { x.PlatformId, x.UserId });
             b.Property(x => x.PlatformId).IsRequired();
             b.Property(x => x.MembershipGeneration).IsRequired();
             b.Property(x => x.JoinedAt).IsRequired();
-            b.HasIndex(x => new { x.PlatformId, x.UserId });
         });
 
         modelBuilder.Entity<AccessAuditEntry>(b =>

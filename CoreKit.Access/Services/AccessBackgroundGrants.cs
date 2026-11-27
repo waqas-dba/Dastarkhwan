@@ -1,67 +1,43 @@
 using System.Security.Cryptography;
 using System.Text.Json;
+using CoreKit.Access.Abstractions;
 using CoreKit.Access.Common;
+using CoreKit.Access.Contracts;
 using CoreKit.Access.Extensions;
+using CoreKit.Access.Settings;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.Extensions.Options;
 
 namespace CoreKit.Access.Services;
 
-/// <summary>
-/// Protects and redeems background grants. The grant is a Data Protection payload: it is encrypted and
-/// authenticated with the application's key ring, so a forged or edited value is rejected instead of trusted.
-/// Hand-rolled signing is deliberately avoided.
-/// </summary>
 internal sealed class AccessBackgroundGrantProtector
 {
     private const int CurrentVersion = 1;
     private const string Purpose = "CoreKit.Access.BackgroundGrant.v1";
-
-    // A grant from a clock that runs a few seconds ahead is accepted. Anything further in the future is invalid.
     private static readonly TimeSpan MaxFutureSkew = TimeSpan.FromSeconds(5);
-
     private readonly IDataProtector _protector;
 
     public AccessBackgroundGrantProtector(IDataProtectionProvider provider)
         => _protector = provider.CreateProtector(Purpose);
 
-    /// <summary>
-    /// The encrypted body. The job kind and the required permission are part of the signed payload, so the
-    /// runner cannot redeem a grant for a different job or a different permission than the one authorized.
-    /// </summary>
     internal sealed record GrantPayload(
-        int V,
-        string JobKind,
-        string RequiredPermission,
-        Guid ActorUserId,
-        Guid? TenantId,
-        DateTime IssuedAt,
-        DateTime ExpiresAt,
+        int V, string JobKind, string RequiredPermission, Guid ActorUserId,
+        Guid? TenantId, DateTime IssuedAt, DateTime ExpiresAt, Guid GrantId);
+
+    internal sealed record Redeemed(
+        AccessBackgroundExecution? Execution,
+        AccessBackgroundRunStatus? Failure,
         Guid GrantId);
 
-    internal sealed record Redeemed(AccessBackgroundExecution? Execution, AccessBackgroundRunStatus? Failure);
-
     public string Protect(
-        string jobKind,
-        string requiredPermission,
-        Guid actorUserId,
-        Guid? tenantId,
-        DateTime issuedAt,
-        DateTime expiresAt)
+        string jobKind, string requiredPermission, Guid actorUserId, Guid? tenantId,
+        DateTime issuedAt, DateTime expiresAt, Guid grantId)
         => _protector.Protect(JsonSerializer.Serialize(new GrantPayload(
-            CurrentVersion,
-            jobKind,
-            requiredPermission,
-            actorUserId,
-            tenantId,
-            issuedAt,
-            expiresAt,
-            Guid.NewGuid())));
+            CurrentVersion, jobKind, requiredPermission, actorUserId,
+            tenantId, issuedAt, expiresAt, grantId)));
 
-    /// <summary>
-    /// Validates the token and rebuilds the execution context. Every failure is a value, never an exception,
-    /// so a job runner can record why a job was refused.
-    /// </summary>
-    public Redeemed Redeem(string? token, string expectedJobKind, string expectedPermission, DateTime now)
+    public Redeemed Redeem(
+        string? token, string expectedJobKind, string expectedPermission, DateTime now)
     {
         if (string.IsNullOrWhiteSpace(token)
             || !AccessBackgroundRules.IsValidJobKind(expectedJobKind)
@@ -89,8 +65,6 @@ internal sealed class AccessBackgroundGrantProtector
             || payload.IssuedAt > now + MaxFutureSkew)
             return Fail(AccessBackgroundRunStatus.GrantInvalid);
 
-        // The runner must ask for exactly the job and the permission that were authorized. This stops a runner
-        // from reusing a grant for another permission the actor happens to hold.
         if (!string.Equals(payload.JobKind, expectedJobKind, StringComparison.Ordinal)
             || !string.Equals(payload.RequiredPermission, expectedPermission, StringComparison.Ordinal))
             return Fail(AccessBackgroundRunStatus.GrantMismatch);
@@ -98,22 +72,21 @@ internal sealed class AccessBackgroundGrantProtector
         if (now >= payload.ExpiresAt)
             return Fail(AccessBackgroundRunStatus.GrantExpired);
 
+        var tenantScope = payload.TenantId is { } tid ? AccessScope.ForTenant(tid) : (AccessScope?)null;
         return new Redeemed(
             new AccessBackgroundExecution(
                 payload.JobKind,
                 AccessBackgroundActorKind.User,
                 payload.ActorUserId,
-                payload.TenantId is { } tenantId ? AccessScope.ForTenant(tenantId) : null),
-            null);
+                tenantScope),
+            Failure: null,
+            GrantId: payload.GrantId);
     }
 
-    private static Redeemed Fail(AccessBackgroundRunStatus status) => new(null, status);
+    private static Redeemed Fail(AccessBackgroundRunStatus status)
+        => new(null, status, Guid.Empty);
 }
 
-/// <summary>
-/// Issues grants from an authorized request. The scope and actor come from the request context, and the
-/// permission is checked on fresh data, so a person whose access was just withdrawn cannot mint a grant.
-/// </summary>
 internal sealed class AccessBackgroundGrantIssuer : IAccessBackgroundGrantIssuer
 {
     private readonly IAccessService _access;
@@ -143,13 +116,10 @@ internal sealed class AccessBackgroundGrantIssuer : IAccessBackgroundGrantIssuer
     }
 
     public async Task<AccessResult<AccessBackgroundGrantToken>> IssueAsync(
-        string jobKind, string requiredPermission, TimeSpan? lifetime = null, CancellationToken ct = default)
+        string jobKind, string requiredPermission, TimeSpan? lifetime = null,
+        CancellationToken ct = default)
     {
-        // Authority is never re-issued from inside a running job. A job chain must be re-authorized by a new
-        // request, or run as a trusted system job.
-        if (_holder.IsActive)
-            return AccessErrors.Denied;
-
+        if (_holder.IsActive) return AccessErrors.Denied;
         if (!AccessBackgroundRules.IsValidJobKind(jobKind) || string.IsNullOrWhiteSpace(requiredPermission))
             return AccessErrors.Validation("A job kind and a required permission are needed.");
 
@@ -161,23 +131,20 @@ internal sealed class AccessBackgroundGrantIssuer : IAccessBackgroundGrantIssuer
         if (!_actor.IsAuthenticated || _actor.UserId is not { } userId || userId == Guid.Empty)
             return AccessErrors.NotAuthenticated;
 
-        // A grant delegates authority, so it is decided on fresh data, never on a cached result.
-        if (_access is not IFreshAccessSource fresh)
-            return AccessErrors.Denied;
-
         var scope = _scopeContext.Current;
-        if (scope is { } present && (!present.IsValid || present.Type != AccessScope.TenantType))
+        if (scope is { } present && !present.IsValid)
             return AccessErrors.Denied;
 
-        // No tenant scope means a platform-level job, authorized against the fixed platform scope.
         var checkScope = scope ?? AccessScope.ForPlatform(AccessScope.PlatformId);
+        var access = await _access.GetFreshAccessAsync(userId, checkScope, ct);
+        if (!access.Has(requiredPermission)) return AccessErrors.Denied;
 
-        var access = await fresh.GetFreshAccessAsync(userId, checkScope, ct);
-        if (!access.Has(requiredPermission))
-            return AccessErrors.Denied;
+        var tenantId = checkScope.Type == AccessScope.TenantType ? checkScope.Id : (Guid?)null;
 
         var now = _time.GetUtcNow().UtcDateTime;
-        var token = _protector.Protect(jobKind, requiredPermission, userId, scope?.Id, now, now + life);
+        var grantId = Guid.NewGuid();
+        var token = _protector.Protect(jobKind, requiredPermission, userId, tenantId,
+            now, now + life, grantId);
 
         return AccessResult.Success(new AccessBackgroundGrantToken(token));
     }

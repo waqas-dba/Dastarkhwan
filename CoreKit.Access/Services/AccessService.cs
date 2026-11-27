@@ -107,12 +107,12 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
     }
 
     public async Task<IReadOnlyList<Guid>> ListUserIdsWithRoleAsync(
-        AccessScope scope, string roleName, CancellationToken ct = default)
+        AccessScope scope, string roleName, long? membershipGeneration, CancellationToken ct = default)
     {
         if (!scope.IsValid || string.IsNullOrWhiteSpace(roleName))
-            return new List<Guid>();
+            return Array.Empty<Guid>();
 
-        return await _assignments.ListUserIdsWithRoleAsync(scope, AccessValidation.NormalizeName(roleName), null, ct);
+        return await _assignments.ListUserIdsWithRoleAsync(scope, AccessValidation.NormalizeName(roleName), membershipGeneration, ct);
     }
 
     public async Task<IReadOnlyList<AccessRoleDto>> ListRolesAsync(AccessScope scope, CancellationToken ct = default)

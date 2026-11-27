@@ -62,9 +62,11 @@ public static class AccessServiceCollectionExtensions
         // Built-in role template for tenant owners: every new tenant gets an Owner role with tenant management permissions.
         services.AddSingleton(new AccessCatalogContribution(b =>
         {
-            b.Add("tenants.read", "View tenants");
-            b.Add("tenants.settings.read", "View tenant settings");
-            b.Add("tenants.members.read", "View tenant members");
+b.Add("tenants.read", "View tenants");
+b.Add("tenants.settings.read", "View tenant settings");
+b.Add("tenants.settings.update", "Update tenant settings");
+b.Add("tenants.members.read", "View tenant members");
+b.Add("tenants.members.manage", "Manage tenant members");
             b.AddRoleTemplate("Owner", "Tenant owner with full tenant management access",
                 "tenants.read", "tenants.settings.read", "tenants.settings.update", "tenants.members.read", "tenants.members.manage");
         }));

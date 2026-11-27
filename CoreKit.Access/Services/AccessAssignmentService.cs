@@ -174,8 +174,9 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
         if (outcome.ToError() is { } saveError) return saveError;
         if (earlyResult is not null) return AccessResult.Success(earlyResult);
 
-        _cache.InvalidateUser(scope, userId);
-        return AccessResult.Success(await LoadRolesAsync(scope, userId, member.MembershipGeneration, ct));
+_cache.InvalidateUser(scope, userId);
+var finalMember = await _membership.FindAsync(scope, userId, ct);
+return AccessResult.Success(await LoadRolesAsync(scope, userId, finalMember?.MembershipGeneration ?? member.MembershipGeneration, ct));
     }
 
     private async Task<IReadOnlyList<AccessRoleDto>> LoadRolesAsync(

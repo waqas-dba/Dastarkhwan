@@ -158,6 +158,15 @@ builder.Services.AddAccessPermissions(p =>
 
 var app = builder.Build();
 
+// Seed the first Identity administrator (if configured)
+// This replaces the Admin host's SeedIdentityAsync() call.
+var seedOptions = builder.Configuration.GetSection("Identity:Seed").Get<IdentitySeedOptions>();
+if (seedOptions != null && !string.IsNullOrWhiteSpace(seedOptions.AdminEmail))
+{
+    using var scope = app.Services.CreateScope();
+    await scope.ServiceProvider.SeedIdentityAsync();
+}
+
  // Development convenience: create or update the databases, then seed them.
  // In production, run migrations as a separate deployment step instead.
  if (app.Environment.IsDevelopment())
@@ -218,7 +227,7 @@ var app = builder.Build();
  });
 
  // Access owns roles and permissions; the seeder only ensures the first administrator exists.
- // Seeding/bootstrapping is done by Admin host to avoid startup race when both hosts run.
+ // SeedIdentityAsync() is called above if Identity:Seed:AdminEmail is configured.
  // Web only verifies DB connectivity via /health/ready.
 
  app.UseForwardedHeaders();   // trust X-Forwarded-For / X-Forwarded-Proto from reverse proxy

@@ -20,7 +20,6 @@
     <Project Path="CoreKit.Tenant/CoreKit.Tenant.csproj" Id="e0d47be8-fd8d-4032-98ab-e5e8ba6480a3" />
   </Folder>
   <Folder Name="/Dastarkhwan/">
-    <Project Path="Dastarkhwan.Admin/Dastarkhwan.Admin.csproj" />
     <Project Path="Dastarkhwan.Integration/Dastarkhwan.Integration.csproj" />
     <Project Path="Dastarkhwan.Integration.Tests/Dastarkhwan.Integration.Tests.csproj" />
     <Project Path="Dastarkhwan.Web/Dastarkhwan.Web.csproj" Id="b2c3d4e5-f6a7-8b9c-0d1e2f3a4b5c6d7e" />

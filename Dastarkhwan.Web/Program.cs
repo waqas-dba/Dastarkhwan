@@ -1,5 +1,6 @@
-using CoreKit.Access.Contracts;
 using CoreKit.Access.Constants;
+using CoreKit.Access.Contracts;
+using CoreKit.Identity.Interfaces;
 using CoreKit.Access.Endpoints;
 using CoreKit.Access.Extensions;
 using CoreKit.Access.Persistence;
@@ -165,6 +166,17 @@ if (seedOptions != null && !string.IsNullOrWhiteSpace(seedOptions.AdminEmail))
 {
     using var scope = app.Services.CreateScope();
     await scope.ServiceProvider.SeedIdentityAsync();
+
+    // Bootstrap the seeded user as a platform administrator so /access/me
+    // reports platform.members.manage and other platform permissions.
+    var userRepo = scope.ServiceProvider.GetRequiredService<IUserRepository>();
+    var seededUser = await userRepo.FindByNormalizedEmailAsync(
+        seedOptions.AdminEmail.Trim().ToUpperInvariant());
+    if (seededUser is not null)
+    {
+        var bootstrap = scope.ServiceProvider.GetRequiredService<IAccessBootstrap>();
+        await bootstrap.BootstrapInitialPlatformAdminAsync(seededUser.Id);
+    }
 }
 
  // Development convenience: create or update the databases, then seed them.

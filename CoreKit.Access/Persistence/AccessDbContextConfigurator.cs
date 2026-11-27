@@ -31,10 +31,13 @@ public static class AccessDbContextConfigurator
             {
                 npgsql.MigrationsHistoryTable(MigrationsHistoryTable, Schema);
 
-                // Retry on failure is explicitly disabled because Access uses manual transactions
-                // (BeginTransactionAsync) which are not compatible with EF Core's retry strategy.
-                // If transient failure handling is needed, use IExecutionStrategy.ExecuteAsync for
-                // specific read-only operations instead.
+                if (database?.EnableRetryOnFailure == true)
+                {
+                    npgsql.EnableRetryOnFailure(
+                        maxRetryCount: database.MaxRetryAttempts,
+                        maxRetryDelay: TimeSpan.FromSeconds(5),
+                        errorCodesToAdd: null);
+                }
             });
 
         return options;

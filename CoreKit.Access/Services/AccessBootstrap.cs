@@ -158,7 +158,37 @@ public sealed class AccessBootstrap : IAccessBootstrap
         foreach (var permission in wanted.Where(p => !current.Contains(p)))
             role.Permissions.Add(new AccessRolePermission { RoleId = role.Id, Permission = permission });
 
-        EnsureSaved(await _unitOfWork.SaveAsync(ct), "platform role ensure");
+        var outcome = await _unitOfWork.SaveAsync(ct);
+        if (outcome == SaveOutcome.ConstraintViolation)
+        {
+            // Another instance won the race; re-fetch the existing role.
+            var existing = await _roles.ListAsync(scope, ct);
+            var existingRole = existing.FirstOrDefault(r => r.NormalizedName == normalized);
+            if (existingRole is { } r)
+            {
+                // Sync permissions to match what we intended (idempotent).
+                var wantedSet = wanted.ToHashSet(StringComparer.Ordinal);
+                foreach (var link in r.Permissions.Where(p => !wantedSet.Contains(p.Permission)).ToList())
+                    r.Permissions.Remove(link);
+                var currentSet = r.Permissions.Select(p => p.Permission).ToHashSet(StringComparer.Ordinal);
+                foreach (var permission in wantedSet.Where(p => !currentSet.Contains(p)))
+                    r.Permissions.Add(new AccessRolePermission { RoleId = r.Id, Permission = permission });
+
+                var saveOutcome2 = await _unitOfWork.SaveAsync(ct);
+                if (saveOutcome2 != SaveOutcome.Saved)
+                    throw new InvalidOperationException(
+                        $"Access platform role ensure re-sync was not persisted: the unit of work reported {saveOutcome2}.");
+
+                _cache.InvalidateScope(scope);
+                return r.Id;
+            }
+            throw new InvalidOperationException(
+                "Access platform role ensure hit a constraint violation but the role does not exist.");
+        }
+
+        if (outcome != SaveOutcome.Saved)
+            throw new InvalidOperationException(
+                $"Access platform role ensure was not persisted: the unit of work reported {outcome}.");
 
         _cache.InvalidateScope(scope);
 

@@ -57,7 +57,11 @@ internal sealed class AccessMaintenance : IAccessMaintenance
         if (!scope.IsValid)
             return;
 
-        await _roles.RemoveScopeAsync(scope, ct); // permissions and assignments follow (cascade)
+        // Purge assignments first so the Restrict FK on AccessAssignment.Role does not block
+        // deleting the roles themselves.
+        await _assignments.RemoveScopeAsync(scope, ct);
+
+        await _roles.RemoveScopeAsync(scope, ct); // permissions follow (cascade)
 
         _audit.Record(scope, AccessAuditActions.ScopeRemoved);
 
@@ -207,44 +211,50 @@ internal sealed class AccessMaintenance : IAccessMaintenance
 
         var scope = AccessScope.ForPlatform(AccessScope.PlatformId);
 
-        var member = await _db.PlatformMembers
-            .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId && m.RevokedAt == null, ct);
-
-        if (member is null)
-            throw new InvalidOperationException("The user is not an active platform member.");
-
         var wanted = roleIds.Where(id => id != Guid.Empty).Distinct().ToList();
         var wantedRoles = await _roles.FindManyAsync(scope, wanted, ct);
 
         if (wantedRoles.Count != wanted.Count)
             throw new InvalidOperationException("One or more roles are not platform-scope roles.");
 
-        var current = await _assignments.ListForUserForUpdateAsync(scope, userId, ct);
-
-        foreach (var assignment in current)
-            _assignments.Remove(assignment);
-
-        var now = _time.GetUtcNow().UtcDateTime;
-
-        foreach (var roleId in wanted)
+        var lockKey = $"access.assign:platform:{AccessScope.PlatformId:N}:{userId:N}";
+        var outcome = await _unitOfWork.SaveWithAdvisoryLockAsync(lockKey, async innerCt =>
         {
-            _assignments.Add(new AccessAssignment
+            var member = await _db.PlatformMembers
+                .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId && m.RevokedAt == null, innerCt);
+
+            if (member is null)
+                throw new InvalidOperationException("The user is not an active platform member.");
+
+            var current = await _assignments.ListForUserForUpdateAsync(scope, userId, innerCt);
+
+            foreach (var assignment in current)
+                _assignments.Remove(assignment);
+
+            var now = _time.GetUtcNow().UtcDateTime;
+
+            foreach (var roleId in wanted)
             {
-                RoleId = roleId,
-                UserId = userId,
-                ScopeType = scope.Type,
-                ScopeId = scope.Id,
-                MembershipGeneration = member.MembershipGeneration,
-                AssignedAt = now
-            });
-        }
+                _assignments.Add(new AccessAssignment
+                {
+                    RoleId = roleId,
+                    UserId = userId,
+                    ScopeType = scope.Type,
+                    ScopeId = scope.Id,
+                    MembershipGeneration = member.MembershipGeneration,
+                    AssignedAt = now
+                });
+            }
 
-        _audit.Record(
-            scope,
-            AccessAuditActions.RolesAssigned,
-            $"user: {userId}; roles: {string.Join(", ", wantedRoles.Select(r => r.Name).Order(StringComparer.Ordinal))}");
+            _audit.Record(
+                scope,
+                AccessAuditActions.RolesAssigned,
+                $"user: {userId}; roles: {string.Join(", ", wantedRoles.Select(r => r.Name).Order(StringComparer.Ordinal))}");
+        }, ct);
 
-        EnsureSaved(await _unitOfWork.SaveAsync(ct), "platform role assignment");
+        if (outcome != SaveOutcome.Saved)
+            throw new InvalidOperationException(
+                $"Access platform role assignment was not persisted: the unit of work reported {outcome}.");
 
         _cache.InvalidateUser(scope, userId);
     }
@@ -268,6 +278,10 @@ public async Task RemoveUserFromAllScopesAsync(Guid userId, CancellationToken ct
 
         // Remove platform membership
         var platformScope = AccessScope.ForPlatform(AccessScope.PlatformId);
+
+        // Remove platform assignments first so the Restrict FK doesn't block anything.
+        await _assignments.RemoveUserAsync(platformScope, userId, ct);
+
         var platformMember = await _db.PlatformMembers
             .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId, ct);
 

@@ -25,6 +25,10 @@ public interface IAccessAssignmentRepository
     /// <summary>Stages deletion of every assignment the user holds in the scope, for tracked removal.
     /// The unit of work persists the staged deletions together with the rest of the change.</summary>
     Task RemoveUserAsync(AccessScope scope, Guid userId, CancellationToken ct = default);
+
+    /// <summary>Stages deletion of every assignment in a scope. Called before role removal so the
+    /// Restrict FK on AccessAssignment.Role does not block the cascade.</summary>
+    Task RemoveScopeAsync(AccessScope scope, CancellationToken ct = default);
 }
 
 internal sealed class AccessAssignmentRepository : IAccessAssignmentRepository
@@ -90,6 +94,15 @@ internal sealed class AccessAssignmentRepository : IAccessAssignmentRepository
     public async Task RemoveUserAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
     {
         var assignments = await ListForUserForUpdateAsync(scope, userId, ct);
+        if (assignments.Count > 0)
+            _db.Assignments.RemoveRange(assignments);
+    }
+
+    public async Task RemoveScopeAsync(AccessScope scope, CancellationToken ct = default)
+    {
+        var assignments = await _db.Assignments
+            .Where(a => a.ScopeType == scope.Type && a.ScopeId == scope.Id)
+            .ToListAsync(ct);
         if (assignments.Count > 0)
             _db.Assignments.RemoveRange(assignments);
     }

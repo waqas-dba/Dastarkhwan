@@ -80,7 +80,9 @@ internal sealed class AccessGuard
         return AccessResult.Success(new AccessCall(scope, userId, access));
     }
 
-    private static bool RequiresFreshAuthority(string permission)
+    /// <summary>Write permissions require fresh authority: changing roles or assignments is decided on the
+    /// person's permissions right now, not from a remembered copy.</summary>
+    public static bool RequiresFreshAuthority(string permission)
         => permission is AccessPermissionNames.RolesManage
             or AccessPermissionNames.AssignmentsManage
             or AccessPermissionNames.PlatformMembersManage;

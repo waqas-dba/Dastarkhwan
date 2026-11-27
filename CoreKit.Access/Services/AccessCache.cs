@@ -216,11 +216,18 @@ internal sealed class AccessCache : IAccessCache, IDisposable
         Func<string, Lazy<Task<EffectiveAccess>>> factory = _ =>
             new Lazy<Task<EffectiveAccess>>(async () =>
             {
-                // Re-check under the gate in case a racing caller just populated it.
-                if (TryGet(scope, userId, out var hit)) return hit;
-                var resolved = await resolver(CancellationToken.None);
-                if (resolved.IsMember) Set(scope, userId, resolved, token);
-                return resolved;
+                try
+                {
+                    // Re-check under the gate in case a racing caller just populated it.
+                    if (TryGet(scope, userId, out var hit)) return hit;
+                    var resolved = await resolver(CancellationToken.None);
+                    if (resolved.IsMember) Set(scope, userId, resolved, token);
+                    return resolved;
+                }
+                finally
+                {
+                    _inflight.TryRemove(key, out var _discarded);
+                }
             }, LazyThreadSafetyMode.ExecutionAndPublication);
 
         var lazy = _inflight.GetOrAdd(key, factory);

@@ -78,23 +78,22 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
         _audit.Record(AccessScope.ForPlatform(AccessScope.PlatformId),
             AccessAuditActions.MemberAdded, $"user: {userId}");
 
-        try
+        if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
         {
-            if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
-                return PlatformMemberResult.Fail(saveError.Kind, saveError.Code, saveError.Message);
-        }
-        catch (DbUpdateException)
-        {
-            // Concurrent AddMember for the same user: another request inserted first.
-            // Reread the persisted state and succeed if the member is now active.
-            var raced = await _db.PlatformMembers
-                .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId, ct);
-            if (raced is not null && raced.RevokedAt is null)
+            if (saveError.Kind == AccessErrorKind.Conflict)
             {
-                _cache.InvalidateUser(AccessScope.ForPlatform(AccessScope.PlatformId), userId);
-                return PlatformMemberResult.Ok();
+                // Concurrent AddMember for the same user: another request inserted first.
+                // Reread the persisted state and succeed if the member is now active.
+                var raced = await _db.PlatformMembers
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId, ct);
+                if (raced is not null && raced.RevokedAt is null)
+                {
+                    _cache.InvalidateUser(AccessScope.ForPlatform(AccessScope.PlatformId), userId);
+                    return PlatformMemberResult.Ok();
+                }
             }
-            throw;
+            return PlatformMemberResult.Fail(saveError.Kind, saveError.Code, saveError.Message);
         }
 
         _cache.InvalidateUser(AccessScope.ForPlatform(AccessScope.PlatformId), userId);

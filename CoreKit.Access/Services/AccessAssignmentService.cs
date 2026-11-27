@@ -86,23 +86,40 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
         var lockKey = $"access.assign:{scope.Type}:{scope.Id:N}:{userId:N}";
         var outcome = await _unitOfWork.SaveWithAdvisoryLockAsync(lockKey, async innerCt =>
         {
+            // Reset closure slots on every entry: with execution-strategy retries, a failed attempt
+            // may have set earlyError/earlyResult before a transient failure, and a subsequent
+            // successful retry must start clean.
+            earlyError = null;
+            earlyResult = null;
+
+            // Re-fetch inside the lock: between the guard check and lock acquisition, the user may
+            // have been revoked and re-added, bumping MembershipGeneration. Using a stale generation
+            // would write assignments that never become effective.
+            var liveMember = await _membership.FindAsync(scope, userId, innerCt);
+            if (liveMember is null)
+            {
+                earlyError = AccessErrors.Validation("The user is no longer a member of this scope.");
+                return;
+            }
+            var generation = liveMember.MembershipGeneration;
+
             var current = await _assignments.ListForUserForUpdateAsync(scope, userId, innerCt);
             var currentIds = current.Select(a => a.RoleId).ToHashSet();
             var addedIds = wanted.Where(id => !currentIds.Contains(id)).ToList();
             var removedIds = currentIds.Where(id => !wanted.Contains(id)).ToList();
             var needsGenerationRefresh = current.Any(a =>
-                wanted.Contains(a.RoleId) && a.MembershipGeneration != member.MembershipGeneration);
+                wanted.Contains(a.RoleId) && a.MembershipGeneration != generation);
 
             if (addedIds.Count == 0 && removedIds.Count == 0 && !needsGenerationRefresh)
             {
-                earlyResult = await LoadRolesAsync(scope, userId, member.MembershipGeneration, innerCt);
+                earlyResult = await LoadRolesAsync(scope, userId, generation, innerCt);
                 return;
             }
 
             var changedRoleIds = addedIds
                 .Concat(removedIds)
                 .Concat(current.Where(a => wanted.Contains(a.RoleId)
-                                           && a.MembershipGeneration != member.MembershipGeneration)
+                                           && a.MembershipGeneration != generation)
                                    .Select(a => a.RoleId))
                 .Distinct()
                 .ToList();
@@ -122,7 +139,7 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
                 var existing = current.FirstOrDefault(a => a.RoleId == roleId);
                 if (existing is not null)
                 {
-                    existing.MembershipGeneration = member.MembershipGeneration;
+                    existing.MembershipGeneration = generation;
                     existing.AssignedAt = now;
                     existing.AssignedBy = actorId;
                 }
@@ -134,7 +151,7 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
                         UserId = userId,
                         ScopeType = scope.Type,
                         ScopeId = scope.Id,
-                        MembershipGeneration = member.MembershipGeneration,
+                        MembershipGeneration = generation,
                         AssignedAt = now,
                         AssignedBy = actorId
                     });

@@ -66,7 +66,7 @@ public sealed class RequireAccessFilter : IEndpointFilter
         // that bypasses the cache, so a permission just revoked is not still honored through a
         // remembered copy. Read permissions use the cached path for performance.
         bool allowed;
-        if (RequiresFreshAuthority(_permission))
+        if (AccessGuard.RequiresFreshAuthority(_permission))
         {
             if (_access is not IFreshAccessSource fresh)
                 return AccessErrors.Denied.ToHttpResult();
@@ -90,7 +90,5 @@ public sealed class RequireAccessFilter : IEndpointFilter
     /// person's permissions right now, not from a remembered copy.
     /// </summary>
     private static bool RequiresFreshAuthority(string permission)
-        => permission is AccessPermissionNames.RolesManage
-            or AccessPermissionNames.AssignmentsManage
-            or AccessPermissionNames.PlatformMembersManage;
+        => AccessGuard.RequiresFreshAuthority(permission);
 }

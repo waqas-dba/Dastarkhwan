@@ -29,16 +29,16 @@ internal sealed class AccessMembership : IAccessMembership
 
         return scope.Type switch
         {
-            AccessScope.PlatformType => await FindPlatformMemberAsync(userId, ct),
+            AccessScope.PlatformType => await FindPlatformMemberAsync(scope.Id, userId, ct),
             AccessScope.TenantType => await FindTenantMemberAsync(scope.Id, userId, ct),
             _ => null
         };
     }
 
-    private async Task<AccessMember?> FindPlatformMemberAsync(Guid userId, CancellationToken ct)
+    private async Task<AccessMember?> FindPlatformMemberAsync(Guid platformId, Guid userId, CancellationToken ct)
     {
         var member = await _db.PlatformMembers
-            .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId && m.RevokedAt == null, ct);
+            .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == platformId && m.RevokedAt == null, ct);
 
         if (member is null)
             return null;

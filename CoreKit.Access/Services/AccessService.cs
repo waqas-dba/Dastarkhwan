@@ -23,6 +23,7 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
     private readonly AccessCatalog _catalog;
     private readonly IAccessScopeContext _scopeContext;
     private readonly IAccessCurrentUser _actor;
+    private readonly IAuthorityPolicy _authorityPolicy;
 
     public AccessService(
         IAccessMembership membership,
@@ -31,7 +32,8 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
         IAccessCache cache,
         AccessCatalog catalog,
         IAccessScopeContext scopeContext,
-        IAccessCurrentUser actor)
+        IAccessCurrentUser actor,
+        IAuthorityPolicy authorityPolicy)
     {
         _membership = membership;
         _assignments = assignments;
@@ -40,6 +42,7 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
         _catalog = catalog;
         _scopeContext = scopeContext;
         _actor = actor;
+        _authorityPolicy = authorityPolicy;
     }
 
     public async Task<EffectiveAccess> GetAccessAsync(Guid userId, AccessScope scope, CancellationToken ct = default)

@@ -5,6 +5,14 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace CoreKit.Access.Tests.Support;
 
+/// <summary>Default authority policy for tests: only fresh authority for manage permissions.</summary>
+internal sealed class TestAuthorityPolicy : IAuthorityPolicy
+{
+    public bool RequiresFreshAuthority(string permission) => false;
+}
+
+namespace CoreKit.Access.Tests.Support;
+
 /// <summary>
 /// One real object graph on an in-memory SQLite database, built like a single web request.
 /// Membership, the current user and the scope are fakes the test controls. Seed with one context and read
@@ -16,7 +24,7 @@ internal sealed class TestEnv : IDisposable
     private readonly DbContextOptions<AccessDbContext> _dbOptions;
     private readonly MemoryCache _memory = new(new MemoryCacheOptions());
 
-    public TestEnv(AccessOptions? options = null, Action<AccessCatalogBuilder>? catalog = null, IAccessUnitOfWork? unitOfWork = null)
+    public TestEnv(AccessOptions? options = null, Action<AccessCatalogBuilder>? catalog = null, IAccessUnitOfWork? unitOfWork = null, IAuthorityPolicy? authorityPolicy = null)
     {
         Config = options ?? new AccessOptions();
 
@@ -42,8 +50,10 @@ internal sealed class TestEnv : IDisposable
         AuditRepo = new AccessAuditRepository(Db);
         UnitOfWork = unitOfWork ?? new AccessUnitOfWork(Db, NullLogger<AccessUnitOfWork>.Instance);
         Audit = new AccessAuditRecorder(AuditRepo, User, Time);
-        Access = new AccessService(Membership, Assignments, Roles, Cache, Catalog, ScopeContext, User);
-        Guard = new AccessGuard(ScopeContext, User, Access);
+        // Use test authority policy if provided, otherwise default to false (no fresh authority required)
+        var authPolicy = authorityPolicy ?? new TestAuthorityPolicy();
+        Access = new AccessService(Membership, Assignments, Roles, Cache, Catalog, ScopeContext, User, authPolicy);
+        Guard = new AccessGuard(ScopeContext, User, Access, authPolicy);
         TenantMembershipReader = new FakeTenantMembershipReader();
     }
 

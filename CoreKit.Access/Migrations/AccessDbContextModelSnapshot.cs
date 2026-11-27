@@ -110,8 +110,10 @@ namespace CoreKit.Access.Migrations
 
             modelBuilder.Entity("CoreKit.Access.Entities.AccessPlatformMember", b =>
                 {
+                    b.Property<Guid>("PlatformId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("UserId")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("JoinedAt")
@@ -120,15 +122,10 @@ namespace CoreKit.Access.Migrations
                     b.Property<long>("MembershipGeneration")
                         .HasColumnType("bigint");
 
-                    b.Property<Guid>("PlatformId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTime?>("RevokedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.HasKey("UserId");
-
-                    b.HasIndex("PlatformId", "UserId");
+                    b.HasKey("PlatformId", "UserId");
 
                     b.ToTable("ACCESS_PlatformMembers", "access");
                 });
@@ -199,7 +196,7 @@ namespace CoreKit.Access.Migrations
                         .WithMany()
                         .HasForeignKey("RoleId", "ScopeType", "ScopeId")
                         .HasPrincipalKey("Id", "ScopeType", "ScopeId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Role");

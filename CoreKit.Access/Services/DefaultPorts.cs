@@ -30,29 +30,3 @@ internal sealed class ClaimsCurrentUser : IAccessCurrentUser
         }
     }
 }
-
-/// <summary>
-/// The scope of a request is its tenant. Without a tenant module there is no scope, so scoped calls
-/// are refused. The default implementation returns null: no scope, no access.
-/// </summary>
-internal sealed class DefaultAccessScopeContext : IAccessScopeContext
-{
-    public AccessScope? Current => null;
-}
-
-/// <summary>
-/// Members of a scope are the people who can hold its roles. Without a membership module nobody
-/// belongs anywhere, so nobody is granted anything. The default implementation returns null:
-/// not a member, no access.
-/// </summary>
-internal sealed class DefaultAccessMembership : IAccessMembershipAdapter
-{
-    public Task<AccessMember?> FindAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
-        => Task.FromResult<AccessMember?>(null);
-
-    public Task<long> GetLastEventSequenceAsync(Guid tenantId, CancellationToken ct = default)
-        => Task.FromResult(0L);
-
-    public Task<long> GetLastAppliedSequenceAsync(Guid tenantId, CancellationToken ct = default)
-        => Task.FromResult(0L);
-}

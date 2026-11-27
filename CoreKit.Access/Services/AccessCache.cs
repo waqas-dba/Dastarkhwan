@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using Microsoft.Extensions.Caching.Memory;
@@ -29,6 +30,12 @@ public interface IAccessCache
 
     /// <summary>Forgets one person's permissions (their roles changed).</summary>
     void InvalidateUser(AccessScope scope, Guid userId);
+
+    /// <summary>Gets a cached value or resolves it once per key, deduplicating concurrent callers.</summary>
+    Task<EffectiveAccess> GetOrResolveAsync(
+        AccessScope scope, Guid userId,
+        Func<CancellationToken, Task<EffectiveAccess>> resolver,
+        CancellationToken ct = default);
 }
 
 /// <summary>
@@ -52,6 +59,9 @@ internal sealed class AccessCache : IAccessCache, IDisposable
     private long _sequence;
     private readonly Dictionary<AccessScope, long> _scopeGenerations = new();
     private readonly Dictionary<(AccessScope Scope, Guid UserId), long> _userGenerations = new();
+
+    // Per-key async gate that deduplicates concurrent resolutions.
+    private readonly ConcurrentDictionary<string, Lazy<Task<EffectiveAccess>>> _inflight = new();
 
     public AccessCache(IMemoryCache cache, IOptions<AccessOptions> options)
         : this(cache, options, DefaultMaxGenerationEntries)
@@ -187,6 +197,35 @@ internal sealed class AccessCache : IAccessCache, IDisposable
     public void Dispose()
     {
         _gate.Dispose();
+    }
+
+    /// <summary>
+    /// Gets a cached value or resolves it once per key, deduplicating concurrent callers.
+    /// The resolver runs under a Lazy gate so only one caller executes it for a cold key.
+    /// </summary>
+    public async Task<EffectiveAccess> GetOrResolveAsync(
+        AccessScope scope, Guid userId,
+        Func<CancellationToken, Task<EffectiveAccess>> resolver,
+        CancellationToken ct = default)
+    {
+        if (TryGet(scope, userId, out var cached)) return cached;
+
+        var token = Begin(scope, userId);
+        var key = MakeKey(scope, userId, token);
+
+        Func<string, Lazy<Task<EffectiveAccess>>> factory = _ =>
+            new Lazy<Task<EffectiveAccess>>(async () =>
+            {
+                // Re-check under the gate in case a racing caller just populated it.
+                if (TryGet(scope, userId, out var hit)) return hit;
+                var resolved = await resolver(CancellationToken.None);
+                if (resolved.IsMember) Set(scope, userId, resolved, token);
+                return resolved;
+            }, LazyThreadSafetyMode.ExecutionAndPublication);
+
+        var lazy = _inflight.GetOrAdd(key, factory);
+
+        return await lazy.Value.WaitAsync(ct);
     }
 
     private AccessCacheToken GetCurrentToken(AccessScope scope, Guid userId)

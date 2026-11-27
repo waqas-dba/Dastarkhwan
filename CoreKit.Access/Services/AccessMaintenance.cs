@@ -111,11 +111,20 @@ internal sealed class AccessMaintenance : IAccessMaintenance
 
         // Re-read after save to verify provisioning actually persisted (concurrent conflicts).
         var outcome = await _unitOfWork.SaveAsync(ct);
+
+        if (outcome == SaveOutcome.ConstraintViolation)
+        {
+            // Another instance won the race; verify it actually provisioned roles.
+            var after = await _roles.CountAsync(scope, ct);
+            if (after > 0) return;
+            throw new InvalidOperationException(
+                "Access scope provisioning hit a constraint violation but no roles exist.");
+        }
+
         if (outcome != SaveOutcome.Saved)
             throw new InvalidOperationException(
                 $"Access scope provisioning was not persisted: the unit of work reported {outcome}.");
 
-        // Verify: another concurrent provisioning may have added roles between our check and save.
         var afterCount = await _roles.CountAsync(scope, ct);
         if (afterCount == 0)
             throw new InvalidOperationException("Access scope provisioning persisted no roles.");

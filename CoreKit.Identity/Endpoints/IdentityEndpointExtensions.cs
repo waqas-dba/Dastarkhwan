@@ -9,7 +9,7 @@ public static class IdentityEndpointExtensions
     /// Maps the Identity HTTP API under a prefix (default "/Identity"). Optional: an app that wants
     /// its own routes can skip this and call the services directly.
     /// </summary>
-    public static IEndpointRouteBuilder MapIdentity(this IEndpointRouteBuilder app, string prefix = "/Identity")
+    public static IEndpointRouteBuilder MapIdentity(this IEndpointRouteBuilder app, string prefix = "/identity")
     {
         prefix = NormalizePrefix(prefix);
 

@@ -97,15 +97,28 @@ public static class AccessEndpointExtensions
         services.AddRateLimiter(limiter =>
         {
             limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-
-            limiter.AddPolicy(AccessWritePolicy, _ => RateLimitPartition.GetFixedWindowLimiter("access-write", _ => new FixedWindowRateLimiterOptions
+            limiter.AddPolicy(AccessWritePolicy, httpContext =>
             {
-                PermitLimit = 20,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0
-            }));
+                var partitionKey = ResolvePartitionKey(httpContext);
+                return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 20,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0
+                });
+            });
         });
-
         return services;
+    }
+
+    private static string ResolvePartitionKey(HttpContext httpContext)
+    {
+        var claimType = httpContext.RequestServices
+            .GetRequiredService<IOptions<AccessOptions>>().Value.UserIdClaimType;
+        var userId = httpContext.User?.FindFirst(claimType)?.Value;
+        if (!string.IsNullOrEmpty(userId) && Guid.TryParse(userId, out _))
+            return $"user:{userId}";
+        var ip = httpContext.Connection.RemoteIpAddress?.ToString();
+        return string.IsNullOrEmpty(ip) ? "anonymous" : $"ip:{ip}";
     }
 }

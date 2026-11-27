@@ -58,69 +58,52 @@ public sealed class AccessBootstrap : IAccessBootstrap
             },
             ct);
 
-        var userAssignments = await _assignments.ListForUserForUpdateAsync(scope, userId, ct);
-        var alreadyAdmin = userAssignments.Any(a => a.RoleId == adminRoleId);
-
-        // Idempotent: if the target user is already an admin, nothing to do.
-        if (alreadyAdmin)
-        {
-            _cache.InvalidateUser(scope, userId);
-            return;
-        }
-
-        // If another admin exists, don't add a second one - log and return.
-        // This makes bootstrap safe to run on every startup.
-        var hasOtherAdmin = await _db.Assignments
-            .AnyAsync(a => a.RoleId == adminRoleId && a.UserId != userId, ct);
-        if (hasOtherAdmin)
-        {
-            // Another admin already exists; target user is not an admin.
-            // This is not an error - just means bootstrap was already done for someone else.
-            _cache.InvalidateUser(scope, userId);
-            return;
-        }
-
-        var member = await _db.PlatformMembers
-            .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId, ct);
-
-        var now = _time.GetUtcNow().UtcDateTime;
-
-        if (member is null)
-        {
-            var generation = await NextGenerationAsync(ct);
-            member = new AccessPlatformMember
+        var outcome = await _unitOfWork.SaveWithAdvisoryLockAsync(
+            "access.platform.bootstrap", async innerCt =>
             {
-                UserId = userId,
-                PlatformId = AccessScope.PlatformId,
-                MembershipGeneration = generation,
-                JoinedAt = now,
-                RevokedAt = null
-            };
-            _db.PlatformMembers.Add(member);
-        }
-        else if (member.RevokedAt is not null)
-        {
-            member.RevokedAt = null;
-            member.MembershipGeneration++;
-            member.JoinedAt = now;
-        }
+                // Re-check inside the lock: another instance may have bootstrapped already.
+                var hasOtherAdmin = await _db.Assignments
+                    .AnyAsync(a => a.RoleId == adminRoleId && a.UserId != userId, innerCt);
+                var alreadyAdmin = await _db.Assignments
+                    .AnyAsync(a => a.RoleId == adminRoleId && a.UserId == userId, innerCt);
+                if (alreadyAdmin || hasOtherAdmin) return;
 
-        _assignments.Add(new AccessAssignment
-        {
-            RoleId = adminRoleId,
-            UserId = userId,
-            ScopeType = scope.Type,
-            ScopeId = scope.Id,
-            MembershipGeneration = member.MembershipGeneration,
-            AssignedAt = now
-        });
+                var member = await _db.PlatformMembers
+                    .FirstOrDefaultAsync(m => m.UserId == userId && m.PlatformId == AccessScope.PlatformId, innerCt);
+                var now = _time.GetUtcNow().UtcDateTime;
+                if (member is null)
+                {
+                    var generation = await NextGenerationAsync(innerCt);
+                    member = new AccessPlatformMember
+                    {
+                        UserId = userId,
+                        PlatformId = AccessScope.PlatformId,
+                        MembershipGeneration = generation,
+                        JoinedAt = now,
+                        RevokedAt = null
+                    };
+                    _db.PlatformMembers.Add(member);
+                }
+                else if (member.RevokedAt is not null)
+                {
+                    member.RevokedAt = null;
+                    member.MembershipGeneration++;
+                    member.JoinedAt = now;
+                }
 
-        // Trusted deployment operation: the operator is the deployment, not the target user. The target
-        // user id is recorded in the details only; it never establishes operator authority.
-        _audit.RecordSystem(scope, "platform.admin.bootstrap", "deployment.bootstrap", $"user: {userId}");
+                _assignments.Add(new AccessAssignment
+                {
+                    RoleId = adminRoleId,
+                    UserId = userId,
+                    ScopeType = scope.Type,
+                    ScopeId = scope.Id,
+                    MembershipGeneration = member.MembershipGeneration,
+                    AssignedAt = now
+                });
+                _audit.RecordSystem(scope, "platform.admin.bootstrap", "deployment.bootstrap", $"user: {userId}");
+            }, ct);
 
-        EnsureSaved(await _unitOfWork.SaveAsync(ct), "platform admin bootstrap");
-
+        EnsureSaved(outcome, "platform admin bootstrap");
         _cache.InvalidateUser(scope, userId);
     }
 

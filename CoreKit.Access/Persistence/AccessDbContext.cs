@@ -70,7 +70,7 @@ public sealed class AccessDbContext : DbContext
             b.HasOne(x => x.Role).WithMany()
                 .HasForeignKey(x => new { x.RoleId, x.ScopeType, x.ScopeId })
                 .HasPrincipalKey(x => new { x.Id, x.ScopeType, x.ScopeId })
-                .OnDelete(DeleteBehavior.Cascade);
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<AccessPlatformMember>(b =>

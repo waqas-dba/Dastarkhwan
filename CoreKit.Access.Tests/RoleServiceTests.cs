@@ -830,6 +830,10 @@ internal sealed class CompetingWriterUnitOfWork : IAccessUnitOfWork
         return await _inner!.SaveAsync(ct);
     }
 
+    public Task<SaveOutcome> SaveWithAdvisoryLockAsync(
+        string lockKey, Func<CancellationToken, Task> work, CancellationToken ct = default)
+        => _inner!.SaveWithAdvisoryLockAsync(lockKey, work, ct);
+
     private void AssertAuditEntryWasStaged()
     {
         Assert.Contains(

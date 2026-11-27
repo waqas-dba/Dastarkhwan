@@ -8,13 +8,13 @@ namespace CoreKit.Access.Extensions;
 /// </summary>
 public sealed class AccessBackgroundOptions
 {
-    /// <summary>Lifetime of a grant when the caller does not choose one. Defaults to 15 minutes.</summary>
-    public TimeSpan DefaultGrantLifetime { get; set; } = TimeSpan.FromMinutes(15);
+    /// <summary>Lifetime of a grant when the caller does not choose one. Defaults to 5 minutes.</summary>
+    public TimeSpan DefaultGrantLifetime { get; set; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
-    /// The longest a grant may live. Defaults to 1 hour. Requests above this are refused.
+    /// The longest a grant may live. Defaults to 30 minutes. Requests above this are refused.
     /// </summary>
-    public TimeSpan MaxGrantLifetime { get; set; } = TimeSpan.FromHours(1);
+    public TimeSpan MaxGrantLifetime { get; set; } = TimeSpan.FromMinutes(30);
 }
 
 /// <summary>
@@ -56,8 +56,8 @@ public static class AccessBackgroundContextExtensions
         builder.Validate(
             o => o.DefaultGrantLifetime > TimeSpan.Zero
                  && o.MaxGrantLifetime >= o.DefaultGrantLifetime
-                 && o.MaxGrantLifetime <= TimeSpan.FromHours(24),
-            "Access background grant lifetimes are invalid (default > 0, default <= max <= 24h).");
+                 && o.MaxGrantLifetime <= TimeSpan.FromMinutes(30),
+            "Access background grant lifetimes are invalid (default > 0, default <= max <= 30m).");
 
         services.AddDataProtection();
         services.TryAddSingleton(TimeProvider.System);
@@ -153,7 +153,8 @@ internal sealed class AccessBackgroundContextStartupCheck : IHostedService
         {
             throw new InvalidOperationException(
                 "The background-aware Access context was replaced by a later registration. " +
-                "Call AddAccessBackgroundContext after every registration of IAccessScopeContext and IAccessCurrentUser.");
+                "Call AddAccessBackgroundContext as the last Access-related registration step, " +
+                "after every registration of IAccessScopeContext and IAccessCurrentUser.");
         }
     }
 }

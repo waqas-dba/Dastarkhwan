@@ -79,78 +79,85 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
         if (wantedRoles.Count != wanted.Count)
             return AccessErrors.NotFound("One or more roles");
 
-        var current = await _assignments.ListForUserForUpdateAsync(scope, userId, ct);
-        var currentIds = current.Select(a => a.RoleId).ToHashSet();
+        // Closure slots filled inside the lock.
+        AccessError? earlyError = null;
+        IReadOnlyList<AccessRoleDto>? earlyResult = null;
 
-        var addedIds = wanted.Where(id => !currentIds.Contains(id)).ToList();
-        var removedIds = currentIds.Where(id => !wanted.Contains(id)).ToList();
-
-        // Re-affirming a role at the current membership generation makes an old-generation
-        // assignment effective again after the member rejoins. The (RoleId, UserId) key means
-        // we update the existing row in place rather than inserting a duplicate.
-        var needsGenerationRefresh = current.Any(a => wanted.Contains(a.RoleId) && a.MembershipGeneration != member.MembershipGeneration);
-
-        if (addedIds.Count == 0 && removedIds.Count == 0 && !needsGenerationRefresh)
-            return AccessResult.Success(await LoadRolesAsync(scope, userId, member.MembershipGeneration, ct));
-
-        var changedRoleIds = addedIds
-            .Concat(removedIds)
-            .Concat(current.Where(a => wanted.Contains(a.RoleId) && a.MembershipGeneration != member.MembershipGeneration).Select(a => a.RoleId))
-            .Distinct()
-            .ToList();
-
-        var changedRoles = await _roles.FindManyAsync(scope, changedRoleIds, ct);
-
-        if (!AccessGuard.Holds(access, changedRoles.SelectMany(r => r.Permissions.Select(p => p.Permission))))
-            return AccessErrors.Escalation;
-
-        var now = _time.GetUtcNow().UtcDateTime;
-
-        foreach (var assignment in current.Where(a => removedIds.Contains(a.RoleId)))
-            _assignments.Remove(assignment);
-
-        foreach (var roleId in wanted)
+        var lockKey = $"access.assign:{scope.Type}:{scope.Id:N}:{userId:N}";
+        var outcome = await _unitOfWork.SaveWithAdvisoryLockAsync(lockKey, async innerCt =>
         {
-            var existing = current.FirstOrDefault(a => a.RoleId == roleId);
-            if (existing is not null)
+            var current = await _assignments.ListForUserForUpdateAsync(scope, userId, innerCt);
+            var currentIds = current.Select(a => a.RoleId).ToHashSet();
+            var addedIds = wanted.Where(id => !currentIds.Contains(id)).ToList();
+            var removedIds = currentIds.Where(id => !wanted.Contains(id)).ToList();
+            var needsGenerationRefresh = current.Any(a =>
+                wanted.Contains(a.RoleId) && a.MembershipGeneration != member.MembershipGeneration);
+
+            if (addedIds.Count == 0 && removedIds.Count == 0 && !needsGenerationRefresh)
             {
-                existing.MembershipGeneration = member.MembershipGeneration;
-                existing.AssignedAt = now;
-                existing.AssignedBy = actorId;
+                earlyResult = await LoadRolesAsync(scope, userId, member.MembershipGeneration, innerCt);
+                return;
             }
-            else
+
+            var changedRoleIds = addedIds
+                .Concat(removedIds)
+                .Concat(current.Where(a => wanted.Contains(a.RoleId)
+                                           && a.MembershipGeneration != member.MembershipGeneration)
+                                   .Select(a => a.RoleId))
+                .Distinct()
+                .ToList();
+            var changedRoles = await _roles.FindManyAsync(scope, changedRoleIds, innerCt);
+            if (!AccessGuard.Holds(access, changedRoles.SelectMany(r => r.Permissions.Select(p => p.Permission))))
             {
-                _assignments.Add(new AccessAssignment
+                earlyError = AccessErrors.Escalation;
+                return;
+            }
+
+            var now = _time.GetUtcNow().UtcDateTime;
+            foreach (var assignment in current.Where(a => removedIds.Contains(a.RoleId)))
+                _assignments.Remove(assignment);
+
+            foreach (var roleId in wanted)
+            {
+                var existing = current.FirstOrDefault(a => a.RoleId == roleId);
+                if (existing is not null)
                 {
-                    RoleId = roleId,
-                    UserId = userId,
-                    ScopeType = scope.Type,
-                    ScopeId = scope.Id,
-                    MembershipGeneration = member.MembershipGeneration,
-                    AssignedAt = now,
-                    AssignedBy = actorId
-                });
+                    existing.MembershipGeneration = member.MembershipGeneration;
+                    existing.AssignedAt = now;
+                    existing.AssignedBy = actorId;
+                }
+                else
+                {
+                    _assignments.Add(new AccessAssignment
+                    {
+                        RoleId = roleId,
+                        UserId = userId,
+                        ScopeType = scope.Type,
+                        ScopeId = scope.Id,
+                        MembershipGeneration = member.MembershipGeneration,
+                        AssignedAt = now,
+                        AssignedBy = actorId
+                    });
+                }
             }
-        }
 
-        // The entry says who ends up with which roles, and also exactly what this call added and removed.
-        var namesById = changedRoles.ToDictionary(r => r.Id, r => r.Name);
+            // The entry says who ends up with which roles, and also exactly what this call added and removed.
+            var namesById = changedRoles.ToDictionary(r => r.Id, r => r.Name);
 
-        string NamesOf(IEnumerable<Guid> ids)
-            => string.Join(", ", ids.Select(id => namesById.TryGetValue(id, out var name) ? name : id.ToString("N"))
+            string NamesOf(IEnumerable<Guid> ids) => string.Join(", ", ids
+                .Select(id => namesById.TryGetValue(id, out var name) ? name : id.ToString("N"))
                 .Order(StringComparer.Ordinal));
 
-        _audit.Record(
-            scope,
-            AccessAuditActions.RolesAssigned,
-            $"user: {userId}; roles: {string.Join(", ", wantedRoles.Select(r => r.Name).Order(StringComparer.Ordinal))}; " +
-            $"added: {NamesOf(addedIds)}; removed: {NamesOf(removedIds)}");
+            _audit.Record(scope, AccessAuditActions.RolesAssigned,
+                $"user: {userId}; roles: {string.Join(", ", wantedRoles.Select(r => r.Name).Order(StringComparer.Ordinal))}; " +
+                $"added: {NamesOf(addedIds)}; removed: {NamesOf(removedIds)}");
+        }, ct);
 
-        if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
-            return saveError;
+        if (earlyError is not null) return earlyError;
+        if (outcome.ToError() is { } saveError) return saveError;
+        if (earlyResult is not null) return AccessResult.Success(earlyResult);
 
         _cache.InvalidateUser(scope, userId);
-
         return AccessResult.Success(await LoadRolesAsync(scope, userId, member.MembershipGeneration, ct));
     }
 

@@ -228,6 +228,10 @@ internal sealed class FailingUnitOfWork : IAccessUnitOfWork
     public FailingUnitOfWork(SaveOutcome outcome) => _outcome = outcome;
 
     public Task<SaveOutcome> SaveAsync(CancellationToken ct = default) => Task.FromResult(_outcome);
+
+    public Task<SaveOutcome> SaveWithAdvisoryLockAsync(
+        string lockKey, Func<CancellationToken, Task> work, CancellationToken ct = default)
+        => Task.FromResult(_outcome);
 }
 
 

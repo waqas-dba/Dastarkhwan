@@ -47,20 +47,7 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
         if (userId == Guid.Empty || !scope.IsValid)
             return EffectiveAccess.None;
 
-        if (_cache.TryGet(scope, userId, out var cached))
-            return cached;
-
-        // Note which cache generation this lookup starts in. If a role or assignment changes while the database
-        // is being read, the result is stale and the cache refuses to store it.
-        var token = _cache.Begin(scope, userId);
-
-        var access = await ResolveAsync(userId, scope, ct);
-
-        // Not a member: nothing is granted, and nothing is remembered (they may be added a moment later).
-        if (access.IsMember)
-            _cache.Set(scope, userId, access, token);
-
-        return access;
+        return await _cache.GetOrResolveAsync(scope, userId, innerCt => ResolveAsync(userId, scope, innerCt), ct);
     }
 
     public async Task<EffectiveAccess> GetFreshAccessAsync(Guid userId, AccessScope scope, CancellationToken ct = default)

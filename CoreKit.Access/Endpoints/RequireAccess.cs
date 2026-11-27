@@ -68,8 +68,10 @@ public sealed class RequireAccessFilter : IEndpointFilter
         bool allowed;
         if (RequiresFreshAuthority(_permission))
         {
-            var freshAccess = await ((IFreshAccessSource)_access)
-                .GetFreshAccessAsync(userId, _scopeContext.Current!.Value, context.HttpContext.RequestAborted);
+            if (_access is not IFreshAccessSource fresh)
+                return AccessErrors.Denied.ToHttpResult();
+            var freshAccess = await fresh.GetFreshAccessAsync(
+                userId, _scopeContext.Current!.Value, context.HttpContext.RequestAborted);
             allowed = freshAccess.Has(_permission);
         }
         else

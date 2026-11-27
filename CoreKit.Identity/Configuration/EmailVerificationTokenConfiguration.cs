@@ -6,7 +6,7 @@ public sealed class EmailVerificationTokenConfiguration : IEntityTypeConfigurati
 {
     public void Configure(EntityTypeBuilder<EmailVerificationToken> builder)
     {
-        builder.ToTable("Idenity_EmailVerificationTokens");
+        builder.ToTable("Identity_EmailVerificationTokens");
 
         builder.HasKey(x => x.Id);
         builder.Property(x => x.Id).ValueGeneratedNever();

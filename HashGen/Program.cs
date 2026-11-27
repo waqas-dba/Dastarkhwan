@@ -1,7 +1,12 @@
 using System;
 using CoreKit.Identity.Security;
 
-var password = args.Length > 0 ? args[0] : "TestPass123!";
+if (args.Length == 0)
+{
+    Console.Error.WriteLine("Usage: HashGen <password>");
+    Environment.Exit(1);
+}
+
+var password = args[0];
 var hasher = new CoreKit.Identity.Security.PasswordHasher();
-var hash = hasher.Hash(password);
-Console.WriteLine(hash);
+Console.WriteLine(hasher.Hash(password));

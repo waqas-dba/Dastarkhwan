@@ -11,8 +11,6 @@ internal sealed class TestAuthorityPolicy : IAuthorityPolicy
     public bool RequiresFreshAuthority(string permission) => false;
 }
 
-namespace CoreKit.Access.Tests.Support;
-
 /// <summary>
 /// One real object graph on an in-memory SQLite database, built like a single web request.
 /// Membership, the current user and the scope are fakes the test controls. Seed with one context and read

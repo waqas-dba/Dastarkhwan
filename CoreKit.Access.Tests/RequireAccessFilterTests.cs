@@ -90,7 +90,8 @@ public sealed class RequireAccessFilterTests
             Permission,
             new FakeScopeContext { Current = AccessScope.ForTenant(Guid.NewGuid()) },
             new FakeCurrentUser { UserId = Guid.NewGuid() },
-            access);
+            access,
+            new TestAuthorityPolicy());
 
         var http = new DefaultHttpContext { RequestServices = EmptyProvider };
         http.RequestAborted = cts.Token;
@@ -109,7 +110,8 @@ public sealed class RequireAccessFilterTests
             "products.manage",
             new FakeScopeContext { Current = AccessScope.ForTenant(Guid.NewGuid()) },
             new FakeCurrentUser { UserId = Guid.NewGuid() },
-            access);
+            access,
+            new TestAuthorityPolicy());
 
         var http = new DefaultHttpContext { RequestServices = EmptyProvider };
 
@@ -183,7 +185,7 @@ public sealed class RequireAccessFilterTests
 
     private static async Task<(int Status, string Body, bool Continued)> Run(TestEnv env)
     {
-        var filter = new RequireAccessFilter(Permission, env.ScopeContext, env.User, env.Access);
+        var filter = new RequireAccessFilter(Permission, env.ScopeContext, env.User, env.Access, new TestAuthorityPolicy());
         var http = new DefaultHttpContext { RequestServices = EmptyProvider };
 
         var continued = false;

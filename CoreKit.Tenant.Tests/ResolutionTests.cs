@@ -1,7 +1,6 @@
 ﻿using CoreKit.Tenant.Resolution;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace CoreKit.Tenant.Tests;

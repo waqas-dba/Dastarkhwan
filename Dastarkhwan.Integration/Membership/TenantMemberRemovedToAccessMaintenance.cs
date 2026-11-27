@@ -1,4 +1,3 @@
-using CoreKit.Abstractions.IntegrationEvents;
 using CoreKit.Access.Contracts;
 using CoreKit.Tenant.Abstractions;
 
@@ -16,7 +15,7 @@ namespace Dastarkhwan.Integration.Membership;
 /// <c>IAccessMaintenance</c> interface, which performs no permission check. A failing handler is logged
 /// by the publisher and does not undo the membership change.
 /// </remarks>
-public sealed class TenantMemberRemovedToAccessMaintenance : IEventHandler<TenantMemberRemoved>
+public sealed class TenantMemberRemovedToAccessMaintenance : ITenantIntegrationEventHandler<TenantMemberRemoved>
 {
     private readonly IAccessMaintenance _maintenance;
 

@@ -1,4 +1,3 @@
-using CoreKit.Abstractions.IntegrationEvents;
 using CoreKit.Identity.Entities;
 using CoreKit.Identity.Contracts;
 using CoreKit.Identity.Outbox;

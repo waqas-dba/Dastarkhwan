@@ -1,4 +1,3 @@
-using CoreKit.Abstractions.IntegrationEvents;
 using CoreKit.Access.Abstractions;
 using CoreKit.Access.Contracts;
 using CoreKit.Access.Extensions;
@@ -51,14 +50,14 @@ public static class IntegrationServiceCollectionExtensions
         // Access queries Tenant membership directly through ITenantMembershipReader (see Access.Services.AccessService).
         // When a person leaves a tenant, clear their effective-authorization state in Access so a
         // cached tenant-scoped permission set cannot outlive the membership.
-        services.TryAddScoped<IEventHandler<TenantMemberRemoved>, TenantMemberRemovedToAccessMaintenance>();
+        services.TryAddScoped<ITenantIntegrationEventHandler<TenantMemberRemoved>, TenantMemberRemovedToAccessMaintenance>();
 
         // When a tenant is created, provision its default roles in Access.
-        services.TryAddScoped<IEventHandler<TenantCreated>, TenantCreatedToAccessProvision>();
+        services.TryAddScoped<ITenantIntegrationEventHandler<TenantCreated>, TenantCreatedToAccessProvision>();
 
         // When an Identity user is deleted, clean up their Tenant membership rows and Access platform membership.
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IEventHandler<IdentityUserDeleted>, IdentityUserDeletedToTenantCleanup>());
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IEventHandler<IdentityUserDeleted>, IdentityUserDeletedToAccessCleanup>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityEventHandler<IdentityUserDeleted>, IdentityUserDeletedToTenantCleanup>());
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityEventHandler<IdentityUserDeleted>, IdentityUserDeletedToAccessCleanup>());
 
         // Tenant adds its tenant claim to every access token Identity issues.
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IAccessTokenClaimsContributor, TenantClaimsContributor>());

@@ -102,15 +102,13 @@ public sealed class TestEnv : IDisposable
     public List<T> EventsOf<T>() where T : ITenantEvent => Published.OfType<T>().ToList();
 
     public TenantService CreateTenantService() => new(
-        Tenants, Members, Audit, UnitOfWork, Publisher, InfoProvider, Guard, Permissions, Options.Create(Config), Time,
-        new TenantOutbox(Db));
+        Tenants, Members, Audit, UnitOfWork, Publisher, InfoProvider, Guard, Permissions, Options.Create(Config), Time);
 
     public TenantSettingsService CreateSettingsService() => new(
         Tenants, Settings, Audit, UnitOfWork, Publisher, Guard, Permissions, Options.Create(Config), Time);
 
     public TenantMembershipService CreateMembershipService() => new(
-        Tenants, Members, Audit, UnitOfWork, Publisher, Guard, PlatformAccess, Actor, Permissions, Time, MembershipReader,
-        new TenantOutbox(Db));
+        Tenants, Members, Audit, UnitOfWork, Publisher, Guard, PlatformAccess, Actor, Permissions, Time, MembershipReader);
 
     public TenantAuditLog CreateAuditLog() => new(AuditEntries, Guard, Permissions);
 

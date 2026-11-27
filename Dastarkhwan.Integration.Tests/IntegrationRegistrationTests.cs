@@ -1,4 +1,3 @@
-using CoreKit.Abstractions.IntegrationEvents;
 using CoreKit.Access.Contracts;
 using CoreKit.Identity.Contracts;
 using CoreKit.Identity.Entities;
@@ -43,13 +42,13 @@ public sealed class IntegrationRegistrationTests
 
         // Verify event handlers are registered for each event type
         // Note: IdentityUserDeleted has two handlers but TryAddScoped only registers the first
-        var identityUserDeletedHandler = scope.ServiceProvider.GetService<IEventHandler<IdentityUserDeleted>>();
+        var identityUserDeletedHandler = scope.ServiceProvider.GetService<IIdentityEventHandler<IdentityUserDeleted>>();
         Assert.NotNull(identityUserDeletedHandler);
 
-        var tenantCreatedHandler = scope.ServiceProvider.GetService<IEventHandler<TenantCreated>>();
+        var tenantCreatedHandler = scope.ServiceProvider.GetService<ITenantIntegrationEventHandler<TenantCreated>>();
         Assert.NotNull(tenantCreatedHandler);
 
-        var tenantMemberRemovedHandler = scope.ServiceProvider.GetService<IEventHandler<TenantMemberRemoved>>();
+        var tenantMemberRemovedHandler = scope.ServiceProvider.GetService<ITenantIntegrationEventHandler<TenantMemberRemoved>>();
         Assert.NotNull(tenantMemberRemovedHandler);
 
         // Verify other integration services

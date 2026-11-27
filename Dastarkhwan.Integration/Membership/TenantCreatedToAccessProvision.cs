@@ -1,4 +1,3 @@
-using CoreKit.Abstractions.IntegrationEvents;
 using CoreKit.Access.Contracts;
 using CoreKit.Tenant.Abstractions;
 
@@ -14,7 +13,7 @@ namespace Dastarkhwan.Integration.Membership;
 /// <c>IAccessMaintenance</c> interface, which performs no permission check. A failing handler is logged
 /// by the publisher and does not undo the tenant creation.
 /// </remarks>
-public sealed class TenantCreatedToAccessProvision : IEventHandler<TenantCreated>
+public sealed class TenantCreatedToAccessProvision : ITenantIntegrationEventHandler<TenantCreated>
 {
     private readonly IAccessMaintenance _maintenance;
 

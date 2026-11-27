@@ -1,4 +1,4 @@
-using CoreKit.Abstractions.IntegrationEvents;
+using CoreKit.Identity.Contracts;
 using CoreKit.Identity.Outbox;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -39,7 +39,7 @@ public sealed class IdentityOutboxTransport : IIdentityOutboxTransport
         }
 
         // Get all handlers for this event type
-        var handlerType = typeof(IEventHandler<>).MakeGenericType(eventType);
+        var handlerType = typeof(IIdentityEventHandler<>).MakeGenericType(eventType);
         var handlers = _services.GetServices(handlerType);
 
         var handled = false;

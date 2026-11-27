@@ -19,10 +19,21 @@ public interface ITenantEventHandler<TEvent> where TEvent : ITenantEvent
 
 /// <summary>
 /// Base marker for cross-module integration events published by Tenant.
-/// Other modules implement <see cref="CoreKit.Abstractions.IntegrationEvents.IEventHandler{TEvent}"/> for these.
+/// Other modules implement <see cref="ITenantIntegrationEventHandler{TEvent}"/> for these.
 /// </summary>
-public interface ITenantIntegrationEvent : CoreKit.Abstractions.IntegrationEvents.IIntegrationEvent
+public interface ITenantIntegrationEvent
 {
+    DateTime OccurredAt { get; }
+}
+
+/// <summary>
+/// Implemented by another module (in practice, by the Integration layer) to react to a Tenant integration
+/// event. Tenant owns this contract. Handlers run in-process after the change is saved; a handler that
+/// throws is logged and does not undo the change.
+/// </summary>
+public interface ITenantIntegrationEventHandler<TEvent> where TEvent : ITenantIntegrationEvent
+{
+    Task HandleAsync(TEvent integrationEvent, CancellationToken ct = default);
 }
 
 /// <summary>A tenant was created.</summary>

@@ -1,5 +1,4 @@
-﻿using CoreKit.Abstractions.IntegrationEvents;
-using CoreKit.Tenant.Abstractions;
+﻿using CoreKit.Tenant.Abstractions;
 
 namespace CoreKit.Tenant.Services;
 
@@ -47,9 +46,9 @@ public sealed class TenantEventPublisher : ITenantEventPublisher
     }
 
     private async Task DispatchAsync<TIntegration>(TIntegration integrationEvent, Guid tenantId, CancellationToken ct)
-        where TIntegration : IIntegrationEvent
+        where TIntegration : ITenantIntegrationEvent
     {
-        foreach (var handler in _services.GetServices<IEventHandler<TIntegration>>())
+        foreach (var handler in _services.GetServices<ITenantIntegrationEventHandler<TIntegration>>())
             await RunAsync(() => handler.HandleAsync(integrationEvent, ct), typeof(TIntegration).Name, tenantId);
     }
 

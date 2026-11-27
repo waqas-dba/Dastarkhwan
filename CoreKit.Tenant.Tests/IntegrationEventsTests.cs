@@ -1,5 +1,4 @@
-﻿using CoreKit.Abstractions.IntegrationEvents;
-using CoreKit.Tenant.Abstractions;
+﻿using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -7,11 +6,11 @@ namespace CoreKit.Tenant.Tests;
 
 public sealed class IntegrationEventTests
 {
-    private sealed class KernelRecorder<TEvent> : IEventHandler<TEvent> where TEvent : IIntegrationEvent
+    private sealed class KernelRecorder<TEvent> : ITenantIntegrationEventHandler<TEvent> where TEvent : ITenantIntegrationEvent
     {
-        private readonly List<IIntegrationEvent> _seen;
+        private readonly List<ITenantIntegrationEvent> _seen;
 
-        public KernelRecorder(List<IIntegrationEvent> seen) => _seen = seen;
+        public KernelRecorder(List<ITenantIntegrationEvent> seen) => _seen = seen;
 
         public Task HandleAsync(TEvent integrationEvent, CancellationToken ct = default)
         {
@@ -20,7 +19,7 @@ public sealed class IntegrationEventTests
         }
     }
 
-    private sealed class KernelThrower<TEvent> : IEventHandler<TEvent> where TEvent : IIntegrationEvent
+    private sealed class KernelThrower<TEvent> : ITenantIntegrationEventHandler<TEvent> where TEvent : ITenantIntegrationEvent
     {
         public Task HandleAsync(TEvent integrationEvent, CancellationToken ct = default)
             => throw new InvalidOperationException("boom");
@@ -28,16 +27,16 @@ public sealed class IntegrationEventTests
 
     private static readonly DateTime Moment = new(2026, 10, 9, 12, 0, 0, DateTimeKind.Utc);
 
-    private readonly List<IIntegrationEvent> _kernelEvents = new();
+    private readonly List<ITenantIntegrationEvent> _kernelEvents = new();
     private readonly List<ITenantEvent> _tenantEvents = new();
 
     private TenantEventPublisher PublisherWith(Action<IServiceCollection>? extra = null)
     {
         var services = new ServiceCollection();
 
-        services.AddSingleton<IEventHandler<TenantCreated>>(new KernelRecorder<TenantCreated>(_kernelEvents));
-        services.AddSingleton<IEventHandler<TenantDeleted>>(new KernelRecorder<TenantDeleted>(_kernelEvents));
-        services.AddSingleton<IEventHandler<TenantMemberRemoved>>(new KernelRecorder<TenantMemberRemoved>(_kernelEvents));
+        services.AddSingleton<ITenantIntegrationEventHandler<TenantCreated>>(new KernelRecorder<TenantCreated>(_kernelEvents));
+        services.AddSingleton<ITenantIntegrationEventHandler<TenantDeleted>>(new KernelRecorder<TenantDeleted>(_kernelEvents));
+        services.AddSingleton<ITenantIntegrationEventHandler<TenantMemberRemoved>>(new KernelRecorder<TenantMemberRemoved>(_kernelEvents));
         services.AddSingleton<ITenantEventHandler<TenantCreatedEvent>>(new RecordingHandler<TenantCreatedEvent>(_tenantEvents));
         extra?.Invoke(services);
 
@@ -98,7 +97,7 @@ public sealed class IntegrationEventTests
     public async Task AFailingHandlerInAnotherModule_DoesNotStopOthersOrTheCaller()
     {
         var publisher = PublisherWith(s =>
-            s.AddSingleton<IEventHandler<TenantDeleted>>(new KernelThrower<TenantDeleted>()));
+            s.AddSingleton<ITenantIntegrationEventHandler<TenantDeleted>>(new KernelThrower<TenantDeleted>()));
 
         await publisher.PublishAsync(new TenantDeletedEvent(Guid.NewGuid(), "acme", Moment));
 

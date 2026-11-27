@@ -11,7 +11,6 @@
     <ProjectReference Include="..\CoreKit.Identity\CoreKit.Identity.csproj" />
     <ProjectReference Include="..\CoreKit.Access\CoreKit.Access.csproj" />
     <ProjectReference Include="..\CoreKit.Tenant\CoreKit.Tenant.csproj" />
-    <ProjectReference Include="..\CoreKit.Abstractions\CoreKit.Abstractions.csproj" />
     <ProjectReference Include="..\CoreKit.Identity.Contracts\CoreKit.Identity.Contracts.csproj" />
     <ProjectReference Include="..\CoreKit.Access.Contracts\CoreKit.Access.Contracts.csproj" />
     <ProjectReference Include="..\CoreKit.Tenant.Contracts\CoreKit.Tenant.Contracts.csproj" />

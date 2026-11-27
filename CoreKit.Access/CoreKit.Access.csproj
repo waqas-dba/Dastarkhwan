@@ -17,7 +17,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CoreKit.Abstractions\CoreKit.Abstractions.csproj" />
     <ProjectReference Include="..\CoreKit.Access.Contracts\CoreKit.Access.Contracts.csproj" />
     <ProjectReference Include="..\CoreKit.Tenant.Contracts\CoreKit.Tenant.Contracts.csproj" />
     <InternalsVisibleTo Include="CoreKit.Access.Tests" />

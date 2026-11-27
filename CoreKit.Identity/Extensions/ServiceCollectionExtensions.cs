@@ -5,7 +5,6 @@ using CoreKit.Identity.Repositories;
 using CoreKit.Identity.Security;
 using CoreKit.Identity.Outbox;
 using CoreKit.Identity.Services;
-using CoreKit.Abstractions.IntegrationEvents;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.IdentityModel.JsonWebTokens;

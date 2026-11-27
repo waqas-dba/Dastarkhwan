@@ -1,4 +1,3 @@
-using CoreKit.Abstractions.IntegrationEvents;
 using CoreKit.Identity.Contracts;
 using CoreKit.Tenant.Abstractions;
 using Microsoft.Extensions.Logging;
@@ -15,7 +14,7 @@ namespace Dastarkhwan.Integration.Membership;
 /// Runs in-process after the Identity user deletion is saved. It is trusted system code.
 /// A failing handler is logged and does not undo the user deletion.
 /// </remarks>
-public sealed class IdentityUserDeletedToTenantCleanup : IEventHandler<IdentityUserDeleted>
+public sealed class IdentityUserDeletedToTenantCleanup : IIdentityEventHandler<IdentityUserDeleted>
 {
     private readonly ITenantMembershipService _membershipService;
     private readonly ILogger<IdentityUserDeletedToTenantCleanup> _logger;

@@ -36,5 +36,4 @@
     <File Path="CLAUDE.md" />
     <File Path="roadmap.md" />
   </Folder>
-  <Project Path="CoreKit.Abstractions/CoreKit.Abstractions.csproj" />
 </Solution>

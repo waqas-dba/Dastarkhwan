@@ -1,4 +1,3 @@
-using CoreKit.Abstractions.IntegrationEvents;
 using CoreKit.Access.Contracts;
 using CoreKit.Identity.Contracts;
 using Microsoft.Extensions.Logging;
@@ -15,7 +14,7 @@ namespace Dastarkhwan.Integration.Membership;
 /// unguarded <c>IAccessMaintenance</c> interface.
 /// A failing handler is logged and does not undo the user deletion.
 /// </remarks>
-public sealed class IdentityUserDeletedToAccessCleanup : IEventHandler<IdentityUserDeleted>
+public sealed class IdentityUserDeletedToAccessCleanup : IIdentityEventHandler<IdentityUserDeleted>
 {
     private readonly IAccessMaintenance _maintenance;
     private readonly ILogger<IdentityUserDeletedToAccessCleanup> _logger;

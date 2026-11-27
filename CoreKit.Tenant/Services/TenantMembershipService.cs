@@ -19,7 +19,6 @@ public sealed class TenantMembershipService : ITenantMembershipService
     private readonly ITenantPermissionChecker _permissions;
     private readonly TimeProvider _time;
     private readonly ITenantMembershipCache _membershipCache;
-    private readonly ITenantOutbox _outbox;
 
     public TenantMembershipService(
         ITenantRepository tenants,
@@ -32,8 +31,7 @@ public sealed class TenantMembershipService : ITenantMembershipService
         ITenantActor actor,
         ITenantPermissionChecker permissions,
         TimeProvider time,
-        ITenantMembershipCache membershipCache,
-        ITenantOutbox outbox)
+        ITenantMembershipCache membershipCache)
     {
         _tenants = tenants;
         _members = members;
@@ -46,7 +44,6 @@ public sealed class TenantMembershipService : ITenantMembershipService
         _permissions = permissions;
         _time = time;
         _membershipCache = membershipCache;
-        _outbox = outbox;
     }
 
     public async Task<TenantResult<IReadOnlyList<TenantMemberDto>>> ListMembersAsync(Guid tenantId, CancellationToken ct = default)
@@ -139,10 +136,6 @@ public sealed class TenantMembershipService : ITenantMembershipService
 
         _audit.Record(tenantId, TenantAuditActions.MemberAdded, request.IsOwner ? $"user: {request.UserId}; owner" : $"user: {request.UserId}");
 
-        // Same SaveChanges as the membership change. StageMembershipEvent also rotates the tenant's
-        // concurrency stamp (F3), so no separate stamp update is needed here.
-        _outbox.StageMembershipEvent(tenant, eventType, member, now);
-
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
             return saveError;
 
@@ -213,10 +206,6 @@ public sealed class TenantMembershipService : ITenantMembershipService
 
         _audit.Record(tenantId, TenantAuditActions.MemberRemoved, $"user: {userId}");
 
-        // F3: StageMembershipEvent rotates the concurrency stamp for every successful removal,
-        // including removal of a member initially read as a non-owner.
-        _outbox.StageMembershipEvent(trackedTenant, TenantOutboxEventTypes.MemberRemoved, member, removedAt);
-
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
             return saveError;
 
@@ -274,9 +263,6 @@ public sealed class TenantMembershipService : ITenantMembershipService
 
         member.IsOwner = request.IsOwner;
         _audit.Record(tenantId, TenantAuditActions.OwnerChanged, $"user: {userId}; owner: {request.IsOwner}");
-
-        // Ownership does not change the generation. StageMembershipEvent rotates the concurrency stamp (F3).
-        _outbox.StageMembershipEvent(trackedTenant, TenantOutboxEventTypes.MemberOwnershipChanged, member, Now());
 
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
             return saveError;

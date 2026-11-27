@@ -212,6 +212,9 @@ if (seedOptions != null && !string.IsNullOrWhiteSpace(seedOptions.AdminEmail))
          }
      }
 
+  // Provision default roles for any tenant that has none (repairs a failed post-creation handler).
+  await app.Services.ReconcileTenantRolesAsync();
+
  // Health endpoints (available in all environments)
  app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
  app.MapGet("/health/ready", async (

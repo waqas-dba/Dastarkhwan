@@ -50,10 +50,13 @@ public static class IntegrationServiceCollectionExtensions
         // Access queries Tenant membership directly through ITenantMembershipReader (see Access.Services.AccessService).
         // When a person leaves a tenant, clear their effective-authorization state in Access so a
         // cached tenant-scoped permission set cannot outlive the membership.
-        services.TryAddScoped<ITenantIntegrationEventHandler<TenantMemberRemoved>, TenantMemberRemovedToAccessMaintenance>();
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITenantIntegrationEventHandler<TenantMemberRemoved>, TenantMemberRemovedToAccessMaintenance>());
 
         // When a tenant is created, provision its default roles in Access.
-        services.TryAddScoped<ITenantIntegrationEventHandler<TenantCreated>, TenantCreatedToAccessProvision>();
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITenantIntegrationEventHandler<TenantCreated>, TenantCreatedToAccessProvision>());
+
+        // When a tenant is deleted, remove everything Access holds for its scope (roles, permissions, assignments).
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<ITenantIntegrationEventHandler<TenantDeleted>, TenantDeletedToAccessCleanup>());
 
         // When an Identity user is deleted, clean up their Tenant membership rows and Access platform membership.
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityEventHandler<IdentityUserDeleted>, IdentityUserDeletedToTenantCleanup>());

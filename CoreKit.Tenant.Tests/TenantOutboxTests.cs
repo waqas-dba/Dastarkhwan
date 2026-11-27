@@ -100,7 +100,7 @@ public sealed class TenantOutboxTests : IDisposable
             new TenantRepository(db), new TenantMemberRepository(db),
             new TenantAuditRecorder(new TenantAuditRepository(db), _env.Actor, _env.Time),
             racing, _env.Publisher, _env.Guard, _env.PlatformAccess, _env.Actor, _env.Permissions, _env.Time,
-            _env.MembershipReader);
+            _env.MembershipReader, new TenantOutbox(db));
 
         ResultAssert.Fails(
             await service.AddMemberAsync(_tenant.Id, new AddTenantMemberRequest { UserId = userId }),

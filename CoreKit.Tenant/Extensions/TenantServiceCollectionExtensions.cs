@@ -62,7 +62,10 @@ public static class TenantServiceCollectionExtensions
         services.AddScoped<ITenantSettingRepository, TenantSettingRepository>();
         services.AddScoped<ITenantMemberRepository, TenantMemberRepository>();
         services.AddScoped<ITenantAuditRepository, TenantAuditRepository>();
-        services.AddScoped<ITenantOutbox, TenantOutbox>();
+        services.AddScoped<ITenantOutbox>(sp => new TenantOutbox(
+            sp.GetRequiredService<TenantDbContext>(),
+            sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<CoreKit.Tenant.Settings.TenantOptions>>().Value
+                .PersistOutboxMessages));
 
         // The tenant of the current request: one object, three views of it.
         services.AddScoped<CurrentTenant>();

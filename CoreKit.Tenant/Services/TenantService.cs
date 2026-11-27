@@ -19,6 +19,7 @@ public sealed class TenantService : ITenantService
     private readonly ITenantPermissionChecker _permissions;
     private readonly TenantOptions _options;
     private readonly TimeProvider _time;
+    private readonly ITenantOutbox _outbox;
     private readonly IOwnerUserValidator? _ownerUserValidator;
 
     public TenantService(
@@ -32,6 +33,7 @@ public sealed class TenantService : ITenantService
         ITenantPermissionChecker permissions,
         IOptions<TenantOptions> options,
         TimeProvider time,
+        ITenantOutbox outbox,
         IOwnerUserValidator? ownerUserValidator = null)
     {
         _tenants = tenants;
@@ -44,6 +46,7 @@ public sealed class TenantService : ITenantService
         _permissions = permissions;
         _options = options.Value;
         _time = time;
+        _outbox = outbox;
         _ownerUserValidator = ownerUserValidator;
     }
 
@@ -157,6 +160,11 @@ public sealed class TenantService : ITenantService
         _tenants.Add(tenant);
         _audit.Record(tenant.Id, TenantAuditActions.Created, $"slug: {slug}; status: {tenant.Status}");
 
+        // The tenant row and its first two events are one transaction. Without the creation event a tenant's
+        // initial state would never reach an external consumer.
+        _outbox.StageLifecycleEvent(
+            tenant, TenantOutboxEventTypes.TenantCreated, null, tenant.Status.ToString(), now);
+
         TenantMember? owner = null;
 
         if (request.OwnerUserId is { } ownerId)
@@ -172,6 +180,7 @@ public sealed class TenantService : ITenantService
 
             _members.Add(owner);
             _audit.Record(tenant.Id, TenantAuditActions.MemberAdded, $"user: {ownerId}; owner");
+            _outbox.StageMembershipEvent(tenant, TenantOutboxEventTypes.MemberAdded, owner, now);
         }
 
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
@@ -304,6 +313,12 @@ public sealed class TenantService : ITenantService
         _tenants.Remove(tenant); // settings and members go with it (cascade); the audit trail stays
         _audit.Record(id, TenantAuditActions.Deleted, $"slug: {slug}");
 
+        // The tenant row is gone after this SaveChanges, so this is the only event that can tell an external
+        // consumer the tenant no longer exists. The outbox has no foreign key to the tenant, so it survives.
+        _outbox.StageLifecycleEvent(
+            tenant, TenantOutboxEventTypes.TenantDeleted, tenant.Status.ToString(),
+            TenantLifecycleStatuses.Deleted, now);
+
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
             return saveError;
 
@@ -351,6 +366,8 @@ public sealed class TenantService : ITenantService
         tenant.ConcurrencyStamp = Guid.NewGuid();
 
         _audit.Record(id, action, cleanReason is null ? $"{from} -> {target}" : $"{from} -> {target}; reason: {cleanReason}");
+        _outbox.StageLifecycleEvent(
+            tenant, TenantOutboxEventTypes.TenantStatusChanged, from.ToString(), target.ToString(), now);
 
         if ((await _unitOfWork.SaveAsync(ct)).ToError() is { } saveError)
             return saveError;

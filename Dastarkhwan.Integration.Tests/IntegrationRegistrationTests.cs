@@ -51,6 +51,9 @@ public sealed class IntegrationRegistrationTests
         var tenantMemberRemovedHandler = scope.ServiceProvider.GetService<ITenantIntegrationEventHandler<TenantMemberRemoved>>();
         Assert.NotNull(tenantMemberRemovedHandler);
 
+        var tenantDeletedHandler = scope.ServiceProvider.GetService<ITenantIntegrationEventHandler<TenantDeleted>>();
+        Assert.NotNull(tenantDeletedHandler);
+
         // Verify other integration services
         var claimsContributor = scope.ServiceProvider.GetService<IAccessTokenClaimsContributor>();
         Assert.NotNull(claimsContributor);

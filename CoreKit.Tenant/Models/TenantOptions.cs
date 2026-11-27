@@ -4,6 +4,15 @@ public sealed class TenantOptions
 {
     public const string SectionName = "Tenant";
 
+    /// <summary>
+    /// When true, tenant lifecycle and membership changes also write a durable outbox message in the same
+    /// transaction. Leave it false (the default) unless an external consumer reads those messages: the
+    /// in-process Integration handlers do not use the outbox, so with nothing consuming the rows they would
+    /// only accumulate. The per-tenant event sequence and the concurrency stamp that serialize concurrent
+    /// membership changes (last-owner protection) are updated either way.
+    /// </summary>
+    public bool PersistOutboxMessages { get; set; }
+
     /// <summary>Slugs nobody may take, because they usually mean something to the platform.</summary>
     public static readonly IReadOnlyList<string> DefaultReservedSlugs = new[]
     {

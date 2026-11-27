@@ -6,8 +6,10 @@ using Microsoft.EntityFrameworkCore;
 namespace CoreKit.Tenant.Persistence;
 
 /// <summary>
-/// Stages an outbox message. It is saved by the same <c>SaveChanges</c> as the membership or lifecycle change,
-/// so the change and its event commit together or not at all.
+/// Sequences tenant changes and, when persistence is enabled, stages an outbox message. A staged message is
+/// saved by the same <c>SaveChanges</c> as the membership or lifecycle change, so the change and its event
+/// commit together or not at all. The sequence and concurrency-stamp update that serializes concurrent
+/// changes to one tenant always happens, whether or not a message is persisted.
 /// </summary>
 public interface ITenantOutbox
 {
@@ -46,8 +48,18 @@ public sealed class TenantOutbox : ITenantOutbox
     };
 
     private readonly TenantDbContext _db;
+    private readonly bool _persistMessages;
 
-    public TenantOutbox(TenantDbContext db) => _db = db;
+    /// <param name="db">The tenant context that tracks the tenant being changed.</param>
+    /// <param name="persistMessages">
+    /// False skips writing the message row (see <c>TenantOptions.PersistOutboxMessages</c>) but still
+    /// advances the tenant's event sequence and concurrency stamp.
+    /// </param>
+    public TenantOutbox(TenantDbContext db, bool persistMessages = true)
+    {
+        _db = db;
+        _persistMessages = persistMessages;
+    }
 
     public TenantOutboxMessage StageMembershipEvent(
         TenantEntity trackedTenant, string eventType, TenantMember member, DateTime occurredAt)
@@ -129,7 +141,9 @@ public sealed class TenantOutbox : ITenantOutbox
             NextAttemptAt = occurredAt
         };
 
-        _db.OutboxMessages.Add(message);
+        if (_persistMessages)
+            _db.OutboxMessages.Add(message);
+
         return message;
     }
 }

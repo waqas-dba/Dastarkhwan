@@ -60,7 +60,7 @@ namespace CoreKit.Identity.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Idenity_EmailVerificationTokens", "identity");
+                    b.ToTable("Identity_EmailVerificationTokens", "identity");
                 });
 
             modelBuilder.Entity("CoreKit.Identity.Entities.IdentityOutboxMessage", b =>

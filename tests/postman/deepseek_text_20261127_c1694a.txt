@@ -1,0 +1,70 @@
+Then start the app. Startup seeding will create the admin.
+
+2. **Admin is a platform administrator.**
+Deployment startup calls `BootstrapInitialPlatformAdminAsync` → the admin gets the `Administrator` platform role. Verify with `GET /access/me` — the response must include `platform.members.manage`.
+
+3. **No preexisting data collision.**
+The collection generates a random suffix `{{runSuffix}}` per run for user emails, tenant slugs, and role names — so repeated runs don't collide. The one exception is the admin user's email, which is stable.
+
+4. **Development environment recommended.**
+Some tests rely on development-mode behaviors (DevEmailInbox endpoints are not exercised, but the ConsoleEmailSender is the only place that stores reset tokens). The suite does not depend on them: it only tests the *invalid* paths for email verification and password reset.
+
+## Importing
+
+1. Postman → Import → drop both JSON files.
+2. Select the environment **Dastarkhwan - Local** in the top-right dropdown.
+3. Verify `baseUrl` points to your running instance.
+4. Open the collection → click **Run** (Runner) → **Run Dastarkhwan**.
+
+The collection runs folders in order (00 → 12). Do not shuffle items — later folders depend on variables populated by earlier ones (`adminAccessToken`, `userAUserId`, `tenantAId`, etc.).
+
+## Folder map
+
+| # | Folder | Focus |
+|---|--------|-------|
+| 00 | Setup | Health checks, login, user/tenant creation, claim refresh |
+| 01 | Identity - Auth | Login/refresh/logout, password reset, verify email |
+| 02 | Identity - Users | CRUD + validation + last-admin protection |
+| 03 | Tenant - Lifecycle | Create/update/status transitions/delete |
+| 04 | Tenant - Settings | Get/set/setMany/remove + validation |
+| 05 | Tenant - Members | Add/remove/owner-promote/owner-demote |
+| 06 | Tenant - Audit | List + cross-tenant rejection |
+| 07 | Access - Roles | CRUD + concurrency stamp + escalation |
+| 08 | Access - Assignments | Get/Set user roles |
+| 09 | Access - Platform Members | Add/is-member/revoke |
+| 10 | Access - Audit | List + permission check |
+| 11 | Security - Negative | Cross-tenant, forged tokens, escalation |
+| 12 | Rate Limiting | Observe 429 |
+
+## Environment variables
+
+| Key | Purpose |
+|-----|---------|
+| `baseUrl` | App root |
+| `adminEmail` / `adminPassword` | Seeded admin |
+| `adminAccessToken` | Populated by `00 - Login as Admin` |
+| `userAEmail` / `userAAccessToken` / `userAUserId` | Populated during setup |
+| `userBEmail` / `userBAccessToken` / `userBUserId` | Populated during setup |
+| `tenantAId` / `tenantASlug` | Populated by `00 - Create Tenant A` |
+| `tenantBId` / `tenantBSlug` | Populated by `00 - Create Tenant B` |
+| `platformAdminRoleId` / `newRoleId` / `managerRoleId` / `cashierRoleId` | Populated by role-list calls |
+| `runSuffix` | Timestamp set once at collection start — keeps run-unique values |
+
+## Understanding failures
+
+- **`00 - Verify Admin is Platform Admin` fails** → bootstrap didn't run, or `Identity:Seed:*` isn't set. Check startup logs for `platform.admin.bootstrap` audit entry.
+- **`00 - Create User A` fails with 409** → stale data from a previous run with the same suffix. Reset `runSuffix` variable or truncate the DB.
+- **`00 - Re-Login User A` fails with 401** → the User A creation or first login didn't complete. Run the Setup folder in isolation first.
+- **`12 - Rate Limiting` flaky** → the default partition is per IP; if you're behind a shared NAT, other users could exhaust your budget. Use a dedicated test instance.
+
+## Running in CI
+
+See `run-tests.sh` / `run-tests.ps1` and the GitHub Actions workflow. Both invoke `newman`:
+
+```bash
+newman run dastarkhwan.postman_collection.json \
+-e dastarkhwan.postman_environment.json \
+--reporters cli,json \
+--reporter-json-export newman-report.json \
+--delay-request 50 \
+--timeout-request 15000

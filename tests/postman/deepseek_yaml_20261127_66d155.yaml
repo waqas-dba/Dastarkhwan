@@ -1,0 +1,111 @@
+name: Postman Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+jobs:
+  postman:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: dastarkhwan_test
+        ports: [ "5432:5432" ]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install newman
+        run: npm i -g newman newman-reporter-htmlextra
+
+      - name: Build
+        run: dotnet build Dastarkhwan.Web/Dastarkhwan.Web.csproj -c Release
+
+      - name: Migrate databases
+        env:
+          ConnectionStrings__Default: "Host=localhost;Port=5432;Database=dastarkhwan_test;Username=postgres;Password=postgres"
+        run: |
+          dotnet tool install --global dotnet-ef || true
+          dotnet ef database update -p CoreKit.Identity -s Dastarkhwan.Web
+          dotnet ef database update -p CoreKit.Tenant   -s Dastarkhwan.Web
+          dotnet ef database update -p CoreKit.Access   -s Dastarkhwan.Web
+
+      - name: Start API
+        env:
+          ASPNETCORE_ENVIRONMENT: Development
+          ASPNETCORE_URLS: "http://localhost:5000"
+          ConnectionStrings__Default: "Host=localhost;Port=5432;Database=dastarkhwan_test;Username=postgres;Password=postgres"
+          Identity__Seed__AdminEmail: "admin@dastarkhwan.local"
+          Identity__Seed__AdminPassword: "AdminPass123!"
+          Identity__Seed__AdminMobile: "+923000000000"
+          Identity__Seed__AdminDisplayName: "CI Admin"
+          Identity__Jwt__SigningKey: "ci-signing-key-must-be-at-least-32-chars-long-please"
+          Identity__Jwt__Issuer: "dastarkhwan-ci"
+          Identity__Jwt__Audience: "dastarkhwan-ci-clients"
+          Email__Provider: "Console"
+          Email__BaseUrl: "http://localhost:5000"
+          Tenant__Outbox__PersistOutboxMessages: "true"
+        run: |
+          dotnet run --project Dastarkhwan.Web/Dastarkhwan.Web.csproj --no-build &
+          echo $! > api.pid
+
+      - name: Wait for API
+        run: |
+          for i in {1..60}; do
+            if curl -sf http://localhost:5000/health/ready > /dev/null; then
+              echo "API is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API failed to start"
+          cat /tmp/*.log 2>/dev/null || true
+          exit 1
+
+      - name: Run Postman collection
+        run: |
+          newman run postman/dastarkhwan.postman_collection.json \
+            -e postman/dastarkhwan.postman_environment.json \
+            --reporters cli,json,htmlextra \
+            --reporter-json-export postman/newman-report.json \
+            --reporter-htmlextra-export postman/newman-report.html \
+            --reporter-htmlextra-skipHeaders Authorization,Cookie \
+            --delay-request 50 \
+            --timeout-request 15000 \
+            --bail
+
+      - name: Stop API
+        if: always()
+        run: |
+          if [ -f api.pid ]; then kill "$(cat api.pid)" || true; fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: newman-report
+          path: |
+            postman/newman-report.json
+            postman/newman-report.html
+          retention-days: 14

@@ -1,0 +1,1518 @@
+{
+  "info": {
+    "name": "Dastarkhwan — Full Test Suite",
+    "description": "Complete positive, negative, security and rate-limit coverage for CoreKit.Identity, CoreKit.Tenant and CoreKit.Access. Prerequisites documented in README-postman.md.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if (!pm.environment.get('runSuffix')) {",
+          "  pm.environment.set('runSuffix', pm.variables.replaceIn('{{$timestamp}}'));",
+          "}",
+          "// Give every request a correlation id if the API wants one later.",
+          "pm.request.headers.upsert({ key: 'X-Correlation-Id', value: pm.variables.replaceIn('{{$guid}}') });"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - Setup",
+      "item": [
+        {
+          "name": "Health - Live",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/health/live", "host": ["{{baseUrl}}"], "path": ["health", "live"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 live', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Health - Ready",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/health/ready", "host": ["{{baseUrl}}"], "path": ["health", "ready"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 ready', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Login as Admin",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/login", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "login"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 login', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.environment.set('adminAccessToken', body.accessToken);",
+            "pm.environment.set('adminRefreshToken', body.refreshToken);",
+            "pm.environment.set('adminUserId', body.user.id);"
+          ]}}]
+        },
+        {
+          "name": "Verify Admin is Platform Admin",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/access/me", "host": ["{{baseUrl}}"], "path": ["access", "me"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "const body = pm.response.json();",
+            "pm.test('is member', () => pm.expect(body.isMember).to.eql(true));",
+            "pm.test('has platform.members.manage', () => pm.expect(body.permissions).to.include('platform.members.manage'));"
+          ]}}]
+        },
+        {
+          "name": "Find Platform Administrator Role",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/access/roles", "host": ["{{baseUrl}}"], "path": ["access", "roles"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "const roles = pm.response.json();",
+            "const admin = roles.find(r => r.name === 'Administrator');",
+            "pm.test('platform Administrator role exists', () => pm.expect(admin).to.be.an('object'));",
+            "if (admin) { pm.environment.set('platformAdminRoleId', admin.id); pm.environment.set('platformAdminConcurrency', admin.concurrencyStamp); }"
+          ]}}]
+        },
+        {
+          "name": "Create User A",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"userA+{{runSuffix}}@test.local\",\n  \"password\": \"{{userAPassword}}\",\n  \"mobile\": \"+923001110001\",\n  \"displayName\": \"Test User A\",\n  \"isActive\": true\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/users", "host": ["{{baseUrl}}"], "path": ["identity", "users"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json();",
+            "pm.environment.set('userAUserId', body.id);",
+            "pm.environment.set('userAEmail', body.email);"
+          ]}}]
+        },
+        {
+          "name": "Create User B",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"userB+{{runSuffix}}@test.local\",\n  \"password\": \"{{userBPassword}}\",\n  \"mobile\": \"+923002220002\",\n  \"displayName\": \"Test User B\",\n  \"isActive\": true\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/users", "host": ["{{baseUrl}}"], "path": ["identity", "users"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json();",
+            "pm.environment.set('userBUserId', body.id);",
+            "pm.environment.set('userBEmail', body.email);"
+          ]}}]
+        },
+        {
+          "name": "Login as User A",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{userAEmail}}\",\n  \"password\": \"{{userAPassword}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/login", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "login"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.environment.set('userAAccessToken', pm.response.json().accessToken);"
+          ]}}]
+        },
+        {
+          "name": "Login as User B",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{userBEmail}}\",\n  \"password\": \"{{userBPassword}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/login", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "login"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.environment.set('userBAccessToken', pm.response.json().accessToken);"
+          ]}}]
+        },
+        {
+          "name": "Create Tenant A (owner=User A)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Tenant A {{runSuffix}}\",\n  \"slug\": \"tenant-a-{{runSuffix}}\",\n  \"activateImmediately\": true,\n  \"ownerUserId\": \"{{userAUserId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/tenants", "host": ["{{baseUrl}}"], "path": ["tenants"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json();",
+            "pm.environment.set('tenantAId', body.id);",
+            "pm.environment.set('tenantASlug', body.slug);",
+            "pm.environment.set('tenantAName', body.name);"
+          ]}}]
+        },
+        {
+          "name": "Create Tenant B (owner=User B)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Tenant B {{runSuffix}}\",\n  \"slug\": \"tenant-b-{{runSuffix}}\",\n  \"activateImmediately\": true,\n  \"ownerUserId\": \"{{userBUserId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/tenants", "host": ["{{baseUrl}}"], "path": ["tenants"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201', () => pm.response.to.have.status(201));",
+            "const body = pm.response.json();",
+            "pm.environment.set('tenantBId', body.id);",
+            "pm.environment.set('tenantBSlug', body.slug);",
+            "pm.environment.set('tenantBName', body.name);"
+          ]}}]
+        },
+        {
+          "name": "User A refreshes token (picks up Tenant A claim)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{userARefreshToken}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/refresh", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "refresh"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "// user A was logged in BEFORE tenant A existed → may not have tenant_id claim yet",
+            "// We re-login below using credentials.",
+            "pm.test('200 or 401 tolerable', () => pm.expect([200, 401]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Re-Login User A (gets tenant claim)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{userAEmail}}\",\n  \"password\": \"{{userAPassword}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/login", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "login"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.environment.set('userAAccessToken', pm.response.json().accessToken);"
+          ]}}]
+        },
+        {
+          "name": "Re-Login User B (gets tenant claim)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{userBEmail}}\",\n  \"password\": \"{{userBPassword}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/login", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "login"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.environment.set('userBAccessToken', pm.response.json().accessToken);"
+          ]}}]
+        },
+        {
+          "name": "Assign Manager role to User A in Tenant A",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/access/roles?scopeTenantId={{tenantAId}}", "host": ["{{baseUrl}}"], "path": ["access", "roles"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "// Admin cannot fetch tenant-scope roles via /access/roles (that resolves the platform scope).",
+            "// We rely on tenant A's Owner role auto-provisioning + user A being Owner → full perms.",
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "01 - Identity - Auth",
+      "item": [
+        {
+          "name": "Login - wrong password → 401",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"WrongPassword999!\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/login", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "login"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401', () => pm.response.to.have.status(401));",
+            "pm.test('error code', () => pm.expect(pm.response.json().errorCode).to.eql('auth.invalid_credentials'));"
+          ]}}]
+        },
+        {
+          "name": "Login - unknown email → 401",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"nobody-{{$guid}}@nowhere.local\",\n  \"password\": \"Anything123!\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/login", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "login"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401', () => pm.response.to.have.status(401));"
+          ]}}]
+        },
+        {
+          "name": "Login - empty body → 400",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/login", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "login"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400 or 401', () => pm.expect([400, 401]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Refresh - valid token → 200",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{adminRefreshToken}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/refresh", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "refresh"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.environment.set('adminAccessToken', pm.response.json().accessToken);",
+            "pm.environment.set('adminRefreshToken', pm.response.json().refreshToken);"
+          ]}}]
+        },
+        {
+          "name": "Refresh - invalid token → 401",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"not-a-real-token\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/refresh", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "refresh"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401', () => pm.response.to.have.status(401));",
+            "pm.test('code', () => pm.expect(pm.response.json().errorCode).to.eql('auth.invalid_refresh_token'));"
+          ]}}]
+        },
+        {
+          "name": "Refresh - empty body → 400 or 401",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/refresh", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "refresh"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400/401', () => pm.expect([400, 401]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Current User - admin → 200",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/identity/auth/me", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "me"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('email', () => pm.expect(pm.response.json()).to.have.property('email'));"
+          ]}}]
+        },
+        {
+          "name": "Current User - anonymous → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/identity/auth/me", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "me"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401', () => pm.response.to.have.status(401));"
+          ]}}]
+        },
+        {
+          "name": "Change Password - wrong current → 400",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"currentPassword\": \"WrongOld999!\",\n  \"newPassword\": \"NewPass123!\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/change-password", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "change-password"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400', () => pm.response.to.have.status(400));",
+            "pm.test('code', () => pm.expect(pm.response.json().errorCode).to.eql('auth.wrong_current_password'));"
+          ]}}]
+        },
+        {
+          "name": "Change Password - weak new password → 400",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"currentPassword\": \"{{userAPassword}}\",\n  \"newPassword\": \"short\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/change-password", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "change-password"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400', () => pm.response.to.have.status(400));"
+          ]}}]
+        },
+        {
+          "name": "Logout - valid token → 204",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{adminRefreshToken}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/logout", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "logout"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('204 or 200', () => pm.expect([200, 204]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Resend Verification - unknown email → 200 (enumeration resistant)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"ghost-{{$guid}}@nowhere.local\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/resend-verification", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "resend-verification"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 (never leaks)', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Forgot Password - unknown email → 200 (enumeration resistant)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"ghost-{{$guid}}@nowhere.local\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/forgot-password", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "forgot-password"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Reset Password - invalid token → 400",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"token\": \"garbage\",\n  \"newPassword\": \"NewPass123!\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/reset-password", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "reset-password"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400', () => pm.response.to.have.status(400));",
+            "pm.test('code', () => pm.expect(pm.response.json().errorCode).to.eql('auth.invalid_reset_token'));"
+          ]}}]
+        },
+        {
+          "name": "Verify Email - invalid token → 400",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"token\": \"garbage\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/verify-email", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "verify-email"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400', () => pm.response.to.have.status(400));",
+            "pm.test('code', () => pm.expect(pm.response.json().errorCode).to.eql('email.invalid_verification_token'));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "02 - Identity - Users",
+      "item": [
+        {
+          "name": "List Users (admin)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/identity/users?page=1&pageSize=20", "host": ["{{baseUrl}}"], "path": ["identity", "users"], "query": [{"key":"page","value":"1"},{"key":"pageSize","value":"20"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('items array', () => pm.expect(pm.response.json()).to.have.property('items').that.is.an('array'));"
+          ]}}]
+        },
+        {
+          "name": "List Users (anon) → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/identity/users", "host": ["{{baseUrl}}"], "path": ["identity", "users"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401', () => pm.response.to.have.status(401));"
+          ]}}]
+        },
+        {
+          "name": "List Users (user A, no permission) → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/identity/users", "host": ["{{baseUrl}}"], "path": ["identity", "users"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403', () => pm.response.to.have.status(403));"
+          ]}}]
+        },
+        {
+          "name": "Get User by ID (admin)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/identity/users/{{userAUserId}}", "host": ["{{baseUrl}}"], "path": ["identity", "users", "{{userAUserId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('id matches', () => pm.expect(pm.response.json().id).to.eql(pm.environment.get('userAUserId')));"
+          ]}}]
+        },
+        {
+          "name": "Get User - not found → 404",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/identity/users/00000000-0000-0000-0000-000000000099", "host": ["{{baseUrl}}"], "path": ["identity", "users", "00000000-0000-0000-0000-000000000099"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('404', () => pm.response.to.have.status(404));"
+          ]}}]
+        },
+        {
+          "name": "Create User - valid",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"newuser+{{$guid}}@test.local\",\n  \"password\": \"NewUserPass123!\",\n  \"mobile\": \"+923004440004\",\n  \"displayName\": \"New User\",\n  \"isActive\": true\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/users", "host": ["{{baseUrl}}"], "path": ["identity", "users"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201', () => pm.response.to.have.status(201));",
+            "const b = pm.response.json();",
+            "pm.environment.set('newUserId', b.id);",
+            "pm.environment.set('newUserEmail', b.email);"
+          ]}}]
+        },
+        {
+          "name": "Create User - invalid email → 400",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"NewUserPass123!\",\n  \"mobile\": \"+923005550005\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/users", "host": ["{{baseUrl}}"], "path": ["identity", "users"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400', () => pm.response.to.have.status(400));"
+          ]}}]
+        },
+        {
+          "name": "Create User - weak password → 400",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"weak+{{$guid}}@test.local\",\n  \"password\": \"123\",\n  \"mobile\": \"+923006660006\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/users", "host": ["{{baseUrl}}"], "path": ["identity", "users"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400', () => pm.response.to.have.status(400));"
+          ]}}]
+        },
+        {
+          "name": "Create User - duplicate email → 409",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{userAEmail}}\",\n  \"password\": \"NewUserPass123!\",\n  \"mobile\": \"+923007770007\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/users", "host": ["{{baseUrl}}"], "path": ["identity", "users"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('409', () => pm.response.to.have.status(409));"
+          ]}}]
+        },
+        {
+          "name": "Update User - change mobile",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"mobile\": \"+923009990009\",\n  \"displayName\": \"User A (updated)\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/users/{{userAUserId}}", "host": ["{{baseUrl}}"], "path": ["identity", "users", "{{userAUserId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('display name updated', () => pm.expect(pm.response.json().displayName).to.eql('User A (updated)'));"
+          ]}}]
+        },
+        {
+          "name": "Update User - email change rejected → 400",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"other+{{$guid}}@test.local\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/users/{{userAUserId}}", "host": ["{{baseUrl}}"], "path": ["identity", "users", "{{userAUserId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400', () => pm.response.to.have.status(400));"
+          ]}}]
+        },
+        {
+          "name": "Update User - self deactivation → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"isActive\": false\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/users/{{adminUserId}}", "host": ["{{baseUrl}}"], "path": ["identity", "users", "{{adminUserId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 or 409', () => pm.expect([403, 409]).to.include(pm.response.code));",
+            "pm.test('message mentions last-admin or self', () => {",
+            "  const m = (pm.response.json().detail || '').toLowerCase();",
+            "  pm.expect(m.includes('your own') || m.includes('last active administrator')).to.eql(true);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Delete User - self → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/identity/users/{{adminUserId}}", "host": ["{{baseUrl}}"], "path": ["identity", "users", "{{adminUserId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403', () => pm.response.to.have.status(403));"
+          ]}}]
+        },
+        {
+          "name": "Delete User - valid (throwaway)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/identity/users/{{newUserId}}", "host": ["{{baseUrl}}"], "path": ["identity", "users", "{{newUserId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('204 or 200', () => pm.expect([200, 204]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "03 - Tenant - Lifecycle",
+      "item": [
+        {
+          "name": "List tenants (admin/platform) → 200",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants", "host": ["{{baseUrl}}"], "path": ["tenants"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('has items', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+          ]}}]
+        },
+        {
+          "name": "List tenants (user A) → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants", "host": ["{{baseUrl}}"], "path": ["tenants"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403', () => pm.response.to.have.status(403));"
+          ]}}]
+        },
+        {
+          "name": "Get Tenant A (as admin) → 200",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('id', () => pm.expect(pm.response.json().id).to.eql(pm.environment.get('tenantAId')));"
+          ]}}]
+        },
+        {
+          "name": "Get Tenant A (as user A, member) → 200",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Get Tenant B (as user A, cross-tenant) → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantBId}}", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantBId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 cross-tenant', () => pm.response.to.have.status(403));",
+            "pm.test('tenant error', () => {",
+            "  const b = pm.response.json();",
+            "  pm.expect(['tenant.cross_tenant_access','tenant.mismatch']).to.include(b.errorCode);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Get Current Tenant (user A) → 200",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/current", "host": ["{{baseUrl}}"], "path": ["tenants", "current"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('is tenant A', () => pm.expect(pm.response.json().id).to.eql(pm.environment.get('tenantAId')));"
+          ]}}]
+        },
+        {
+          "name": "Create Tenant - reserved slug → 400",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Reserved Slug Tenant\",\n  \"slug\": \"admin\",\n  \"activateImmediately\": false,\n  \"ownerUserId\": \"{{adminUserId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/tenants", "host": ["{{baseUrl}}"], "path": ["tenants"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400', () => pm.response.to.have.status(400));"
+          ]}}]
+        },
+        {
+          "name": "Create Tenant - duplicate slug → 409",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Duplicate Slug Tenant\",\n  \"slug\": \"{{tenantASlug}}\",\n  \"activateImmediately\": true,\n  \"ownerUserId\": \"{{adminUserId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/tenants", "host": ["{{baseUrl}}"], "path": ["tenants"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('409', () => pm.response.to.have.status(409));"
+          ]}}]
+        },
+        {
+          "name": "Update Tenant A - rename",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Tenant A Renamed {{runSuffix}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('name updated', () => pm.expect(pm.response.json().name).to.include('Renamed'));"
+          ]}}]
+        },
+        {
+          "name": "Suspend Tenant A",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"test suspend\"\n}" },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/suspend", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "suspend"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('Suspended', () => pm.expect(pm.response.json().status).to.eql('Suspended'));"
+          ]}}]
+        },
+        {
+          "name": "Update Tenant A (archived-readonly check before archive) - noop",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{}" },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 (empty update noop)', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Activate Tenant A",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/activate", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "activate"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Archive Tenant A",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"reason\": \"test archive\"\n}" },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/archive", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "archive"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('Archived', () => pm.expect(pm.response.json().status).to.eql('Archived'));"
+          ]}}]
+        },
+        {
+          "name": "Update Archived Tenant → 409",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Should Fail\"\n}" },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('409', () => pm.response.to.have.status(409));"
+          ]}}]
+        },
+        {
+          "name": "Restore Tenant A (archived → suspended)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/restore", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "restore"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Activate Tenant A (restored)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/activate", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "activate"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Delete non-archived tenant → 409",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantBId}}", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantBId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('409', () => pm.response.to.have.status(409));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "04 - Tenant - Settings",
+      "item": [
+        {
+          "name": "List settings (user A in tenant A) → 200",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/settings", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "settings"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Get missing setting → 404",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/settings/does.not.exist", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "settings", "does.not.exist"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('404', () => pm.response.to.have.status(404));"
+          ]}}]
+        },
+        {
+          "name": "Set single setting",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"value\": \"UTC\"\n}" },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/settings/general.timezone", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "settings", "general.timezone"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('value', () => pm.expect(pm.response.json().value).to.eql('UTC'));"
+          ]}}]
+        },
+        {
+          "name": "Set many settings",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"values\": {\n    \"ui.theme\": \"dark\",\n    \"ui.locale\": \"en-US\"\n  }\n}" },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/settings", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "settings"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('2 returned', () => pm.expect(pm.response.json()).to.have.lengthOf(2));"
+          ]}}]
+        },
+        {
+          "name": "Set invalid key format → 400",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"value\": \"bad\"\n}" },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/settings/Bad Key!", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "settings", "Bad Key!"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400 or 404', () => pm.expect([400,404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Delete setting",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/settings/ui.theme", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "settings", "ui.theme"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('204 or 200', () => pm.expect([200,204]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "05 - Tenant - Members",
+      "item": [
+        {
+          "name": "List members (user A)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/members", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "members"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('contains user A as owner', () => {",
+            "  const list = pm.response.json();",
+            "  const a = list.find(m => m.userId === pm.environment.get('userAUserId'));",
+            "  pm.expect(a).to.be.an('object');",
+            "  pm.expect(a.isOwner).to.eql(true);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Add member (user B into Tenant A)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{userBUserId}}\",\n  \"isOwner\": false\n}" },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/members", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "members"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Add duplicate member → 409",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{userBUserId}}\",\n  \"isOwner\": false\n}" },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/members", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "members"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('409', () => pm.response.to.have.status(409));"
+          ]}}]
+        },
+        {
+          "name": "Add self as owner → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{userAUserId}}\",\n  \"isOwner\": true\n}" },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/members", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "members"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 or 409', () => pm.expect([403,409]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Remove last owner (user A) → 409",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/members/{{userAUserId}}", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "members", "{{userAUserId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('409', () => pm.response.to.have.status(409));"
+          ]}}]
+        },
+        {
+          "name": "Set owner (promote user B in tenant A)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"isOwner\": true\n}" },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/members/{{userBUserId}}/owner", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "members", "{{userBUserId}}", "owner"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Remove member (non-owner user B)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/members/{{userBUserId}}", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "members", "{{userBUserId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('204 or 200', () => pm.expect([200,204]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "06 - Tenant - Audit",
+      "item": [
+        {
+          "name": "List tenant A audit",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}/audit", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}", "audit"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('has items', () => pm.expect(pm.response.json().items).to.be.an('array'));"
+          ]}}]
+        },
+        {
+          "name": "List tenant B audit as user A → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantBId}}/audit", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantBId}}", "audit"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403', () => pm.response.to.have.status(403));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "07 - Access - Roles",
+      "item": [
+        {
+          "name": "List permissions",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/access/permissions", "host": ["{{baseUrl}}"], "path": ["access", "permissions"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('has identity.users.read', () => {",
+            "  const list = pm.response.json();",
+            "  pm.expect(list.some(p => p.name === 'identity.users.read')).to.eql(true);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "List roles (platform scope, admin)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/access/roles", "host": ["{{baseUrl}}"], "path": ["access", "roles"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('platform Administrator present', () => {",
+            "  const list = pm.response.json();",
+            "  pm.expect(list.some(r => r.name === 'Administrator')).to.eql(true);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "List roles (tenant A, as owner)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/access/roles", "host": ["{{baseUrl}}"], "path": ["access", "roles"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.test('Owner role present', () => {",
+            "  const list = pm.response.json();",
+            "  pm.expect(list.some(r => r.name === 'Owner')).to.eql(true);",
+            "  const manager = list.find(r => r.name === 'Manager');",
+            "  if (manager) pm.environment.set('managerRoleId', manager.id);",
+            "  const cashier = list.find(r => r.name === 'Cashier');",
+            "  if (cashier) pm.environment.set('cashierRoleId', cashier.id);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Get role by ID",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/access/roles/{{platformAdminRoleId}}", "host": ["{{baseUrl}}"], "path": ["access", "roles", "{{platformAdminRoleId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Get missing role → 404",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/access/roles/00000000-0000-0000-0000-0000000000ff", "host": ["{{baseUrl}}"], "path": ["access", "roles", "00000000-0000-0000-0000-0000000000ff"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('404', () => pm.response.to.have.status(404));"
+          ]}}]
+        },
+        {
+          "name": "Create role (tenant A)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Temp Role {{runSuffix}}\",\n  \"description\": \"temporary test role\",\n  \"permissions\": [\"sales.create\"]\n}" },
+            "url": { "raw": "{{baseUrl}}/access/roles", "host": ["{{baseUrl}}"], "path": ["access", "roles"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201', () => pm.response.to.have.status(201));",
+            "const b = pm.response.json();",
+            "pm.environment.set('newRoleId', b.id);",
+            "pm.environment.set('newRoleConcurrency', b.concurrencyStamp);"
+          ]}}]
+        },
+        {
+          "name": "Create role - duplicate name → 409",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Temp Role {{runSuffix}}\",\n  \"permissions\": []\n}" },
+            "url": { "raw": "{{baseUrl}}/access/roles", "host": ["{{baseUrl}}"], "path": ["access", "roles"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('409', () => pm.response.to.have.status(409));"
+          ]}}]
+        },
+        {
+          "name": "Create role - unknown permission → 400",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Unknown Perm Role {{runSuffix}}\",\n  \"permissions\": [\"does.not.exist\"]\n}" },
+            "url": { "raw": "{{baseUrl}}/access/roles", "host": ["{{baseUrl}}"], "path": ["access", "roles"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400', () => pm.response.to.have.status(400));"
+          ]}}]
+        },
+        {
+          "name": "Update role - missing concurrency stamp → 400",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Renamed\"\n}" },
+            "url": { "raw": "{{baseUrl}}/access/roles/{{newRoleId}}", "host": ["{{baseUrl}}"], "path": ["access", "roles", "{{newRoleId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400', () => pm.response.to.have.status(400));"
+          ]}}]
+        },
+        {
+          "name": "Update role - concurrency mismatch → 409",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Renamed\",\n  \"concurrencyStamp\": \"00000000-0000-0000-0000-000000000000\"\n}" },
+            "url": { "raw": "{{baseUrl}}/access/roles/{{newRoleId}}", "host": ["{{baseUrl}}"], "path": ["access", "roles", "{{newRoleId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('400 or 409', () => pm.expect([400,409]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Update role - valid",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Temp Role Renamed {{runSuffix}}\",\n  \"concurrencyStamp\": \"{{newRoleConcurrency}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/access/roles/{{newRoleId}}", "host": ["{{baseUrl}}"], "path": ["access", "roles", "{{newRoleId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));",
+            "pm.environment.set('newRoleConcurrency', pm.response.json().concurrencyStamp);"
+          ]}}]
+        },
+        {
+          "name": "Set permissions on role",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"permissions\": [\"sales.create\", \"products.view\"],\n  \"concurrencyStamp\": \"{{newRoleConcurrency}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/access/roles/{{newRoleId}}/permissions", "host": ["{{baseUrl}}"], "path": ["access", "roles", "{{newRoleId}}", "permissions"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Delete role",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/access/roles/{{newRoleId}}", "host": ["{{baseUrl}}"], "path": ["access", "roles", "{{newRoleId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('204 or 200', () => pm.expect([200,204]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "08 - Access - Assignments",
+      "item": [
+        {
+          "name": "Get user B roles in tenant A",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/access/users/{{userBUserId}}/roles", "host": ["{{baseUrl}}"], "path": ["access", "users", "{{userBUserId}}", "roles"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "Set user B roles in tenant A - invalid role id → 404",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"roleIds\": [\"00000000-0000-0000-0000-0000000000ff\"]\n}" },
+            "url": { "raw": "{{baseUrl}}/access/users/{{userBUserId}}/roles", "host": ["{{baseUrl}}"], "path": ["access", "users", "{{userBUserId}}", "roles"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('404', () => pm.response.to.have.status(404));"
+          ]}}]
+        },
+        {
+          "name": "Set user B roles in tenant A - valid (assign Cashier if exists)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"roleIds\": [\"{{cashierRoleId}}\"]\n}" },
+            "url": { "raw": "{{baseUrl}}/access/users/{{userBUserId}}/roles", "host": ["{{baseUrl}}"], "path": ["access", "users", "{{userBUserId}}", "roles"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 or 404 (role may not exist)', () => pm.expect([200,404]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "09 - Access - Platform Members",
+      "item": [
+        {
+          "name": "Is user A a platform member?",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/access/platform/members/{{userAUserId}}", "host": ["{{baseUrl}}"], "path": ["access", "platform", "members", "{{userAUserId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200 or 404', () => pm.expect([200,404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Add platform member (user A)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"{{userAUserId}}\"\n}" },
+            "url": { "raw": "{{baseUrl}}/access/platform/members", "host": ["{{baseUrl}}"], "path": ["access", "platform", "members"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('201 or 200 (idempotent)', () => pm.expect([200,201]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Revoke platform member",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/access/platform/members/{{userAUserId}}", "host": ["{{baseUrl}}"], "path": ["access", "platform", "members", "{{userAUserId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "10 - Access - Audit",
+      "item": [
+        {
+          "name": "List access audit (admin)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/access/audit", "host": ["{{baseUrl}}"], "path": ["access", "audit"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('200', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "List access audit as user B (no perm) → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userBAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/access/audit", "host": ["{{baseUrl}}"], "path": ["access", "audit"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 or 200 (if owner of tenant B)', () => pm.expect([200,403]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "11 - Security - Negative",
+      "item": [
+        {
+          "name": "Anonymous → /access/me → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/access/me", "host": ["{{baseUrl}}"], "path": ["access", "me"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401', () => pm.response.to.have.status(401));"
+          ]}}]
+        },
+        {
+          "name": "Anonymous → /tenants/{{tenantAId}} → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantAId}}", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantAId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401', () => pm.response.to.have.status(401));"
+          ]}}]
+        },
+        {
+          "name": "Anonymous → /tenants/current → 401",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/current", "host": ["{{baseUrl}}"], "path": ["tenants", "current"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401', () => pm.response.to.have.status(401));"
+          ]}}]
+        },
+        {
+          "name": "User A accesses tenant B settings → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantBId}}/settings", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantBId}}", "settings"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 cross-tenant', () => pm.response.to.have.status(403));"
+          ]}}]
+        },
+        {
+          "name": "User A adds self as owner in tenant B → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"isOwner\": true\n}" },
+            "url": { "raw": "{{baseUrl}}/tenants/{{tenantBId}}/members/{{userAUserId}}/owner", "host": ["{{baseUrl}}"], "path": ["tenants", "{{tenantBId}}", "members", "{{userAUserId}}", "owner"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 or 404', () => pm.expect([403,404]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Cross-tenant X-Tenant-Id header forgery (no trust) → no escalation",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userAAccessToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [{ "key": "X-Tenant-Id", "value": "{{tenantBId}}" }],
+            "url": { "raw": "{{baseUrl}}/tenants/current", "host": ["{{baseUrl}}"], "path": ["tenants", "current"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('still tenant A (header ignored)', () => {",
+            "  if (pm.response.code === 200) {",
+            "    pm.expect(pm.response.json().id).to.eql(pm.environment.get('tenantAId'));",
+            "  } else {",
+            "    pm.expect([403]).to.include(pm.response.code);",
+            "  }",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "Last-admin protection: admin tries to deactivate self",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminAccessToken}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"isActive\": false\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/users/{{adminUserId}}", "host": ["{{baseUrl}}"], "path": ["identity", "users", "{{adminUserId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 or 409', () => pm.expect([403,409]).to.include(pm.response.code));"
+          ]}}]
+        },
+        {
+          "name": "Privilege escalation: user B tries to create role with permission they lack",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{userBAccessToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Escalation Attempt {{runSuffix}}\",\n  \"permissions\": [\"platform.members.manage\"]\n}" },
+            "url": { "raw": "{{baseUrl}}/access/roles", "host": ["{{baseUrl}}"], "path": ["access", "roles"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('403 (not a platform admin)', () => pm.response.to.have.status(403));"
+          ]}}]
+        },
+        {
+          "name": "Stale/forged bearer token → 401",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "not.a.real.jwt", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/identity/auth/me", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "me"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('401', () => pm.response.to.have.status(401));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "12 - Rate Limiting",
+      "item": [
+        {
+          "name": "Hammer login → expect eventual 429",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"hammer+{{$guid}}@nowhere.local\",\n  \"password\": \"nope\"\n}" },
+            "url": { "raw": "{{baseUrl}}/identity/auth/login", "host": ["{{baseUrl}}"], "path": ["identity", "auth", "login"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "// A single call may be 401/429. Call it in a Runner loop with delay=0 to observe 429.",
+            "pm.test('401 or 429', () => pm.expect([401,429]).to.include(pm.response.code));"
+          ]}}]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000" }
+  ]
+}

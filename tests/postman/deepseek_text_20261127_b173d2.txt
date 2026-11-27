@@ -1,0 +1,52 @@
+
+---
+
+## 4. `run-tests.sh`
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Usage: ./run-tests.sh [environment-name]
+# Requires: newman (npm i -g newman)
+# Requires: the API is reachable at the URL in the environment file.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COLLECTION="${SCRIPT_DIR}/dastarkhwan.postman_collection.json"
+ENVIRONMENT="${SCRIPT_DIR}/dastarkhwan.postman_environment.json"
+REPORT_JSON="${SCRIPT_DIR}/newman-report.json"
+REPORT_HTML="${SCRIPT_DIR}/newman-report.html"
+
+command -v newman >/dev/null 2>&1 || { echo "newman not installed. Run: npm i -g newman newman-reporter-htmlextra"; exit 1; }
+[[ -f "$COLLECTION" ]] || { echo "Missing $COLLECTION"; exit 1; }
+[[ -f "$ENVIRONMENT" ]] || { echo "Missing $ENVIRONMENT"; exit 1; }
+
+echo "▶ Running Dastarkhwan Postman suite"
+echo "  Collection : $COLLECTION"
+echo "  Environment: $ENVIRONMENT"
+echo ""
+
+newman run "$COLLECTION" \
+  -e "$ENVIRONMENT" \
+  --reporters cli,json,htmlextra \
+  --reporter-json-export "$REPORT_JSON" \
+  --reporter-htmlextra-export "$REPORT_HTML" \
+  --reporter-htmlextra-title "Dastarkhwan Postman Results" \
+  --reporter-htmlextra-browserTitle "Dastarkhwan Postman Results" \
+  --reporter-htmlextra-omitHeaders false \
+  --reporter-htmlextra-showEnvironmentData \
+  --reporter-htmlextra-skipHeaders Authorization,Cookie \
+  --delay-request 50 \
+  --timeout-request 15000 \
+  --timeout-script 5000 \
+  --bail \
+  --color on
+
+EXIT=$?
+echo ""
+if [[ $EXIT -eq 0 ]]; then
+  echo "✔ All tests passed. HTML report: $REPORT_HTML"
+else
+  echo "✖ Failures detected. See: $REPORT_HTML"
+fi
+exit $EXIT

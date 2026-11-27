@@ -11,57 +11,76 @@ public sealed class IdentityOutboxDispatcher
     private readonly IdentityDbContext _db;
     private readonly IIdentityOutboxTransport _transport;
     private readonly IdentityOutboxOptions _options;
+    private readonly TimeProvider _time;
     private readonly ILogger<IdentityOutboxDispatcher> _logger;
+    private readonly string _leaseOwner =
+        $"{Environment.MachineName}:{Environment.ProcessId}:{Guid.NewGuid():N}";
 
     public IdentityOutboxDispatcher(
         IdentityDbContext db,
         IIdentityOutboxTransport transport,
         IOptions<IdentityOutboxOptions> options,
+        TimeProvider time,
         ILogger<IdentityOutboxDispatcher> logger)
     {
         _db = db;
         _transport = transport;
         _options = options.Value;
+        _time = time;
         _logger = logger;
     }
 
-    public async Task DispatchPendingAsync(CancellationToken ct = default)
+    public async Task<int> DispatchPendingAsync(CancellationToken ct = default)
     {
-        var messages = await _db.OutboxMessages
-            .Where(m => m.Status == IdentityOutboxStatus.Pending && m.NextAttemptAt <= DateTime.UtcNow)
+        var now = Now();
+        var leaseUntil = now + _options.LeaseDuration;
+
+        var candidateIds = await _db.OutboxMessages.AsNoTracking()
+            .Where(m => m.Status == IdentityOutboxStatus.Pending
+                     && m.NextAttemptAt <= now
+                     && (m.LeaseExpiresAt == null || m.LeaseExpiresAt <= now))
             .OrderBy(m => m.CreatedAt)
+            .Select(m => m.EventId)
             .Take(_options.BatchSize)
             .ToListAsync(ct);
 
-        foreach (var message in messages)
+        if (candidateIds.Count == 0) return 0;
+
+        var claimed = new List<Guid>(candidateIds.Count);
+        foreach (var id in candidateIds)
         {
-            await DispatchOneAsync(message, ct);
+            var rows = await _db.OutboxMessages
+                .Where(m => m.EventId == id
+                         && m.Status == IdentityOutboxStatus.Pending
+                         && (m.LeaseExpiresAt == null || m.LeaseExpiresAt <= now))
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(m => m.LeaseOwner, _leaseOwner)
+                    .SetProperty(m => m.LeaseExpiresAt, (DateTime?)leaseUntil)
+                    .SetProperty(m => m.AttemptCount, m => m.AttemptCount + 1)
+                    .SetProperty(m => m.LastAttemptAt, (DateTime?)now), ct);
+
+            if (rows == 1) claimed.Add(id);
         }
+
+        if (claimed.Count == 0) return 0;
+
+        var messages = await _db.OutboxMessages.AsNoTracking()
+            .Where(m => claimed.Contains(m.EventId))
+            .OrderBy(m => m.CreatedAt)
+            .ToListAsync(ct);
+
+        var delivered = 0;
+        foreach (var message in messages)
+            if (await DeliverOneAsync(message, ct)) delivered++;
+
+        return delivered;
     }
 
-    private async Task DispatchOneAsync(IdentityOutboxMessage message, CancellationToken ct)
+    private async Task<bool> DeliverOneAsync(IdentityOutboxMessage message, CancellationToken ct)
     {
-        var leaseOwner = Environment.MachineName + "-" + Guid.NewGuid().ToString("N")[..8];
-        var leaseExpires = DateTime.UtcNow.Add(_options.LeaseDuration);
-
-        message.Status = IdentityOutboxStatus.Pending;
-        message.AttemptCount++;
-        message.LastAttemptAt = DateTime.UtcNow;
-        message.NextAttemptAt = DateTime.UtcNow.Add(ComputeBackoff(message.AttemptCount));
-        message.LeaseOwner = leaseOwner;
-        message.LeaseExpiresAt = leaseExpires;
-        message.LastError = null;
-
-        await _db.SaveChangesAsync(ct);
-
         var envelope = new IdentityOutboxEnvelope(
-            message.EventId,
-            message.EventType,
-            message.SchemaVersion,
-            message.SubjectUserId,
-            message.PayloadJson,
-            message.OccurredAt,
-            message.AttemptCount);
+            message.EventId, message.EventType, message.SchemaVersion, message.SubjectUserId,
+            message.PayloadJson, message.OccurredAt, message.AttemptCount);
 
         IdentityOutboxDeliveryResult result;
         try
@@ -70,49 +89,85 @@ public sealed class IdentityOutboxDispatcher
             cts.CancelAfter(_options.DeliveryTimeout);
             result = await _transport.DeliverAsync(envelope, cts.Token);
         }
-        catch (OperationCanceledException)
-        {
-            result = IdentityOutboxDeliveryResult.RetryLater("Delivery timeout");
-        }
-        catch (Exception ex)
-        {
-            result = IdentityOutboxDeliveryResult.RetryLater(ex.Message);
-        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex) { result = IdentityOutboxDeliveryResult.RetryLater(ex.Message); }
+
+        var now = Now();
 
         if (result.Outcome == IdentityOutboxDeliveryOutcome.Accepted)
         {
-            message.Status = IdentityOutboxStatus.Delivered;
-            message.DeliveredAt = DateTime.UtcNow;
-            message.LeaseOwner = null;
-            message.LeaseExpiresAt = null;
-            _logger.LogInformation("Identity outbox event {EventId} ({EventType}) delivered", message.EventId, message.EventType);
+            var rows = await _db.OutboxMessages
+                .Where(m => m.EventId == message.EventId
+                         && m.LeaseOwner == _leaseOwner
+                         && m.Status == IdentityOutboxStatus.Pending)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(m => m.Status, IdentityOutboxStatus.Delivered)
+                    .SetProperty(m => m.DeliveredAt, (DateTime?)now)
+                    .SetProperty(m => m.LeaseOwner, (string?)null)
+                    .SetProperty(m => m.LeaseExpiresAt, (DateTime?)null)
+                    .SetProperty(m => m.LastError, (string?)null), ct);
+
+            if (rows == 0)
+                _logger.LogWarning(
+                    "Identity outbox event {EventId} accepted but lease was lost; will be redelivered.",
+                    message.EventId);
+            else
+                _logger.LogInformation(
+                    "Identity outbox event {EventId} ({EventType}) delivered.",
+                    message.EventId, message.EventType);
+
+            return rows == 1;
         }
-        else if (result.Outcome == IdentityOutboxDeliveryOutcome.Rejected || message.AttemptCount >= _options.MaxAttempts)
+
+        var deadLetter = result.Outcome == IdentityOutboxDeliveryOutcome.Rejected
+                      || message.AttemptCount >= _options.MaxAttempts;
+
+        if (deadLetter)
         {
-            message.Status = IdentityOutboxStatus.DeadLettered;
-            message.DeadLetteredAt = DateTime.UtcNow;
-            message.LastError = result.Error;
-            message.LeaseOwner = null;
-            message.LeaseExpiresAt = null;
-            _logger.LogError("Identity outbox event {EventId} ({EventType}) dead-lettered after {Attempts} attempts: {Error}",
+            await _db.OutboxMessages
+                .Where(m => m.EventId == message.EventId
+                         && m.LeaseOwner == _leaseOwner
+                         && m.Status == IdentityOutboxStatus.Pending)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(m => m.Status, IdentityOutboxStatus.DeadLettered)
+                    .SetProperty(m => m.DeadLetteredAt, (DateTime?)now)
+                    .SetProperty(m => m.LastError, result.Error)
+                    .SetProperty(m => m.LeaseOwner, (string?)null)
+                    .SetProperty(m => m.LeaseExpiresAt, (DateTime?)null), ct);
+
+            _logger.LogError(
+                "Identity outbox event {EventId} ({EventType}) dead-lettered after {Attempts} attempts: {Error}",
                 message.EventId, message.EventType, message.AttemptCount, result.Error);
         }
         else
         {
-            message.Status = IdentityOutboxStatus.Pending;
-            message.LastError = result.Error;
-            message.LeaseOwner = null;
-            message.LeaseExpiresAt = null;
-            _logger.LogWarning("Identity outbox event {EventId} ({EventType}) will retry (attempt {Attempts}/{MaxAttempts}): {Error}",
-                message.EventId, message.EventType, message.AttemptCount, _options.MaxAttempts, result.Error);
+            var next = now + ComputeBackoff(message.AttemptCount);
+            await _db.OutboxMessages
+                .Where(m => m.EventId == message.EventId
+                         && m.LeaseOwner == _leaseOwner
+                         && m.Status == IdentityOutboxStatus.Pending)
+                .ExecuteUpdateAsync(s => s
+                    .SetProperty(m => m.NextAttemptAt, next)
+                    .SetProperty(m => m.LastError, result.Error)
+                    .SetProperty(m => m.LeaseOwner, (string?)null)
+                    .SetProperty(m => m.LeaseExpiresAt, (DateTime?)null), ct);
+
+            _logger.LogWarning(
+                "Identity outbox event {EventId} ({EventType}) will retry (attempt {Attempts}/{Max}) at {Next}: {Error}",
+                message.EventId, message.EventType, message.AttemptCount, _options.MaxAttempts, next, result.Error);
         }
 
-        await _db.SaveChangesAsync(ct);
+        return false;
     }
 
     private TimeSpan ComputeBackoff(int attempt)
     {
-        var backoff = TimeSpan.FromSeconds(_options.BaseBackoff.TotalSeconds * Math.Pow(2, attempt - 1));
-        return backoff > _options.MaxBackoff ? _options.MaxBackoff : backoff;
+        var seconds = Math.Min(
+            _options.MaxBackoff.TotalSeconds,
+            _options.BaseBackoff.TotalSeconds * Math.Pow(2, Math.Max(0, attempt - 1)));
+        var jitter = 1 + (Random.Shared.NextDouble() * 0.4 - 0.2);
+        return TimeSpan.FromSeconds(Math.Min(_options.MaxBackoff.TotalSeconds, seconds * jitter));
     }
+
+    private DateTime Now() => _time.GetUtcNow().UtcDateTime;
 }

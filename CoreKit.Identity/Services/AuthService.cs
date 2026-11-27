@@ -14,6 +14,10 @@ public sealed class AuthService : IAuthService
     // Longer input is never a real login, and hashing huge strings would be an easy way to slow the server down.
     private const int MaxEmailLength = 320;
 
+    private static readonly Lazy<string> DummyPasswordHash = new(
+        () => new PasswordHasher().Hash("dummy-" + Guid.NewGuid().ToString("N")),
+        LazyThreadSafetyMode.ExecutionAndPublication);
+
     private readonly IUserRepository _userRepository;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IPasswordHasher _hasher;
@@ -64,8 +68,7 @@ public sealed class AuthService : IAuthService
 
         if (user is null)
         {
-            // Spend the same time as a real check, so response time does not reveal which emails exist.
-            _ = _hasher.Hash(password);
+            _ = _hasher.Verify(DummyPasswordHash.Value, password);
             _logger.LogInformation("Login failed.");
             return IdentityErrors.InvalidCredentials;
         }

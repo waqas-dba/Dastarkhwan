@@ -48,12 +48,19 @@ public static class TenantEndpointExtensions
         {
             limiter.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-            limiter.AddPolicy(TenantWritePolicy, _ => RateLimitPartition.GetFixedWindowLimiter("tenant-write", _ => new FixedWindowRateLimiterOptions
+            limiter.AddPolicy(TenantWritePolicy, httpContext =>
             {
-                PermitLimit = 20,
-                Window = TimeSpan.FromMinutes(1),
-                QueueLimit = 0
-            }));
+                var tenantId = httpContext.RequestServices.GetService<ICurrentTenant>()?.Id?.ToString("N") ?? "none";
+                var userId = httpContext.User?.FindFirst("sub")?.Value ?? "anon";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    $"tenant:{tenantId}:user:{userId}",
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 20,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0
+                    });
+            });
         });
 
         return services;

@@ -1,11 +1,13 @@
-﻿using System.Text.Json;
-using CoreKit.Identity.Constants;
+﻿using CoreKit.Identity.Constants;
 using CoreKit.Identity.Entities;
 using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Security;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
+using JwtRegNames = System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames;
+using System.Security.Claims;
+using System.Text;
 
 namespace CoreKit.Identity.Services;
 
@@ -36,28 +38,37 @@ public sealed class TokenService : ITokenService
         var now = _time.GetUtcNow().UtcDateTime;
         var expires = now.AddMinutes(_options.AccessTokenMinutes);
 
-        var payload = new Dictionary<string, object>
+        var claims = new List<Claim>
         {
-            [JwtRegisteredClaimNames.Sub] = user.Id.ToString(),
-            [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString(),
-            [JwtRegisteredClaimNames.Email] = user.Email,
-            [JwtRegisteredClaimNames.Iss] = _options.Issuer,
-            [JwtRegisteredClaimNames.Aud] = _options.Audience,
-            [JwtRegisteredClaimNames.Iat] = new DateTimeOffset(now).ToUnixTimeSeconds(),
-            [JwtRegisteredClaimNames.Nbf] = new DateTimeOffset(now).ToUnixTimeSeconds(),
-            [JwtRegisteredClaimNames.Exp] = new DateTimeOffset(expires).ToUnixTimeSeconds(),
-            [IdentityClaimTypes.SecurityVersion] = user.SecurityVersion
+            new Claim(JwtRegNames.Sub, user.Id.ToString()),
+            new Claim(JwtRegNames.Jti, Guid.NewGuid().ToString()),
+            new Claim(JwtRegNames.Email, user.Email),
+            new Claim(JwtRegNames.Iss, _options.Issuer),
+            new Claim(JwtRegNames.Aud, _options.Audience),
+            new Claim(JwtRegNames.Iat, new DateTimeOffset(now).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+            new Claim(JwtRegNames.Nbf, new DateTimeOffset(now).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+            new Claim(JwtRegNames.Exp, new DateTimeOffset(expires).ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+            new Claim(IdentityClaimTypes.SecurityVersion, user.SecurityVersion.ToString(), ClaimValueTypes.Integer32)
         };
 
         if (!string.IsNullOrWhiteSpace(user.DisplayName))
-            payload[IdentityClaimTypes.Name] = user.DisplayName;
+            claims.Add(new Claim(IdentityClaimTypes.Name, user.DisplayName));
 
         // Other modules may add claims, but never overwrite the ones Identity owns.
         if (extraClaims is not null)
             foreach (var claim in extraClaims.Where(c => !ReservedClaims.Contains(c.Type)))
-                payload[claim.Type] = claim.Value;
+                claims.Add(new Claim(claim.Type, claim.Value));
 
-        var token = _handler.CreateToken(JsonSerializer.Serialize(payload), _signingCredentials);
+        var descriptor = new SecurityTokenDescriptor
+        {
+            Subject = new ClaimsIdentity(claims),
+            Expires = expires,
+            SigningCredentials = _signingCredentials,
+            Issuer = _options.Issuer,
+            Audience = _options.Audience
+        };
+
+        var token = _handler.CreateToken(descriptor);
 
         return new AccessTokenResult(token, expires);
     }

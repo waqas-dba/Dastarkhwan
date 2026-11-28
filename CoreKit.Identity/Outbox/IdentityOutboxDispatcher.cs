@@ -1,5 +1,6 @@
 using CoreKit.Identity.Entities;
 using CoreKit.Identity.Outbox;
+using CoreKit.Identity.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -8,6 +9,8 @@ namespace CoreKit.Identity.Outbox;
 
 public sealed class IdentityOutboxDispatcher
 {
+    private const int MaxErrorLength = 512;
+
     private readonly IdentityDbContext _db;
     private readonly IIdentityOutboxTransport _transport;
     private readonly IdentityOutboxOptions _options;
@@ -37,8 +40,8 @@ public sealed class IdentityOutboxDispatcher
 
         var candidateIds = await _db.OutboxMessages.AsNoTracking()
             .Where(m => m.Status == IdentityOutboxStatus.Pending
-                     && m.NextAttemptAt <= now
-                     && (m.LeaseExpiresAt == null || m.LeaseExpiresAt <= now))
+                && m.NextAttemptAt <= now
+                && (m.LeaseExpiresAt == null || m.LeaseExpiresAt <= now))
             .OrderBy(m => m.CreatedAt)
             .Select(m => m.EventId)
             .Take(_options.BatchSize)
@@ -51,8 +54,8 @@ public sealed class IdentityOutboxDispatcher
         {
             var rows = await _db.OutboxMessages
                 .Where(m => m.EventId == id
-                         && m.Status == IdentityOutboxStatus.Pending
-                         && (m.LeaseExpiresAt == null || m.LeaseExpiresAt <= now))
+                    && m.Status == IdentityOutboxStatus.Pending
+                    && (m.LeaseExpiresAt == null || m.LeaseExpiresAt <= now))
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(m => m.LeaseOwner, _leaseOwner)
                     .SetProperty(m => m.LeaseExpiresAt, (DateTime?)leaseUntil)
@@ -71,9 +74,34 @@ public sealed class IdentityOutboxDispatcher
 
         var delivered = 0;
         foreach (var message in messages)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            if (!await RenewLeaseAsync(message.EventId, ct))
+                continue;
+
             if (await DeliverOneAsync(message, ct)) delivered++;
+        }
 
         return delivered;
+    }
+
+    private async Task<bool> RenewLeaseAsync(Guid eventId, CancellationToken ct)
+    {
+        var leaseUntil = Now() + _options.LeaseDuration;
+        var rows = await _db.OutboxMessages
+            .Where(m => m.EventId == eventId
+                && m.LeaseOwner == _leaseOwner
+                && m.Status == IdentityOutboxStatus.Pending)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(m => m.LeaseExpiresAt, (DateTime?)leaseUntil), ct);
+
+        if (rows == 1) return true;
+
+        _logger.LogWarning(
+            "Identity outbox event {EventId} is no longer leased to this dispatcher; skipping delivery.",
+            eventId);
+        return false;
     }
 
     private async Task<bool> DeliverOneAsync(IdentityOutboxMessage message, CancellationToken ct)
@@ -93,13 +121,14 @@ public sealed class IdentityOutboxDispatcher
         catch (Exception ex) { result = IdentityOutboxDeliveryResult.RetryLater(ex.Message); }
 
         var now = Now();
+        var error = Truncate(result.Error);
 
         if (result.Outcome == IdentityOutboxDeliveryOutcome.Accepted)
         {
             var rows = await _db.OutboxMessages
                 .Where(m => m.EventId == message.EventId
-                         && m.LeaseOwner == _leaseOwner
-                         && m.Status == IdentityOutboxStatus.Pending)
+                    && m.LeaseOwner == _leaseOwner
+                    && m.Status == IdentityOutboxStatus.Pending)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(m => m.Status, IdentityOutboxStatus.Delivered)
                     .SetProperty(m => m.DeliveredAt, (DateTime?)now)
@@ -120,41 +149,41 @@ public sealed class IdentityOutboxDispatcher
         }
 
         var deadLetter = result.Outcome == IdentityOutboxDeliveryOutcome.Rejected
-                      || message.AttemptCount >= _options.MaxAttempts;
+            || message.AttemptCount >= _options.MaxAttempts;
 
         if (deadLetter)
         {
             await _db.OutboxMessages
                 .Where(m => m.EventId == message.EventId
-                         && m.LeaseOwner == _leaseOwner
-                         && m.Status == IdentityOutboxStatus.Pending)
+                    && m.LeaseOwner == _leaseOwner
+                    && m.Status == IdentityOutboxStatus.Pending)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(m => m.Status, IdentityOutboxStatus.DeadLettered)
                     .SetProperty(m => m.DeadLetteredAt, (DateTime?)now)
-                    .SetProperty(m => m.LastError, result.Error)
+                    .SetProperty(m => m.LastError, error)
                     .SetProperty(m => m.LeaseOwner, (string?)null)
                     .SetProperty(m => m.LeaseExpiresAt, (DateTime?)null), ct);
 
             _logger.LogError(
                 "Identity outbox event {EventId} ({EventType}) dead-lettered after {Attempts} attempts: {Error}",
-                message.EventId, message.EventType, message.AttemptCount, result.Error);
+                message.EventId, message.EventType, message.AttemptCount, error);
         }
         else
         {
             var next = now + ComputeBackoff(message.AttemptCount);
             await _db.OutboxMessages
                 .Where(m => m.EventId == message.EventId
-                         && m.LeaseOwner == _leaseOwner
-                         && m.Status == IdentityOutboxStatus.Pending)
+                    && m.LeaseOwner == _leaseOwner
+                    && m.Status == IdentityOutboxStatus.Pending)
                 .ExecuteUpdateAsync(s => s
                     .SetProperty(m => m.NextAttemptAt, next)
-                    .SetProperty(m => m.LastError, result.Error)
+                    .SetProperty(m => m.LastError, error)
                     .SetProperty(m => m.LeaseOwner, (string?)null)
                     .SetProperty(m => m.LeaseExpiresAt, (DateTime?)null), ct);
 
             _logger.LogWarning(
                 "Identity outbox event {EventId} ({EventType}) will retry (attempt {Attempts}/{Max}) at {Next}: {Error}",
-                message.EventId, message.EventType, message.AttemptCount, _options.MaxAttempts, next, result.Error);
+                message.EventId, message.EventType, message.AttemptCount, _options.MaxAttempts, next, error);
         }
 
         return false;
@@ -168,6 +197,9 @@ public sealed class IdentityOutboxDispatcher
         var jitter = 1 + (Random.Shared.NextDouble() * 0.4 - 0.2);
         return TimeSpan.FromSeconds(Math.Min(_options.MaxBackoff.TotalSeconds, seconds * jitter));
     }
+
+    private static string? Truncate(string? text)
+        => text is { Length: > MaxErrorLength } ? text[..MaxErrorLength] : text;
 
     private DateTime Now() => _time.GetUtcNow().UtcDateTime;
 }

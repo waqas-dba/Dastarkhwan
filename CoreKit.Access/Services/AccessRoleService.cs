@@ -2,6 +2,9 @@
 
 internal sealed class AccessRoleService : IAccessRoleService
 {
+    private static readonly string ProtectedPlatformRoleNormalizedName =
+        AccessValidation.NormalizeName("Administrator");
+
     private readonly AccessGuard _guard;
     private readonly IAccessRoleRepository _roles;
     private readonly IAccessAssignmentRepository _assignments;
@@ -37,7 +40,6 @@ internal sealed class AccessRoleService : IAccessRoleService
     public async Task<AccessResult<IReadOnlyList<AccessPermissionDto>>> ListPermissionsAsync(CancellationToken ct = default)
     {
         var call = await _guard.RequireAsync(AccessPermissionNames.RolesRead, ct);
-
         if (call.IsFailure)
             return call.Error!;
 
@@ -48,14 +50,12 @@ internal sealed class AccessRoleService : IAccessRoleService
     public async Task<AccessResult<IReadOnlyList<AccessRoleDto>>> ListAsync(CancellationToken ct = default)
     {
         var call = await _guard.RequireAsync(AccessPermissionNames.RolesRead, ct);
-
         if (call.IsFailure)
             return call.Error!;
 
         var scope = call.Value.Scope;
         var roles = await _roles.ListAsync(scope, ct);
         var counts = await _assignments.CountByRoleAsync(scope, ct);
-
         return AccessResult.Success<IReadOnlyList<AccessRoleDto>>(
             roles.Select(r => AccessMapper.ToDto(r, counts.GetValueOrDefault(r.Id))).ToList());
     }
@@ -63,12 +63,10 @@ internal sealed class AccessRoleService : IAccessRoleService
     public async Task<AccessResult<AccessRoleDto>> GetAsync(Guid id, CancellationToken ct = default)
     {
         var call = await _guard.RequireAsync(AccessPermissionNames.RolesRead, ct);
-
         if (call.IsFailure)
             return call.Error!;
 
         var role = await _roles.FindAsync(call.Value.Scope, id, ct);
-
         if (role is null)
             return AccessErrors.NotFound("Role");
 
@@ -78,24 +76,20 @@ internal sealed class AccessRoleService : IAccessRoleService
     public async Task<AccessResult<AccessRoleDto>> CreateAsync(CreateAccessRoleRequest request, CancellationToken ct = default)
     {
         var call = await _guard.RequireAsync(AccessPermissionNames.RolesManage, ct);
-
         if (call.IsFailure)
             return call.Error!;
 
         var (scope, _, access) = call.Value;
 
         var nameError = AccessValidation.ValidateName(request.Name, out var name);
-
         if (nameError is not null)
             return nameError;
 
         var descriptionError = AccessValidation.ValidateDescription(request.Description, out var description);
-
         if (descriptionError is not null)
             return descriptionError;
 
         var permissionError = AccessValidation.ValidatePermissions(request.Permissions, _catalog, out var permissions);
-
         if (permissionError is not null)
             return permissionError;
 
@@ -106,7 +100,6 @@ internal sealed class AccessRoleService : IAccessRoleService
             return AccessErrors.Conflict($"At most {_options.MaxRolesPerScope} roles are allowed.");
 
         var normalizedName = AccessValidation.NormalizeName(name!);
-
         if (await _roles.NameExistsAsync(scope, normalizedName, null, ct))
             return AccessErrors.Conflict("A role with this name already exists.");
 
@@ -121,7 +114,6 @@ internal sealed class AccessRoleService : IAccessRoleService
             CreatedAt = Now(),
             ConcurrencyStamp = Guid.NewGuid()
         };
-
         foreach (var permission in permissions)
             role.Permissions.Add(new AccessRolePermission { RoleId = role.Id, Permission = permission });
 
@@ -137,66 +129,56 @@ internal sealed class AccessRoleService : IAccessRoleService
     public async Task<AccessResult<AccessRoleDto>> UpdateAsync(Guid id, UpdateAccessRoleRequest request, CancellationToken ct = default)
     {
         var call = await _guard.RequireAsync(AccessPermissionNames.RolesManage, ct);
-
         if (call.IsFailure)
             return call.Error!;
 
         var (scope, _, access) = call.Value;
 
-        // Validate first, then change, so a refused request leaves nothing half-done.
         string? newName = null;
-
         if (request.Name is not null)
         {
             var nameError = AccessValidation.ValidateName(request.Name, out newName);
-
             if (nameError is not null)
                 return nameError;
         }
 
         string? newDescription = null;
-
         if (request.Description is not null)
         {
             var descriptionError = AccessValidation.ValidateDescription(request.Description, out newDescription);
-
             if (descriptionError is not null)
                 return descriptionError;
         }
 
         var role = await _roles.FindForUpdateAsync(scope, id, ct);
-
         if (role is null)
             return AccessErrors.NotFound("Role");
 
-        // Optimistic concurrency: require a stamp and refuse if it doesn't match the current one.
         if (request.ConcurrencyStamp == Guid.Empty)
             return AccessErrors.ConcurrencyStampRequired;
-
         if (request.ConcurrencyStamp != role.ConcurrencyStamp)
             return AccessErrors.SaveConflict;
 
-        // A role stronger than you cannot be edited by you.
         if (!AccessGuard.Holds(access, role.Permissions.Select(p => p.Permission)))
             return AccessErrors.Escalation;
 
-        var changes = new List<string>();
+        if (newName is not null
+            && IsProtectedRole(scope, role)
+            && AccessValidation.NormalizeName(newName) != role.NormalizedName)
+            return AccessErrors.Conflict("The built-in Administrator role cannot be renamed.");
 
+        var changes = new List<string>();
         if (newName is not null && newName != role.Name)
         {
             var normalized = AccessValidation.NormalizeName(newName);
-
             if (normalized != role.NormalizedName && await _roles.NameExistsAsync(scope, normalized, id, ct))
                 return AccessErrors.Conflict("A role with this name already exists.");
-
             changes.Add($"name: {role.Name} -> {newName}");
         }
-
         if (request.Description is not null && newDescription != role.Description)
             changes.Add("description changed");
 
         var memberCount = await _assignments.CountForRoleAsync(id, ct);
-
         if (changes.Count == 0)
             return AccessResult.Success(AccessMapper.ToDto(role, memberCount));
 
@@ -205,7 +187,6 @@ internal sealed class AccessRoleService : IAccessRoleService
             role.Name = newName;
             role.NormalizedName = AccessValidation.NormalizeName(newName);
         }
-
         if (request.Description is not null)
             role.Description = newDescription;
 
@@ -218,7 +199,6 @@ internal sealed class AccessRoleService : IAccessRoleService
             return saveError;
 
         _cache.InvalidateScope(scope);
-
         return AccessResult.Success(AccessMapper.ToDto(role, memberCount));
     }
 
@@ -226,46 +206,36 @@ internal sealed class AccessRoleService : IAccessRoleService
         Guid id, SetAccessRolePermissionsRequest request, CancellationToken ct = default)
     {
         var call = await _guard.RequireAsync(AccessPermissionNames.RolesManage, ct);
-
         if (call.IsFailure)
             return call.Error!;
 
         var (scope, _, access) = call.Value;
 
         var permissionError = AccessValidation.ValidatePermissions(request.Permissions, _catalog, out var wanted);
-
         if (permissionError is not null)
             return permissionError;
 
         var role = await _roles.FindForUpdateAsync(scope, id, ct);
-
         if (role is null)
             return AccessErrors.NotFound("Role");
 
-        // Optimistic concurrency: require a stamp and refuse if it doesn't match the current one.
         if (request.ConcurrencyStamp == Guid.Empty)
             return AccessErrors.ConcurrencyStampRequired;
-
         if (request.ConcurrencyStamp != role.ConcurrencyStamp)
             return AccessErrors.SaveConflict;
 
         var current = role.Permissions.Select(p => p.Permission).ToList();
-
-        // You must hold everything the role has now and everything it will have, so you can neither
-        // hand out a permission you lack nor strip a role that is stronger than you.
         if (!AccessGuard.Holds(access, current.Concat(wanted)))
             return AccessErrors.Escalation;
 
         var memberCount = await _assignments.CountForRoleAsync(id, ct);
         var added = wanted.Except(current).ToList();
         var removed = current.Except(wanted).ToList();
-
         if (added.Count == 0 && removed.Count == 0)
             return AccessResult.Success(AccessMapper.ToDto(role, memberCount));
 
         foreach (var link in role.Permissions.Where(p => removed.Contains(p.Permission)).ToList())
             role.Permissions.Remove(link);
-
         foreach (var permission in added)
             role.Permissions.Add(new AccessRolePermission { RoleId = role.Id, Permission = permission });
 
@@ -281,29 +251,28 @@ internal sealed class AccessRoleService : IAccessRoleService
             return saveError;
 
         _cache.InvalidateScope(scope);
-
         return AccessResult.Success(AccessMapper.ToDto(role, memberCount));
     }
 
     public async Task<AccessResult> DeleteAsync(Guid id, CancellationToken ct = default)
     {
         var call = await _guard.RequireAsync(AccessPermissionNames.RolesManage, ct);
-
         if (call.IsFailure)
             return call.Error!;
 
         var (scope, _, access) = call.Value;
 
         var role = await _roles.FindForUpdateAsync(scope, id, ct);
-
         if (role is null)
             return AccessErrors.NotFound("Role");
 
         if (!AccessGuard.Holds(access, role.Permissions.Select(p => p.Permission)))
             return AccessErrors.Escalation;
 
-        var memberCount = await _assignments.CountForRoleAsync(id, ct);
+        if (IsProtectedRole(scope, role))
+            return AccessErrors.Conflict("The built-in Administrator role cannot be deleted.");
 
+        var memberCount = await _assignments.CountForRoleAsync(id, ct);
         if (memberCount > 0)
             return AccessErrors.Conflict($"The role is held by {memberCount} person(s). Remove it from them first.");
 
@@ -315,6 +284,10 @@ internal sealed class AccessRoleService : IAccessRoleService
 
         return AccessResult.Success();
     }
+
+    private static bool IsProtectedRole(AccessScope scope, AccessRole role)
+        => scope.Type != AccessScope.TenantType
+            && string.Equals(role.NormalizedName, ProtectedPlatformRoleNormalizedName, StringComparison.Ordinal);
 
     private DateTime Now() => _time.GetUtcNow().UtcDateTime;
 }

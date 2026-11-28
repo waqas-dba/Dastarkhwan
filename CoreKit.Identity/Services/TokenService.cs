@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using JwtRegNames = System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
@@ -22,7 +23,7 @@ public sealed class TokenService : ITokenService
     private readonly JwtOptions _options;
     private readonly TimeProvider _time;
     private readonly SigningCredentials _signingCredentials;
-    private readonly JsonWebTokenHandler _handler = new();
+    private readonly JwtSecurityTokenHandler _handler = new();
 
     public TokenService(IOptions<JwtOptions> options, TimeProvider time)
     {
@@ -59,7 +60,7 @@ public sealed class TokenService : ITokenService
             foreach (var claim in extraClaims.Where(c => !ReservedClaims.Contains(c.Type)))
                 claims.Add(new Claim(claim.Type, claim.Value));
 
-        var descriptor = new SecurityTokenDescriptor
+        var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
             Expires = expires,
@@ -68,9 +69,10 @@ public sealed class TokenService : ITokenService
             Audience = _options.Audience
         };
 
-        var token = _handler.CreateToken(descriptor);
+        var token = _handler.CreateToken(tokenDescriptor);
+        var tokenString = _handler.WriteToken(token);
 
-        return new AccessTokenResult(token, expires);
+        return new AccessTokenResult(tokenString, expires);
     }
 
     public GeneratedRefreshToken CreateRefreshToken()

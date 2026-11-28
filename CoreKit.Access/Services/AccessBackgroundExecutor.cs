@@ -38,6 +38,7 @@ internal sealed class AccessBackgroundExecutor : IAccessBackgroundExecutor
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(work);
+
         if (string.IsNullOrWhiteSpace(requiredPermission))
             return AccessBackgroundRunStatus.ContextInvalid;
 
@@ -45,7 +46,7 @@ internal sealed class AccessBackgroundExecutor : IAccessBackgroundExecutor
             grant.Value, expectedJobKind, requiredPermission, _time.GetUtcNow().UtcDateTime);
         if (redeemed.Failure is { } failure) return failure;
 
-        if (!await _grants.TryConsumeAsync(redeemed.GrantId, _time.GetUtcNow().UtcDateTime, ct))
+        if (!await _grants.TryConsumeAsync(redeemed.GrantId, redeemed.ExpiresAt, ct))
         {
             _log.LogWarning(
                 "Access background grant {GrantId} for job {JobKind} rejected: already consumed.",
@@ -54,15 +55,14 @@ internal sealed class AccessBackgroundExecutor : IAccessBackgroundExecutor
         }
 
         var execution = redeemed.Execution!;
+
         await using var scope = _scopes.CreateAsyncScope();
         var holder = scope.ServiceProvider.GetRequiredService<AccessBackgroundContextHolder>();
         holder.Activate(execution);
-
         try
         {
             var access = scope.ServiceProvider.GetRequiredService<IAccessService>();
             var checkScope = execution.TenantScope ?? AccessScope.ForPlatform(AccessScope.PlatformId);
-
             var fresh = await access.GetFreshAccessAsync(execution.ActorUserId!.Value, checkScope, ct);
             if (!fresh.Has(requiredPermission))
                 return AccessBackgroundRunStatus.NotAuthorized;
@@ -87,6 +87,7 @@ internal sealed class AccessBackgroundExecutor : IAccessBackgroundExecutor
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(work);
+
         if (string.IsNullOrWhiteSpace(source) || source.Length > 200)
             return AccessBackgroundRunStatus.ContextInvalid;
 
@@ -98,11 +99,9 @@ internal sealed class AccessBackgroundExecutor : IAccessBackgroundExecutor
         await using var scope = _scopes.CreateAsyncScope();
         var holder = scope.ServiceProvider.GetRequiredService<AccessBackgroundContextHolder>();
         holder.Activate(execution);
-
         try
         {
             var auditScope = tenantScope ?? AccessScope.ForPlatform(AccessScope.PlatformId);
-
             await RecordSystemStartAsync(scope.ServiceProvider, auditScope, jobKind, source, ct);
 
             await work(scope.ServiceProvider, ct);

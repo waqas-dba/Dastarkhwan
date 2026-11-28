@@ -15,6 +15,7 @@ internal sealed class AccessBackgroundGrantProtector
     private const int CurrentVersion = 1;
     private const string Purpose = "CoreKit.Access.BackgroundGrant.v1";
     private static readonly TimeSpan MaxFutureSkew = TimeSpan.FromSeconds(5);
+
     private readonly IDataProtector _protector;
 
     public AccessBackgroundGrantProtector(IDataProtectionProvider provider)
@@ -27,7 +28,8 @@ internal sealed class AccessBackgroundGrantProtector
     internal sealed record Redeemed(
         AccessBackgroundExecution? Execution,
         AccessBackgroundRunStatus? Failure,
-        Guid GrantId);
+        Guid GrantId,
+        DateTime ExpiresAt);
 
     public string Protect(
         string jobKind, string requiredPermission, Guid actorUserId, Guid? tenantId,
@@ -73,6 +75,7 @@ internal sealed class AccessBackgroundGrantProtector
             return Fail(AccessBackgroundRunStatus.GrantExpired);
 
         var tenantScope = payload.TenantId is { } tid ? AccessScope.ForTenant(tid) : (AccessScope?)null;
+
         return new Redeemed(
             new AccessBackgroundExecution(
                 payload.JobKind,
@@ -80,11 +83,12 @@ internal sealed class AccessBackgroundGrantProtector
                 payload.ActorUserId,
                 tenantScope),
             Failure: null,
-            GrantId: payload.GrantId);
+            GrantId: payload.GrantId,
+            ExpiresAt: payload.ExpiresAt);
     }
 
     private static Redeemed Fail(AccessBackgroundRunStatus status)
-        => new(null, status, Guid.Empty);
+        => new(null, status, Guid.Empty, default);
 }
 
 internal sealed class AccessBackgroundGrantIssuer : IAccessBackgroundGrantIssuer
@@ -120,6 +124,7 @@ internal sealed class AccessBackgroundGrantIssuer : IAccessBackgroundGrantIssuer
         CancellationToken ct = default)
     {
         if (_holder.IsActive) return AccessErrors.Denied;
+
         if (!AccessBackgroundRules.IsValidJobKind(jobKind) || string.IsNullOrWhiteSpace(requiredPermission))
             return AccessErrors.Validation("A job kind and a required permission are needed.");
 
@@ -140,9 +145,9 @@ internal sealed class AccessBackgroundGrantIssuer : IAccessBackgroundGrantIssuer
         if (!access.Has(requiredPermission)) return AccessErrors.Denied;
 
         var tenantId = checkScope.Type == AccessScope.TenantType ? checkScope.Id : (Guid?)null;
-
         var now = _time.GetUtcNow().UtcDateTime;
         var grantId = Guid.NewGuid();
+
         var token = _protector.Protect(jobKind, requiredPermission, userId, tenantId,
             now, now + life, grantId);
 

@@ -48,17 +48,17 @@ jobs:
       - name: Run Identity tests
         run: dotnet test CoreKit.Identity.Tests/CoreKit.Identity.Tests.csproj --no-build --verbosity normal
         env:
-          ConnectionStrings__Identity: Host=localhost;Port=5432;Database=${{ env.POSTGRES_DB }};Username=${{ env.POSTGRES_USER }};Password=${{ env.POSTGRES_PASSWORD }}
+          ConnectionStrings__Default: Host=localhost;Port=5432;Database=${{ env.POSTGRES_DB }};Username=${{ env.POSTGRES_USER }};Password=${{ env.POSTGRES_PASSWORD }}
 
       - name: Run Access tests
         run: dotnet test CoreKit.Access.Tests/CoreKit.Access.Tests.csproj --no-build --verbosity normal
         env:
-          ConnectionStrings__Access: Host=localhost;Port=5432;Database=${{ env.POSTGRES_DB }};Username=${{ env.POSTGRES_USER }};Password=${{ env.POSTGRES_PASSWORD }}
+          ConnectionStrings__Default: Host=localhost;Port=5432;Database=${{ env.POSTGRES_DB }};Username=${{ env.POSTGRES_USER }};Password=${{ env.POSTGRES_PASSWORD }}
 
       - name: Run Tenant tests
         run: dotnet test CoreKit.Tenant.Tests/CoreKit.Tenant.Tests.csproj --no-build --verbosity normal
         env:
-          ConnectionStrings__Tenant: Host=localhost;Port=5432;Database=${{ env.POSTGRES_DB }};Username=${{ env.POSTGRES_USER }};Password=${{ env.POSTGRES_PASSWORD }}
+          ConnectionStrings__Default: Host=localhost;Port=5432;Database=${{ env.POSTGRES_DB }};Username=${{ env.POSTGRES_USER }};Password=${{ env.POSTGRES_PASSWORD }}
 
   composed-smoke-test:
     runs-on: ubuntu-latest
@@ -97,9 +97,7 @@ jobs:
             --filter "FullyQualifiedName~ComposedSmokeTest" \
             --verbosity normal
         env:
-          ConnectionStrings__Identity: Host=localhost;Port=5432;Database=${{ env.POSTGRES_DB }};Username=${{ env.POSTGRES_USER }};Password=${{ env.POSTGRES_PASSWORD }}
-          ConnectionStrings__Access: Host=localhost;Port=5432;Database=${{ env.POSTGRES_DB }};Username=${{ env.POSTGRES_USER }};Password=${{ env.POSTGRES_PASSWORD }}
-          ConnectionStrings__Tenant: Host=localhost;Port=5432;Database=${{ env.POSTGRES_DB }};Username=${{ env.POSTGRES_USER }};Password=${{ env.POSTGRES_PASSWORD }}
+          ConnectionStrings__Default: Host=localhost;Port=5432;Database=${{ env.POSTGRES_DB }};Username=${{ env.POSTGRES_USER }};Password=${{ env.POSTGRES_PASSWORD }}
           Identity__Jwt__SigningKey: this-is-a-dev-only-signing-key-that-is-at-least-32-bytes-long
           Identity__Jwt__Issuer: https://localhost:5000
           Identity__Jwt__Audience: dastarkhwan

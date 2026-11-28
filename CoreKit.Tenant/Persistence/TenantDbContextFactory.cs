@@ -10,16 +10,13 @@ public sealed class TenantDbContextFactory : IDesignTimeDbContextFactory<TenantD
 {
     public TenantDbContext CreateDbContext(string[] args)
     {
-        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Tenant");
-
-
-        //var connectionString = "Host=127.0.0.1;Port=5432;Database=daskhawa;Username=postgres;Password=123";
+        var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__Default");
 
         if (string.IsNullOrWhiteSpace(connectionString))
             throw new InvalidOperationException(
-                "Set the ConnectionStrings__Tenant environment variable before running dotnet ef. " +
-                "Example (PowerShell): $env:ConnectionStrings__Tenant = " +
-                "\"Host=127.0.0.1;Port=5432;Database=daskhawa;Username=postgres;Password=YOUR_PASSWORD\"");
+                "Set the ConnectionStrings__Default environment variable before running dotnet ef. " +
+                "Example (PowerShell): $env:ConnectionStrings__Default = " +
+                "\"Host=127.0.0.1;Port=5432;Database=dastarkhwan_db;Username=postgres;Password=YOUR_PASSWORD\"");
 
         var builder = new DbContextOptionsBuilder<TenantDbContext>();
         TenantDbContextConfigurator.Configure(builder, connectionString);

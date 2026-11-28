@@ -5,7 +5,7 @@ namespace CoreKit.Access.Tests.Support;
 
 /// <summary>
 /// An isolated PostgreSQL scratch database for integration tests. Creates a uniquely named database
-/// on the server named by <c>ConnectionStrings__Access</c>, and drops it on disposal. The configured
+/// on the server named by <c>ConnectionStrings__Default</c>, and drops it on disposal. The configured
 /// database itself is never touched. When the environment variable is missing, or a scratch database
 /// cannot be created, the test reports the reason through <see cref="ITestOutputHelper"/> and skips,
 /// unless <c>COREKIT_REQUIRE_POSTGRES=1</c> is set, in which case the unavailability is reported as a
@@ -30,10 +30,10 @@ internal sealed class PostgresScratchDb : IAsyncDisposable
     public static async Task<PostgresScratchDb?> TryCreateAsync(ITestOutputHelper output)
     {
         var required = string.Equals(Environment.GetEnvironmentVariable("COREKIT_REQUIRE_POSTGRES"), "1", StringComparison.OrdinalIgnoreCase);
-        var baseConnection = Environment.GetEnvironmentVariable("ConnectionStrings__Access");
+        var baseConnection = Environment.GetEnvironmentVariable("ConnectionStrings__Default");
         if (string.IsNullOrWhiteSpace(baseConnection))
         {
-            var message = "Skipped: ConnectionStrings__Access is not set; no PostgreSQL integration coverage in this environment.";
+            var message = "Skipped: ConnectionStrings__Default is not set; no PostgreSQL integration coverage in this environment.";
             if (required)
             {
                 output.WriteLine("FAIL: " + message);

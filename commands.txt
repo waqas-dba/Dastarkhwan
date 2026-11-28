@@ -13,9 +13,9 @@ Reference for the approved/standardized development workflow (see `ai-tasks.md`,
 
 | Module / DbContext | Project | Migrations folder | Design-time factory | Connection string name |
 |---|---|---|---|---|
-| `IdentityDbContext` (`CoreKit.Identity.Persistence.IdentityDbContext`) | `CoreKit.Identity/CoreKit.Identity.csproj` | `CoreKit.Identity/Migrations` | `CoreKit.Identity/Persistence/IdentityDbContextFactory.cs` | `ConnectionStrings:Identity` / `ConnectionStrings__Identity` |
-| `AccessDbContext` (`CoreKit.Access.Persistence.AccessDbContext`) | `CoreKit.Access/CoreKit.Access.csproj` | `CoreKit.Access/Migrations` | `CoreKit.Access/Persistence/AccessDbContextFactory.cs` | `ConnectionStrings:Access` / `ConnectionStrings__Access` |
-| `TenantDbContext` (`CoreKit.Tenant.Persistence.TenantDbContext`) | `CoreKit.Tenant/CoreKit.Tenant.csproj` | `CoreKit.Tenant/Migrations` | `CoreKit.Tenant/Persistence/TenantDbContextFactory.cs` | `ConnectionStrings:Tenant` / `ConnectionStrings__Tenant` |
+| `IdentityDbContext` (`CoreKit.Identity.Persistence.IdentityDbContext`) | `CoreKit.Identity/CoreKit.Identity.csproj` | `CoreKit.Identity/Migrations` | `CoreKit.Identity/Persistence/IdentityDbContextFactory.cs` | `ConnectionStrings:Default` / `ConnectionStrings__Default` |
+| `AccessDbContext` (`CoreKit.Access.Persistence.AccessDbContext`) | `CoreKit.Access/CoreKit.Access.csproj` | `CoreKit.Access/Migrations` | `CoreKit.Access/Persistence/AccessDbContextFactory.cs` | `ConnectionStrings:Default` / `ConnectionStrings__Default` |
+| `TenantDbContext` (`CoreKit.Tenant.Persistence.TenantDbContext`) | `CoreKit.Tenant/CoreKit.Tenant.csproj` | `CoreKit.Tenant/Migrations` | `CoreKit.Tenant/Persistence/TenantDbContextFactory.cs` | `ConnectionStrings:Default` / `ConnectionStrings__Default` |
 
 - Solution: `Dastarkhwan.slnx`
 - Database provider: PostgreSQL (Npgsql), per module configurators/factories (inspect `*DbContextConfigurator.cs`/`*DbContextFactory.cs` for current behavior).
@@ -27,17 +27,13 @@ Reference for the approved/standardized development workflow (see `ai-tasks.md`,
 Replace `YOUR_DEV_PASSWORD` and other placeholders only in a secure local session/configuration. Prefer user-secrets or secure environment configuration over source-controlled files.
 
 ```powershell
-$env:ConnectionStrings__Identity = "Host=<DEV_HOST>;Port=5432;Database=<DEV_DB>;Username=<DEV_USER>;Password=YOUR_DEV_PASSWORD"
-$env:ConnectionStrings__Tenant   = "Host=<DEV_HOST>;Port=5432;Database=<DEV_DB>;Username=<DEV_USER>;Password=YOUR_DEV_PASSWORD"
-$env:ConnectionStrings__Access   = "Host=<DEV_HOST>;Port=5432;Database=<DEV_DB>;Username=<DEV_USER>;Password=YOUR_DEV_PASSWORD"
+$env:ConnectionStrings__Default = "Host=<DEV_HOST>;Port=5432;Database=<DEV_DB>;Username=<DEV_USER>;Password=YOUR_DEV_PASSWORD"
 ```
 
 Verify presence only (never print values):
 
 ```powershell
-"Identity: " + [bool]$env:ConnectionStrings__Identity
-"Tenant:   " + [bool]$env:ConnectionStrings__Tenant
-"Access:   " + [bool]$env:ConnectionStrings__Access
+"Default: " + [bool]$env:ConnectionStrings__Default
 ```
 
 ## 3. Relevant build/test commands (run in approved implementation tasks; report exact results)

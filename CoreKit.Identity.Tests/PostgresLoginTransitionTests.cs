@@ -11,7 +11,7 @@ namespace CoreKit.Identity.Tests;
 /// <summary>
 /// PostgreSQL-backed concurrency coverage for the atomic login state transitions.
 /// Each test creates an isolated scratch database on the development PostgreSQL server named by
-/// ConnectionStrings__Identity, runs the real EF Core/Npgsql stack against it, and drops the
+/// ConnectionStrings__Default, runs the real EF Core/Npgsql stack against it, and drops the
 /// scratch database afterwards; the configured database itself is never touched. When that
 /// environment variable is missing, or a scratch database cannot be created, the test reports
 /// the exact reason through <see cref="ITestOutputHelper"/> and returns without asserting —
@@ -289,10 +289,10 @@ public sealed class PostgresLoginTransitionTests
 
         public static async Task<PostgresScratchDb?> TryCreateAsync(ITestOutputHelper output)
         {
-            var baseConnection = Environment.GetEnvironmentVariable("ConnectionStrings__Identity");
+            var baseConnection = Environment.GetEnvironmentVariable("ConnectionStrings__Default");
             if (string.IsNullOrWhiteSpace(baseConnection))
             {
-                output.WriteLine("Skipped: ConnectionStrings__Identity is not set; no PostgreSQL integration coverage in this environment.");
+                output.WriteLine("Skipped: ConnectionStrings__Default is not set; no PostgreSQL integration coverage in this environment.");
                 return null;
             }
 

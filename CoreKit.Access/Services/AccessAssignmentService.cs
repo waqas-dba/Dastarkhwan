@@ -59,7 +59,7 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
         if (call.IsFailure)
             return call.Error!;
 
-        var (scope, actorId, access) = call.Value;
+        var (scope, actorId, _) = call.Value;
 
         if (userId == Guid.Empty)
             return AccessErrors.Validation("A user id is required.");
@@ -78,15 +78,6 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
 
         if (wantedRoles.Count != wanted.Count)
             return AccessErrors.NotFound("One or more roles");
-
-        // Closure slots filled inside the lock.
-        if (scope.Type == AccessScope.PlatformType)
-        {
-            var adminName = AccessValidation.NormalizeName("Administrator");
-            var admins = await _assignments.ListUserIdsWithRoleAsync(scope, adminName, null, ct);
-            if (admins.Count == 1 && admins[0] == userId && !wantedRoles.Any(r => r.NormalizedName == adminName))
-                return AccessErrors.Conflict("The last platform administrator cannot lose the Administrator role.");
-        }
 
         AccessError? earlyError = null;
         IReadOnlyList<AccessRoleDto>? earlyResult = null;
@@ -111,6 +102,25 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
             }
             var generation = liveMember.MembershipGeneration;
 
+            // Re-fetch fresh authority inside the lock: the actor's permissions may have changed
+            // between the guard check and lock acquisition. A stale access object would let a
+            // demoted actor keep assigning roles they no longer hold.
+            var freshAccess = await _access.GetFreshAccessAsync(actorId, scope, innerCt);
+
+            // The last-platform-administrator check must run inside the lock: between the guard
+            // check and lock acquisition, another request could remove the only other administrator,
+            // making this user the last one. The check here prevents demoting the last admin.
+            if (scope.Type == AccessScope.PlatformType)
+            {
+                var adminName = AccessValidation.NormalizeName("Administrator");
+                var admins = await _assignments.ListUserIdsWithRoleAsync(scope, adminName, null, innerCt);
+                if (admins.Count == 1 && admins[0] == userId && !wantedRoles.Any(r => r.NormalizedName == adminName))
+                {
+                    earlyError = AccessErrors.Conflict("The last platform administrator cannot lose the Administrator role.");
+                    return;
+                }
+            }
+
             var current = await _assignments.ListForUserForUpdateAsync(scope, userId, innerCt);
             var currentIds = current.Select(a => a.RoleId).ToHashSet();
             var addedIds = wanted.Where(id => !currentIds.Contains(id)).ToList();
@@ -132,7 +142,7 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
                 .Distinct()
                 .ToList();
             var changedRoles = await _roles.FindManyAsync(scope, changedRoleIds, innerCt);
-            if (!AccessGuard.Holds(access, changedRoles.SelectMany(r => r.Permissions.Select(p => p.Permission))))
+            if (!AccessGuard.Holds(freshAccess, changedRoles.SelectMany(r => r.Permissions.Select(p => p.Permission))))
             {
                 earlyError = AccessErrors.Escalation;
                 return;

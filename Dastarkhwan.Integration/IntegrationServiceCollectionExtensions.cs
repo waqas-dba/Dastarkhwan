@@ -91,12 +91,6 @@ public static class IntegrationServiceCollectionExtensions
         // Provide IPlatformAdministratorProvider via AccessPlatformAdministratorProvider.
         services.AddScoped<IPlatformAdministratorProvider, AccessPlatformAdministratorProvider>();
 
-        // Tenant adds its tenant claim to every access token Identity issues.
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAccessTokenClaimsContributor, TenantClaimsContributor>());
-
-        // Add platform admin claim to access tokens for platform administrators.
-        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAccessTokenClaimsContributor, PlatformAdminClaimsContributor>());
-
         return services;
     }
 

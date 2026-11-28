@@ -9,7 +9,12 @@ public sealed class AdministratorGuard : IAdministratorGuard
 {
     private readonly IPlatformAdministratorProvider _provider;
     private readonly IdentityDbContext _db;
-    private const long AdminCheckLockKey = 0x4C41535441444D4E;
+    // In-process mutex serializing last-administrator checks so concurrent requests
+    // cannot both decide it is safe to deactivate the last active administrator.
+    // Cross-instance serialization is provided by the database-level advisory lock
+    // used by the Access unit of work; on non-PostgreSQL providers this guard is
+    // single-instance only, backed by the SecurityVersion check in TryDeactivateAsync.
+    private static readonly SemaphoreSlim s_adminCheckLock = new(1, 1);
 
     public AdministratorGuard(IPlatformAdministratorProvider provider,
                               IUserRepository userRepository,
@@ -21,6 +26,19 @@ public sealed class AdministratorGuard : IAdministratorGuard
 
     public async Task<bool> IsLastActiveAdministratorAsync(Guid userId, CancellationToken ct = default)
     {
+        await s_adminCheckLock.WaitAsync(ct);
+        try
+        {
+            return await CheckAsync(userId, ct);
+        }
+        finally
+        {
+            s_adminCheckLock.Release();
+        }
+    }
+
+    private async Task<bool> CheckAsync(Guid userId, CancellationToken ct)
+    {
         var ownsTransaction = _db.Database.CurrentTransaction is null;
         IDbContextTransaction? transaction = null;
 
@@ -29,9 +47,6 @@ public sealed class AdministratorGuard : IAdministratorGuard
 
         try
         {
-            await _db.Database.ExecuteSqlRawAsync(
-                $"SELECT pg_advisory_xact_lock({AdminCheckLockKey})", ct);
-
             var adminUserIds = await _provider.GetPlatformAdministratorUserIdsAsync(ct);
             if (adminUserIds.Count == 0)
                 return false;

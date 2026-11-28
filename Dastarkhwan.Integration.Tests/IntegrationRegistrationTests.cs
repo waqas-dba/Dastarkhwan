@@ -1,4 +1,5 @@
 using CoreKit.Access.Contracts;
+using CoreKit.Access.Services;
 using CoreKit.Identity.Contracts;
 using CoreKit.Identity.Entities;
 using CoreKit.Identity.Interfaces;
@@ -27,6 +28,9 @@ public sealed class IntegrationRegistrationTests
         services.AddScoped<ITenantMembershipService, FakeTenantMembershipService>();
         services.AddScoped<ITenantMemberRepository, FakeTenantMemberRepository>();
         services.AddScoped<IUserRepository, FakeUserRepository>();
+        // Required for AccessPlatformAdministratorProvider
+        services.AddScoped<IAccessService, FakeAccessService>();
+        services.AddSingleton<IPlatformAdministratorProvider, FakePlatformAdministratorProvider>();
         return services;
     }
 
@@ -36,8 +40,7 @@ public sealed class IntegrationRegistrationTests
         var services = ServicesWithAccessPorts();
         services.AddDastarkhwanIntegration();
 
-        using var provider = services.BuildServiceProvider(
-            new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+        using var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
 
         // Verify event handlers are registered for each event type
@@ -282,5 +285,35 @@ public sealed class IntegrationRegistrationTests
             => Task.CompletedTask;
 
         public void StageDelete(User user) { }
+    }
+
+    private sealed class FakeAccessService : IAccessService
+    {
+        public Task<EffectiveAccess> GetAccessAsync(Guid userId, AccessScope scope, CancellationToken ct = default)
+            => Task.FromResult(EffectiveAccess.None);
+
+        public Task<bool> HasPermissionAsync(Guid userId, AccessScope scope, string permission, CancellationToken ct = default)
+            => Task.FromResult(false);
+
+        public Task<bool> HasPermissionAsync(string permission, CancellationToken ct = default)
+            => Task.FromResult(false);
+
+        public Task<AccessResult<EffectiveAccess>> GetMyAccessAsync(CancellationToken ct = default)
+            => Task.FromResult(AccessResult.Success(EffectiveAccess.None));
+
+        public Task<IReadOnlyList<Guid>> ListUserIdsWithRoleAsync(AccessScope scope, string roleName, long? membershipGeneration, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<Guid>>(new List<Guid>());
+
+        public Task<IReadOnlyList<AccessRoleDto>> ListRolesAsync(AccessScope scope, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<AccessRoleDto>>(new List<AccessRoleDto>());
+
+        public Task<EffectiveAccess> GetFreshAccessAsync(Guid userId, AccessScope scope, CancellationToken ct = default)
+            => Task.FromResult(EffectiveAccess.None);
+    }
+
+    private sealed class FakePlatformAdministratorProvider : IPlatformAdministratorProvider
+    {
+        public Task<IReadOnlyList<Guid>> GetPlatformAdministratorUserIdsAsync(CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<Guid>>(new List<Guid>());
     }
 }

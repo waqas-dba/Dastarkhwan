@@ -35,7 +35,7 @@ public static class AccessServiceCollectionExtensions
             .Validate(o => o.CommandTimeoutSeconds is null or > 0, "Database:CommandTimeoutSeconds must be positive when set.")
             .Validate(o => o.MaxRetryAttempts >= 1, "Database:MaxRetryAttempts must be at least 1.");
 
-        services.AddDbContext<AccessDbContext>((sp, options) =>
+        services.AddDbContextPool<AccessDbContext>((sp, options) =>
         {
             if (configureDatabase is not null)
             {

@@ -25,6 +25,8 @@ public interface IAccessAssignmentRepository
     /// <summary>Stages deletion of every assignment the user holds in the scope, for tracked removal.
     /// The unit of work persists the staged deletions together with the rest of the change.</summary>
     Task RemoveUserAsync(AccessScope scope, Guid userId, CancellationToken ct = default);
+    Task<IReadOnlyList<AccessScope>> ListScopesForUserAsync(Guid userId, CancellationToken ct = default);
+    Task RemoveUserEverywhereAsync(Guid userId, CancellationToken ct = default);
 
     /// <summary>Stages deletion of every assignment in a scope. Called before role removal so the
     /// Restrict FK on AccessAssignment.Role does not block the cascade.</summary>
@@ -96,6 +98,23 @@ internal sealed class AccessAssignmentRepository : IAccessAssignmentRepository
     public async Task RemoveUserAsync(AccessScope scope, Guid userId, CancellationToken ct = default)
     {
         var assignments = await ListForUserForUpdateAsync(scope, userId, ct);
+        if (assignments.Count > 0)
+            _db.Assignments.RemoveRange(assignments);
+    }
+
+    public async Task<IReadOnlyList<AccessScope>> ListScopesForUserAsync(Guid userId, CancellationToken ct = default)
+    {
+        var rows = await _db.Assignments.AsNoTracking()
+            .Where(a => a.UserId == userId)
+            .Select(a => new { a.ScopeType, a.ScopeId })
+            .Distinct()
+            .ToListAsync(ct);
+        return rows.Select(r => new AccessScope(r.ScopeType, r.ScopeId)).ToList();
+    }
+
+    public async Task RemoveUserEverywhereAsync(Guid userId, CancellationToken ct = default)
+    {
+        var assignments = await _db.Assignments.Where(a => a.UserId == userId).ToListAsync(ct);
         if (assignments.Count > 0)
             _db.Assignments.RemoveRange(assignments);
     }

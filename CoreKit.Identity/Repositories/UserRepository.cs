@@ -64,7 +64,7 @@ public sealed class UserRepository : IUserRepository
 
         var items = await users
             .OrderBy(u => u.NormalizedEmail)
-            .Skip((page - 1) * pageSize)
+            .Skip((int)Math.Min(((long)page - 1) * pageSize, int.MaxValue))
             .Take(pageSize)
             .ToListAsync(ct);
 
@@ -173,7 +173,7 @@ public sealed class UserRepository : IUserRepository
         // expected-hash and expected-version predicates run inside the UPDATE against the
         // current row, so two concurrent credential updates cannot silently overwrite each
         // other: only the request whose expectations still hold wins.
-        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await BeginScopedAsync(ct);
 
         var affected = await _db.Users
             .Where(u => u.Id == userId
@@ -220,7 +220,7 @@ public sealed class UserRepository : IUserRepository
         // the refresh-token revocation are one transaction. The expected-version predicate makes
         // the update conditional, so a concurrent security-sensitive update wins or loses
         // deterministically instead of being silently overwritten.
-        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await BeginScopedAsync(ct);
 
         var affected = await _db.Users
             .Where(u => u.Id == userId
@@ -262,7 +262,7 @@ public sealed class UserRepository : IUserRepository
         DateTime now,
         CancellationToken ct = default)
     {
-        await using var transaction = await _db.Database.BeginTransactionAsync(ct);
+        await using var transaction = await BeginScopedAsync(ct);
 
         // Single UPDATE with conditional predicates for both version and password hash.
         // If either predicate fails, affected == 0 and we rollback.
@@ -341,6 +341,15 @@ public sealed class UserRepository : IUserRepository
     /// Two requests can both pass an "email is free" or "mobile is free" check. The unique index
     /// then rejects the second one, and this turns that database error into a plain false.
     /// </summary>
+    // Joins the caller's ambient transaction instead of trying to open a nested one
+    // (EF throws "The connection is already in a transaction" otherwise).
+    private async Task<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction> BeginScopedAsync(CancellationToken ct)
+    {
+        if (_db.Database.CurrentTransaction is { } ambient)
+            return new JoinedTransaction(ambient);
+        return await _db.Database.BeginTransactionAsync(ct);
+    }
+
     private async Task<bool> TrySaveAsync(User user, CancellationToken ct)
     {
         try

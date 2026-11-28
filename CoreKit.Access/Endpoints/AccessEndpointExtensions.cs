@@ -77,8 +77,11 @@ public static class AccessEndpointExtensions
                 : result.ToHttpResult();
         }).RequireRateLimiting(AccessWritePolicy);
 
-        platform.MapGet("/{userId:guid}", async (Guid userId, IPlatformMembershipService s, CancellationToken ct) =>
+        platform.MapGet("/{userId:guid}", async (
+            Guid userId, IPlatformMembershipService s, IAccessCurrentUser me, IPermissionChecker perms, CancellationToken ct) =>
         {
+            if (me.UserId != userId && !await perms.HasPlatformPermissionAsync(AccessPermissionNames.AssignmentsRead, ct))
+                return AccessErrors.Denied.ToHttpResult();
             var isMember = await s.IsMemberAsync(userId, ct);
             return isMember ? Results.Ok(new { userId, isMember = true }) : Results.NotFound(new { userId, isMember = false });
         });

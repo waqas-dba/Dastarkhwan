@@ -44,18 +44,12 @@ public sealed class AccessBootstrap : IAccessBootstrap
 
         var scope = AccessScope.ForPlatform(AccessScope.PlatformId);
 
+        // The platform administrator must hold every declared permission (access.*, tenants.*,
+        // identity.users.*, ...). Otherwise nobody can ever grant those permissions (escalation guard).
         var adminRoleId = await EnsurePlatformRoleAsync(
             "Administrator",
-            "Initial platform administrator",
-            new[]
-            {
-                AccessPermissionNames.RolesRead,
-                AccessPermissionNames.RolesManage,
-                AccessPermissionNames.AssignmentsRead,
-                AccessPermissionNames.AssignmentsManage,
-                AccessPermissionNames.AuditRead,
-                AccessPermissionNames.PlatformMembersManage
-            },
+            "Platform administrator (holds every declared permission)",
+            _catalog.Names.ToArray(),
             ct);
 
         var outcome = await _unitOfWork.SaveWithAdvisoryLockAsync(

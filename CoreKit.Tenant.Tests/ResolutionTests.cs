@@ -1,5 +1,10 @@
 ﻿using CoreKit.Tenant.Resolution;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -121,6 +126,15 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
         return context;
     }
 
+    private static IServiceProvider CreateTestServices()
+    {
+        var services = new ServiceCollection();
+        services.AddOptions<Microsoft.AspNetCore.Mvc.Infrastructure.ProblemDetailsOptions>();
+        services.AddSingleton<Microsoft.AspNetCore.Mvc.Infrastructure.IProblemDetailsService, Microsoft.AspNetCore.Mvc.Infrastructure.DefaultProblemDetailsService>();
+        services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
+        return services.BuildServiceProvider();
+    }
+
     private async Task<(DefaultHttpContext Context, bool NextCalled, string Body)> RunAsync(DefaultHttpContext context)
     {
         var nextCalled = false;
@@ -130,7 +144,7 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
                 nextCalled = true;
                 return Task.CompletedTask;
             },
-            Options.Create(new TenantResolutionOptions()),
+            Options.Create(new TenantOptions()),
             NullLogger<TenantResolutionMiddleware>.Instance);
         var membership = new TenantMembershipReader(_env.Members, _env.Tenants, new MemoryCache(new MemoryCacheOptions()), Options.Create(_env.Config));
 
@@ -140,6 +154,8 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
             new HeaderTenantResolutionStrategy(options),
             new ClaimTenantResolutionStrategy(options)
         };
+
+        context.RequestServices = CreateTestServices();
 
         context.Response.Body = new MemoryStream();
         await middleware.InvokeAsync(context, membership, strategies, _env.InfoProvider, _env.CurrentTenant);
@@ -197,7 +213,7 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
         var bySlugTenant = other.AddTenant("Shop", "shop");
         var middleware = new TenantResolutionMiddleware(
             _ => Task.CompletedTask,
-            Options.Create(new TenantResolutionOptions()),
+            Options.Create(new TenantOptions()),
             NullLogger<TenantResolutionMiddleware>.Instance);
         var membership = new TenantMembershipReader(other.Members, other.Tenants, new MemoryCache(new MemoryCacheOptions()), Options.Create(other.Config));
         var options = Options.Create(other.Config);
@@ -478,7 +494,7 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
                 nextCalled = true;
                 return Task.CompletedTask;
             },
-            Options.Create(new TenantResolutionOptions()),
+            Options.Create(new TenantOptions()),
             NullLogger<TenantResolutionMiddleware>.Instance);
         var membership = new NullMembershipReader();
 

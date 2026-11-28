@@ -91,7 +91,7 @@ public sealed class SendGridEmailSender : IIdentityEmailSender
             <html>
             <body>
                 <h2>Verify your email address</h2>
-                <p>Hello {message.DisplayName ?? message.Email},</p>
+                <p>Hello {System.Net.WebUtility.HtmlEncode(message.DisplayName ?? message.Email)},</p>
                 <p>Please click the link below to verify your email address:</p>
                 <p><a href='{verifyUrl}'>Verify Email</a></p>
                 <p>This link expires at {message.ExpiresAt:u} UTC.</p>
@@ -107,7 +107,7 @@ public sealed class SendGridEmailSender : IIdentityEmailSender
             <html>
             <body>
                 <h2>Reset your password</h2>
-                <p>Hello {message.DisplayName ?? message.Email},</p>
+                <p>Hello {System.Net.WebUtility.HtmlEncode(message.DisplayName ?? message.Email)},</p>
                 <p>You requested a password reset. Click the link below to set a new password:</p>
                 <p><a href='{resetUrl}'>Reset Password</a></p>
                 <p>This link expires at {message.ExpiresAt:u} UTC.</p>

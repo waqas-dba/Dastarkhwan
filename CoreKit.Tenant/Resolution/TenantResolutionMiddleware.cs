@@ -24,10 +24,10 @@ public sealed class TenantResolutionMiddleware
     private readonly TenantResolutionOptions _options;
     private readonly ILogger<TenantResolutionMiddleware> _logger;
 
-    public TenantResolutionMiddleware(RequestDelegate next, IOptions<TenantResolutionOptions> options, ILogger<TenantResolutionMiddleware> logger)
+    public TenantResolutionMiddleware(RequestDelegate next, IOptions<TenantOptions> options, ILogger<TenantResolutionMiddleware> logger)
     {
         _next = next;
-        _options = options.Value;
+        _options = options.Value.Resolution;
         _logger = logger;
     }
 
@@ -40,11 +40,11 @@ public sealed class TenantResolutionMiddleware
     {
         // Skip tenant resolution for excluded paths (account/platform routes, health checks, etc.)
         var path = context.Request.Path.Value ?? string.Empty;
-        _logger.LogInformation("TenantResolutionMiddleware invoked for path: {Path}", path);
+        _logger.LogDebug("TenantResolutionMiddleware invoked for path: {Path}", path);
         
         if (_options.ExcludedPathPrefixes.Any(prefix => path.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
         {
-            _logger.LogInformation("Path {Path} is excluded from tenant resolution", path);
+            _logger.LogDebug("Path {Path} is excluded from tenant resolution", path);
             await _next(context);
             return;
         }
@@ -56,23 +56,23 @@ public sealed class TenantResolutionMiddleware
 
         foreach (var strategy in strategies.OrderBy(s => s.Order))
         {
-            _logger.LogInformation("Running tenant resolution strategy: {Strategy} (Order: {Order})", strategy.GetType().Name, strategy.Order);
+            _logger.LogDebug("Running tenant resolution strategy: {Strategy} (Order: {Order})", strategy.GetType().Name, strategy.Order);
             var identifier = await strategy.ResolveAsync(context, ct);
 
             if (identifier is not null)
             {
-                _logger.LogInformation("Strategy {Strategy} returned identifier: {Identifier}", strategy.GetType().Name, identifier);
+                _logger.LogDebug("Strategy {Strategy} returned identifier: {Identifier}", strategy.GetType().Name, identifier);
                 identifiers.Add(identifier);
             }
             else
             {
-                _logger.LogInformation("Strategy {Strategy} returned null", strategy.GetType().Name);
+                _logger.LogDebug("Strategy {Strategy} returned null", strategy.GetType().Name);
             }
         }
 
         if (identifiers.Count == 0)
         {
-            _logger.LogInformation("No tenant identifiers found, continuing without tenant");
+            _logger.LogDebug("No tenant identifiers found, continuing without tenant");
             await _next(context);
             return;
         }
@@ -121,7 +121,7 @@ public sealed class TenantResolutionMiddleware
         if (context.User.Identity?.IsAuthenticated == true)
         {
             var userId = GetUserId(context.User);
-            _logger.LogInformation("Authenticated user ID: {UserId}", userId);
+            _logger.LogDebug("Authenticated user ID: {UserId}", userId);
             if (userId is null)
             {
                 _logger.LogWarning("Invalid user identity - no user ID found in claims");
@@ -138,14 +138,14 @@ public sealed class TenantResolutionMiddleware
 
             setter.Set(tenant.Id);
             context.Items[TenantContextItemKeys.TenantId] = tenant.Id;
-            _logger.LogInformation("Tenant {TenantId} set for user {UserId}", tenant.Id, userId);
+            _logger.LogDebug("Tenant {TenantId} set for user {UserId}", tenant.Id, userId);
 
             await _next(context);
             return;
         }
 
         setter.Set(tenant.Id);
-        _logger.LogInformation("Tenant {TenantId} set for anonymous request", tenant.Id);
+        _logger.LogDebug("Tenant {TenantId} set for anonymous request", tenant.Id);
 
         await _next(context);
     }

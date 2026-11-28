@@ -51,6 +51,7 @@ public sealed class Pr2VerificationIntegrationTests : IDisposable
 
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddProblemDetails();
         services.AddTenant(config, options => options.UseSqlite(_tenantConnection));
         services.AddAccess(config, options => options.UseSqlite(_accessConnection));
         services.AddDastarkhwanIntegration();
@@ -317,7 +318,7 @@ public sealed class Pr2VerificationIntegrationTests : IDisposable
                 nextCalled = true;
                 return Task.CompletedTask;
             },
-            Options.Create(new TenantResolutionOptions()),
+            Options.Create(new TenantOptions()),
             NullLogger<TenantResolutionMiddleware>.Instance);
 
         context.Response.Body = new MemoryStream();

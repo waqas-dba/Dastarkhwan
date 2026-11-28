@@ -16,7 +16,10 @@ using CoreKit.Tenant.Abstractions;
 using CoreKit.Tenant.Endpoints;
 using CoreKit.Tenant.Extensions;
 using CoreKit.Tenant.Persistence;
+using CoreKit.Identity.Outbox;
 using Dastarkhwan.Integration;
+using Dastarkhwan.Integration.Identity;
+using Dastarkhwan.Integration.Membership;
 using Dastarkhwan.Integration.Endpoints;
 using Dastarkhwan.Web.Configuration;
 using Dastarkhwan.Web.Email;
@@ -92,6 +95,7 @@ builder.Services.AddScoped<IIdentityAdminAuthorizer>(sp =>
 });
 
 builder.Services.AddIdentitySeeding(builder.Configuration);
+builder.Services.AddIdentityOutboxRetention();
 builder.Services.AddTenant(builder.Configuration);
 builder.Services.AddAccess(builder.Configuration);
 
@@ -241,52 +245,22 @@ if (app.Environment.IsDevelopment())
         .RequireAccess("sales.refund");
 }
 
-if (app.Environment.IsDevelopment())
+// Test-only endpoints that hand out account tokens: Development + explicit opt-in
+// (Dev:EnableTokenEndpoints=true) + loopback callers only.
+if (app.Environment.IsDevelopment() && builder.Configuration.GetValue<bool>("Dev:EnableTokenEndpoints"))
 {
-    app.MapGet("/dev/verification-token", (string email, DevEmailInbox inbox) =>
+    var dev = app.MapGroup("/dev");
+    dev.AddEndpointFilter(async (ctx, next) =>
+    {
+        if (ctx.HttpContext.Connection.RemoteIpAddress is { } ip && IPAddress.IsLoopback(ip))
+            return await next(ctx);
+        return Results.NotFound();
+    });
+    dev.MapGet("/verification-token", (string email, DevEmailInbox inbox) =>
         inbox.Get(email) is { } token ? Results.Ok(new { token }) : Results.NotFound());
-    app.MapGet("/dev/password-reset-token", (string email, DevEmailInbox inbox) =>
+    dev.MapGet("/password-reset-token", (string email, DevEmailInbox inbox) =>
         inbox.GetReset(email) is { } token ? Results.Ok(new { token }) : Results.NotFound());
 }
 
 app.Run();
 
-public sealed class PermissionBasedIdentityAdminAuthorizer : IIdentityAdminAuthorizer
-{
-    private readonly IPermissionChecker _permissionChecker;
-
-    public PermissionBasedIdentityAdminAuthorizer(IPermissionChecker permissionChecker)
-    {
-        _permissionChecker = permissionChecker;
-    }
-
-    public async Task<bool> IsAllowedAsync(IdentityAdminOperation operation, CancellationToken ct = default)
-    {
-        var permission = operation switch
-        {
-            IdentityAdminOperation.ReadUsers => "identity.users.read",
-            IdentityAdminOperation.CreateUsers => "identity.users.create",
-            IdentityAdminOperation.UpdateUsers => "identity.users.update",
-            IdentityAdminOperation.DeleteUsers => "identity.users.delete",
-            _ => null
-        };
-
-        return permission is not null && await _permissionChecker.HasPlatformPermissionAsync(permission, ct);
-    }
-}
-
-internal sealed class AccessPlatformAdministratorProvider : IPlatformAdministratorProvider
-{
-    private readonly IAccessService _access;
-
-    public AccessPlatformAdministratorProvider(IAccessService access)
-    {
-        _access = access;
-    }
-
-    public Task<IReadOnlyList<Guid>> GetPlatformAdministratorUserIdsAsync(CancellationToken ct = default)
-    {
-        var platformScope = AccessScope.ForPlatform(AccessScope.PlatformId);
-        return _access.ListUserIdsWithRoleAsync(platformScope, "Administrator", ct);
-    }
-}

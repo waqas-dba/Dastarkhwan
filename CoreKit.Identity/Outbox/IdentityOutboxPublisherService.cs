@@ -7,6 +7,7 @@ namespace CoreKit.Identity.Outbox;
 
 public sealed class IdentityOutboxPublisherService : BackgroundService
 {
+    private static readonly TimeSpan MaxIdlePoll = TimeSpan.FromSeconds(30);
     private readonly IServiceProvider _services;
     private readonly IdentityOutboxOptions _options;
     private readonly ILogger<IdentityOutboxPublisherService> _logger;
@@ -24,6 +25,7 @@ public sealed class IdentityOutboxPublisherService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Identity outbox publisher started");
+        var idle = _options.PollInterval;
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -44,11 +46,18 @@ public sealed class IdentityOutboxPublisherService : BackgroundService
                 processed = 0;
             }
 
-            if (processed >= _options.BatchSize) continue;
+            if (processed >= _options.BatchSize)
+            {
+                idle = _options.PollInterval;
+                continue;
+            }
+            idle = processed > 0
+                ? _options.PollInterval
+                : TimeSpan.FromTicks(Math.Min(idle.Ticks * 2, MaxIdlePoll.Ticks));
 
             try
             {
-                await Task.Delay(_options.PollInterval, stoppingToken);
+                await Task.Delay(idle, stoppingToken);
             }
             catch (OperationCanceledException)
             {

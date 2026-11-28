@@ -88,6 +88,15 @@ public static class IntegrationServiceCollectionExtensions
         // Guard against deleting a user who is a tenant owner.
         services.TryAddScoped<IUserDeletionGuard, UserDeletionGuard>();
 
+        // Provide IPlatformAdministratorProvider via AccessPlatformAdministratorProvider.
+        services.AddScoped<IPlatformAdministratorProvider, AccessPlatformAdministratorProvider>();
+
+        // Tenant adds its tenant claim to every access token Identity issues.
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAccessTokenClaimsContributor, TenantClaimsContributor>());
+
+        // Add platform admin claim to access tokens for platform administrators.
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IAccessTokenClaimsContributor, PlatformAdminClaimsContributor>());
+
         return services;
     }
 

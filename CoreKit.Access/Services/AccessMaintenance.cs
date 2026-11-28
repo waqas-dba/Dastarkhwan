@@ -269,12 +269,15 @@ public async Task RemoveUserFromAllScopesAsync(Guid userId, CancellationToken ct
         var memberships = await _tenants.ListForUserIncludingRemovedAsync(userId, ct);
 
         // Remove from all tenant scopes
+        // Source of truth for "where does this user hold roles" is Access itself, not Tenant
+        // (Tenant memberships are already hard-deleted by the time this handler runs).
+        var scopes = (await _assignments.ListScopesForUserAsync(userId, ct)).ToHashSet();
         foreach (var (tenantId, _, _) in memberships)
-        {
-            var scope = AccessScope.ForTenant(tenantId);
-            await _assignments.RemoveUserAsync(scope, userId, ct);
+            scopes.Add(AccessScope.ForTenant(tenantId));
+        scopes.Remove(AccessScope.ForPlatform(AccessScope.PlatformId));
+        foreach (var scope in scopes)
             _audit.Record(scope, AccessAuditActions.UserRemoved, $"user: {userId}; account-deleted");
-        }
+        await _assignments.RemoveUserEverywhereAsync(userId, ct);
 
         // Remove platform membership
         var platformScope = AccessScope.ForPlatform(AccessScope.PlatformId);
@@ -295,10 +298,8 @@ public async Task RemoveUserFromAllScopesAsync(Guid userId, CancellationToken ct
         EnsureSaved(await _unitOfWork.SaveAsync(ct), "remove user from all scopes");
 
         // Invalidate cache for all affected scopes
-        foreach (var (tenantId, _, _) in memberships)
-        {
-            _cache.InvalidateUser(AccessScope.ForTenant(tenantId), userId);
-        }
+        foreach (var s in scopes)
+            _cache.InvalidateUser(s, userId);
         _cache.InvalidateUser(platformScope, userId);
     }
 

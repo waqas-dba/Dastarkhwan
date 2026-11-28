@@ -36,6 +36,10 @@ public sealed class AccessUnitOfWork : IAccessUnitOfWork
         _logger = logger;
     }
 
+    private static bool IsConflictSqlState(DbUpdateException ex)
+        => ex.InnerException is Npgsql.PostgresException { SqlState: { } s }
+           && (s.StartsWith("23", StringComparison.Ordinal) || s == "40001" || s == "40P01");
+
     public async Task<SaveOutcome> SaveAsync(CancellationToken ct = default)
     {
         try
@@ -49,7 +53,7 @@ public sealed class AccessUnitOfWork : IAccessUnitOfWork
             _db.ChangeTracker.Clear();
             return SaveOutcome.ConcurrencyConflict;
         }
-        catch (DbUpdateException ex)
+        catch (DbUpdateException ex) when (IsConflictSqlState(ex))
         {
             _logger.LogError(ex, "An access change was refused by the database.");
             _db.ChangeTracker.Clear();
@@ -83,7 +87,7 @@ public sealed class AccessUnitOfWork : IAccessUnitOfWork
                 _db.ChangeTracker.Clear();
                 return SaveOutcome.ConcurrencyConflict;
             }
-            catch (DbUpdateException ex)
+            catch (DbUpdateException ex) when (IsConflictSqlState(ex))
             {
                 _logger.LogError(ex, "An access change was refused by the database.");
                 _db.ChangeTracker.Clear();

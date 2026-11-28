@@ -1,4 +1,5 @@
 using CoreKit.Identity.Contracts;
+using CoreKit.Tenant.Entities;
 using CoreKit.Tenant.Persistence;
 
 namespace Dastarkhwan.Integration.Identity;
@@ -20,8 +21,22 @@ public sealed class UserDeletionGuard : IUserDeletionGuard
         if (userId == Guid.Empty)
             return false;
 
-        // Check if user is an owner of any active tenant
         var memberships = await _memberRepository.ListForUserAsync(userId, ct);
-        return !memberships.Any(m => m.IsOwner && m.Tenant.Status == CoreKit.Tenant.Entities.TenantStatus.Active);
+
+        foreach (var membership in memberships)
+        {
+            if (!membership.IsOwner)
+                continue;
+
+            // Block if user owns an Active tenant
+            if (membership.Tenant.Status == TenantStatus.Active)
+                return false;
+
+            // Block if user is the last owner of any tenant (any status)
+            if (await _memberRepository.CountOwnersAsync(membership.TenantId, ct) <= 1)
+                return false;
+        }
+
+        return true;
     }
 }

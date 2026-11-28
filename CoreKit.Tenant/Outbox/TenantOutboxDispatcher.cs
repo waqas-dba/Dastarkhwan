@@ -51,8 +51,14 @@ public sealed class TenantOutboxDispatcher
         var batch = await ClaimBatchAsync(ct);
 
         foreach (var envelope in batch)
-            await DeliverOneAsync(envelope, ct);
+        {
+            ct.ThrowIfCancellationRequested();
 
+            if (!await RenewLeaseAsync(envelope, ct))
+                continue;
+
+            await DeliverOneAsync(envelope, ct);
+        }
         return batch.Count;
     }
 
@@ -82,18 +88,17 @@ public sealed class TenantOutboxDispatcher
 
         var candidateIds = await db.OutboxMessages.AsNoTracking()
             .Where(m => m.Status == TenantOutboxStatus.Pending
-                        && m.NextAttemptAt <= now
-                        && (m.LeaseExpiresAt == null || m.LeaseExpiresAt <= now)
-                        && !db.OutboxMessages.Any(p => p.TenantId == m.TenantId
-                                                       && p.Sequence < m.Sequence
-                                                       && p.Status != TenantOutboxStatus.Delivered))
+                && m.NextAttemptAt <= now
+                && (m.LeaseExpiresAt == null || m.LeaseExpiresAt <= now)
+                && !db.OutboxMessages.Any(p => p.TenantId == m.TenantId
+                    && p.Sequence < m.Sequence
+                    && p.Status != TenantOutboxStatus.Delivered))
             .OrderBy(m => m.CreatedAt).ThenBy(m => m.Sequence)
             .Select(m => m.EventId)
             .Take(_options.BatchSize)
             .ToListAsync(ct);
 
         var claimed = new List<Guid>();
-
         foreach (var id in candidateIds)
         {
             // The conditional UPDATE is the claim: if another instance won it first, zero rows match.
@@ -124,10 +129,32 @@ public sealed class TenantOutboxDispatcher
             m.MembershipGeneration, m.PayloadJson, m.OccurredAt, m.AttemptCount)).ToList();
     }
 
+    private async Task<bool> RenewLeaseAsync(TenantOutboxEnvelope envelope, CancellationToken ct)
+    {
+        await using var scope = _scopes.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<TenantDbContext>();
+
+        var leaseUntil = Now() + _options.LeaseDuration;
+        var rows = await db.OutboxMessages
+            .Where(m => m.EventId == envelope.EventId
+                && m.LeaseOwner == _owner
+                && m.Status == TenantOutboxStatus.Pending)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(m => m.LeaseExpiresAt, (DateTime?)leaseUntil), ct);
+
+        if (rows == 1)
+            return true;
+
+        LeaseLostCounter.Add(1);
+        _logger.LogWarning(
+            "Outbox event {EventId} (tenant {TenantId}, sequence {Sequence}) is no longer leased to this dispatcher; skipping delivery.",
+            envelope.EventId, envelope.TenantId, envelope.Sequence);
+        return false;
+    }
+
     private async Task DeliverOneAsync(TenantOutboxEnvelope envelope, CancellationToken ct)
     {
         TenantOutboxDeliveryResult result;
-
         try
         {
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -202,8 +229,8 @@ public sealed class TenantOutboxDispatcher
         var text = Truncate(error);
 
         var query = db.OutboxMessages.Where(m => m.EventId == envelope.EventId
-                                                 && m.LeaseOwner == _owner
-                                                 && m.Status == TenantOutboxStatus.Pending);
+                                                  && m.LeaseOwner == _owner
+                                                  && m.Status == TenantOutboxStatus.Pending);
 
         int rows;
         if (deadLetter)

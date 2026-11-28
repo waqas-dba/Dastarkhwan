@@ -80,6 +80,14 @@ internal sealed class AccessAssignmentService : IAccessAssignmentService
             return AccessErrors.NotFound("One or more roles");
 
         // Closure slots filled inside the lock.
+        if (scope.Type == AccessScope.PlatformType)
+        {
+            var adminName = AccessValidation.NormalizeName("Administrator");
+            var admins = await _assignments.ListUserIdsWithRoleAsync(scope, adminName, null, ct);
+            if (admins.Count == 1 && admins[0] == userId && !wantedRoles.Any(r => r.NormalizedName == adminName))
+                return AccessErrors.Conflict("The last platform administrator cannot lose the Administrator role.");
+        }
+
         AccessError? earlyError = null;
         IReadOnlyList<AccessRoleDto>? earlyResult = null;
 

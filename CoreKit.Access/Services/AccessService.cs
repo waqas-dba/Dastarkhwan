@@ -79,6 +79,8 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
 
         if (member.IsOwner)
             permissions.UnionWith(_catalog.Names);
+        if (scope.Type == AccessScope.TenantType)
+            permissions.RemoveWhere(AccessScopePolicy.IsPlatformOnly);
 
         return new EffectiveAccess(
             true, member.IsOwner, permissions, roles.Select(r => r.Name).Order(StringComparer.Ordinal).ToList());

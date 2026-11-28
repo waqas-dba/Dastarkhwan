@@ -7,7 +7,7 @@ public sealed record EffectiveAccess(
     public static EffectiveAccess None { get; } =
         new(false, false, new HashSet<string>(StringComparer.Ordinal), Array.Empty<string>());
 
-    public bool Has(string permission) => IsMember && (IsOwner || Permissions.Contains(permission));
+    public bool Has(string permission) => IsMember && ((IsOwner && !AccessScopePolicy.IsPlatformOnly(permission)) || Permissions.Contains(permission));
 }
 
 /// <summary>Role DTO returned by Access queries.</summary>

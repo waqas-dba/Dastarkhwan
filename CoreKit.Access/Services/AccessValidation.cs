@@ -29,7 +29,7 @@ internal static class AccessValidation
     }
 
     /// <summary>Every permission must be declared in the catalog. An empty list is fine.</summary>
-    public static AccessError? ValidatePermissions(IEnumerable<string>? input, AccessCatalog catalog, out List<string> cleaned)
+    public static AccessError? ValidatePermissions(IEnumerable<string>? input, AccessCatalog catalog, out List<string> cleaned, AccessScope? scope = null)
     {
         cleaned = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -43,6 +43,8 @@ internal static class AccessValidation
 
             if (!catalog.Contains(permission))
                 return AccessErrors.Validation($"The permission '{permission}' does not exist.");
+            if (scope is { Type: AccessScope.TenantType } && AccessScopePolicy.IsPlatformOnly(permission))
+                return AccessErrors.Validation($"The permission '{permission}' can only be granted at platform level.");
 
             if (seen.Add(permission))
                 cleaned.Add(permission);

@@ -7,7 +7,6 @@ using CoreKit.Tenant.Resolution;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Infrastructure;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -22,8 +21,7 @@ public sealed class TenantResolutionMiddlewareScopeContextTests
     private static IServiceProvider CreateTestServices()
     {
         var services = new ServiceCollection();
-        services.AddOptions<Microsoft.AspNetCore.Mvc.Infrastructure.ProblemDetailsOptions>();
-        services.AddSingleton<Microsoft.AspNetCore.Mvc.Infrastructure.IProblemDetailsService, Microsoft.AspNetCore.Mvc.Infrastructure.DefaultProblemDetailsService>();
+        services.AddProblemDetails();
         services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
         return services.BuildServiceProvider();
     }

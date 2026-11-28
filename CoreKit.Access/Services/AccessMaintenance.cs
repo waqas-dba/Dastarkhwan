@@ -217,6 +217,11 @@ internal sealed class AccessMaintenance : IAccessMaintenance
         if (wantedRoles.Count != wanted.Count)
             throw new InvalidOperationException("One or more roles are not platform-scope roles.");
 
+        var adminRoleName = AccessValidation.NormalizeName("Administrator");
+        var currentAdmins = await _assignments.ListUserIdsWithRoleAsync(scope, adminRoleName, null, ct);
+        if (currentAdmins.Count == 1 && currentAdmins[0] == userId && !wantedRoles.Any(r => r.NormalizedName == adminRoleName))
+            throw new InvalidOperationException("The last platform administrator cannot lose the Administrator role.");
+
         var lockKey = $"access.assign:platform:{AccessScope.PlatformId:N}:{userId:N}";
         var outcome = await _unitOfWork.SaveWithAdvisoryLockAsync(lockKey, async innerCt =>
         {
@@ -290,6 +295,11 @@ public async Task RemoveUserFromAllScopesAsync(Guid userId, CancellationToken ct
 
         if (platformMember is not null && platformMember.RevokedAt is null)
         {
+            var platformAdmins = await _assignments.ListUserIdsWithRoleAsync(
+                AccessScope.ForPlatform(AccessScope.PlatformId), AccessValidation.NormalizeName("Administrator"), null, ct);
+            if (platformAdmins.Count == 1 && platformAdmins[0] == userId)
+                throw new InvalidOperationException("The last platform administrator cannot be removed.");
+
             platformMember.RevokedAt = _time.GetUtcNow().UtcDateTime;
             platformMember.MembershipGeneration++;
             _audit.Record(platformScope, AccessAuditActions.MemberRevoked, $"user: {userId}; account-deleted");

@@ -129,8 +129,7 @@ public sealed class TenantResolutionMiddlewareTests : IDisposable
     private static IServiceProvider CreateTestServices()
     {
         var services = new ServiceCollection();
-        services.AddOptions<Microsoft.AspNetCore.Mvc.Infrastructure.ProblemDetailsOptions>();
-        services.AddSingleton<Microsoft.AspNetCore.Mvc.Infrastructure.IProblemDetailsService, Microsoft.AspNetCore.Mvc.Infrastructure.DefaultProblemDetailsService>();
+        services.AddProblemDetails();
         services.AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance);
         return services.BuildServiceProvider();
     }

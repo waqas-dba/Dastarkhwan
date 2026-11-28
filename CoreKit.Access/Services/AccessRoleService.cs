@@ -89,7 +89,7 @@ internal sealed class AccessRoleService : IAccessRoleService
         if (descriptionError is not null)
             return descriptionError;
 
-        var permissionError = AccessValidation.ValidatePermissions(request.Permissions, _catalog, out var permissions);
+        var permissionError = AccessValidation.ValidatePermissions(request.Permissions, _catalog, out var permissions, scope);
         if (permissionError is not null)
             return permissionError;
 
@@ -211,7 +211,7 @@ internal sealed class AccessRoleService : IAccessRoleService
 
         var (scope, _, access) = call.Value;
 
-        var permissionError = AccessValidation.ValidatePermissions(request.Permissions, _catalog, out var wanted);
+        var permissionError = AccessValidation.ValidatePermissions(request.Permissions, _catalog, out var wanted, scope);
         if (permissionError is not null)
             return permissionError;
 
@@ -223,6 +223,9 @@ internal sealed class AccessRoleService : IAccessRoleService
             return AccessErrors.ConcurrencyStampRequired;
         if (request.ConcurrencyStamp != role.ConcurrencyStamp)
             return AccessErrors.SaveConflict;
+
+        if (IsProtectedRole(scope, role))
+            return AccessErrors.Conflict("The built-in Administrator role is managed by the system; its permissions cannot be changed.");
 
         var current = role.Permissions.Select(p => p.Permission).ToList();
         if (!AccessGuard.Holds(access, current.Concat(wanted)))

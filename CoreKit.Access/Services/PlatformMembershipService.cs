@@ -19,6 +19,7 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
     private readonly IAccessCache _cache;
     private readonly TimeProvider _time;
     private readonly AccessGuard _guard;
+    private readonly IAccessAssignmentRepository _assignments;
 
     public PlatformMembershipService(
         AccessDbContext db,
@@ -27,7 +28,8 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
         IAccessCurrentUser actor,
         IAccessCache cache,
         TimeProvider time,
-        AccessGuard guard)
+        AccessGuard guard,
+        IAccessAssignmentRepository assignments)
     {
         _db = db;
         _unitOfWork = unitOfWork;
@@ -36,6 +38,7 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
         _cache = cache;
         _time = time;
         _guard = guard;
+        _assignments = assignments;
     }
 
     public async Task<PlatformMemberResult> AddMemberAsync(Guid userId, CancellationToken ct = default)
@@ -114,6 +117,12 @@ internal sealed class PlatformMembershipService : IPlatformMembershipService
 
         if (existing is null || existing.RevokedAt is not null)
             return PlatformMemberResult.Ok(); // already not a member
+
+        var admins = await _assignments.ListUserIdsWithRoleAsync(
+            AccessScope.ForPlatform(AccessScope.PlatformId), AccessValidation.NormalizeName("Administrator"), null, ct);
+        if (admins.Count == 1 && admins[0] == userId)
+            return PlatformMemberResult.Fail(
+                AccessErrorKind.Conflict, "conflict", "The last platform administrator cannot be revoked.");
 
         existing.RevokedAt = _time.GetUtcNow().UtcDateTime;
         existing.MembershipGeneration++;

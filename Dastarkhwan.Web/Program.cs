@@ -95,6 +95,7 @@ builder.Services.AddScoped<IIdentityAdminAuthorizer>(sp =>
 });
 
 builder.Services.AddIdentitySeeding(builder.Configuration);
+builder.Services.AddHostedService<IdentityTokenRetentionService>();
 builder.Services.AddIdentityOutboxRetention();
 builder.Services.AddTenant(builder.Configuration);
 builder.Services.AddAccess(builder.Configuration);

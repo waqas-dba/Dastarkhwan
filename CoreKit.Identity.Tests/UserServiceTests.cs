@@ -1,7 +1,10 @@
 using CoreKit.Identity.Contracts;
+using CoreKit.Identity.Common;
+using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Repositories;
 using CoreKit.Identity.Security;
 using CoreKit.Identity.Settings;
+using CoreKit.Identity.Tests.Support;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -616,7 +619,7 @@ public sealed class UserServiceTests : IDisposable
             Password = "wrong-password"
         }, CancellationToken.None);
 
-        ResultAssert.Fails(result5, IdentityErrorKind.Forbidden, "auth.account_locked");
+        ResultAssert.Fails(result5, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
 
         using var db = _env.NewContext();
         var lockedUser = await db.Users.FirstOrDefaultAsync(u => u.Id == user);
@@ -647,7 +650,7 @@ public sealed class UserServiceTests : IDisposable
             Password = "wrong-password"
         }, CancellationToken.None);
 
-        ResultAssert.Fails(result, IdentityErrorKind.Forbidden, "auth.account_locked");
+        ResultAssert.Fails(result, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
     }
 
     [Fact]
@@ -676,7 +679,7 @@ public sealed class UserServiceTests : IDisposable
             Password = "StaffPass123!"
         }, CancellationToken.None);
 
-        ResultAssert.Fails(result, IdentityErrorKind.Forbidden, "auth.account_locked");
+        ResultAssert.Fails(result, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
 
         using var db = _env.NewContext();
         var userAfter = await db.Users.FirstOrDefaultAsync(u => u.Id == user);
@@ -747,7 +750,7 @@ public sealed class UserServiceTests : IDisposable
             Password = "wrong-password"
         }, CancellationToken.None);
 
-        ResultAssert.Fails(result, IdentityErrorKind.Forbidden, "auth.account_locked");
+        ResultAssert.Fails(result, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
 
         using var db = _env.NewContext();
         var userAfter = await db.Users.FirstOrDefaultAsync(u => u.Id == user);
@@ -1027,12 +1030,12 @@ public sealed class UserServiceTests : IDisposable
         {
             Email = "staff@example.com",
             Password = "wrong-password"
-        }, CancellationToken.None), IdentityErrorKind.Forbidden, "auth.account_locked");
+        }, CancellationToken.None), IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
 
         releaseTransition.SetResult();
 
         // The correct-password login should now fail with AccountLocked (not InvalidCredentials)
-        ResultAssert.Fails(await loginTask, IdentityErrorKind.Forbidden, "auth.account_locked");
+        ResultAssert.Fails(await loginTask, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
 
         using var verify = _env.NewContext();
         var user = await verify.Users.AsNoTracking()
@@ -1064,6 +1067,7 @@ public sealed class UserServiceTests : IDisposable
             emailOptions,
             _env.LockoutOptions,
             _env.Time,
+            new FakeLoginRiskGate(),
             NullLogger<AuthService>.Instance);
     }
 }

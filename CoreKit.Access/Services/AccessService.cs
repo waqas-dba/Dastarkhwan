@@ -24,6 +24,7 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
     private readonly IAccessScopeContext _scopeContext;
     private readonly IAccessCurrentUser _actor;
     private readonly IAuthorityPolicy _authorityPolicy;
+    private readonly IAccessBackgroundContext? _background;
 
     public AccessService(
         IAccessMembership membership,
@@ -33,7 +34,8 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
         AccessCatalog catalog,
         IAccessScopeContext scopeContext,
         IAccessCurrentUser actor,
-        IAuthorityPolicy authorityPolicy)
+        IAuthorityPolicy authorityPolicy,
+        IAccessBackgroundContext? background = null)
     {
         _membership = membership;
         _assignments = assignments;
@@ -43,6 +45,7 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
         _scopeContext = scopeContext;
         _actor = actor;
         _authorityPolicy = authorityPolicy;
+        _background = background;
     }
 
     public async Task<EffectiveAccess> GetAccessAsync(Guid userId, AccessScope scope, CancellationToken ct = default)
@@ -50,7 +53,18 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
         if (userId == Guid.Empty || !scope.IsValid)
             return EffectiveAccess.None;
 
-        return await _cache.GetOrResolveAsync(scope, userId, innerCt => ResolveAsync(userId, scope, innerCt), ct);
+        return Narrow(await _cache.GetOrResolveAsync(scope, userId, innerCt => ResolveAsync(userId, scope, innerCt), ct));
+    }
+
+    // While a delegated background grant is active, the job may only use the permission(s) the grant
+    // was issued for - never the delegating user's full permission set (and no owner shortcut).
+    private EffectiveAccess Narrow(EffectiveAccess access)
+    {
+        if (!access.IsMember || _background?.Current is not { AllowedPermissions: { } allowed })
+            return access;
+
+        var kept = access.Permissions.Where(allowed.Contains).ToHashSet(StringComparer.Ordinal);
+        return new EffectiveAccess(true, false, kept, access.Roles);
     }
 
     public async Task<EffectiveAccess> GetFreshAccessAsync(Guid userId, AccessScope scope, CancellationToken ct = default)
@@ -58,7 +72,7 @@ internal sealed class AccessService : IAccessService, IFreshAccessSource
         if (userId == Guid.Empty || !scope.IsValid)
             return EffectiveAccess.None;
 
-        return await ResolveAsync(userId, scope, ct);
+        return Narrow(await ResolveAsync(userId, scope, ct));
     }
 
     private async Task<EffectiveAccess> ResolveAsync(Guid userId, AccessScope scope, CancellationToken ct)

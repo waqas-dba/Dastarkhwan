@@ -57,6 +57,7 @@ public sealed class TenantResolutionOptions
     public IReadOnlyList<string> ExcludedPathPrefixes { get; set; } = new[]
     {
         "/identity",
+        "/tenants/me",
         "/health",
         "/favicon.ico",
         "/.well-known"

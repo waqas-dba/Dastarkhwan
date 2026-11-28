@@ -54,7 +54,7 @@ internal sealed class AccessBackgroundExecutor : IAccessBackgroundExecutor
             return AccessBackgroundRunStatus.GrantAlreadyConsumed;
         }
 
-        var execution = redeemed.Execution!;
+        var execution = redeemed.Execution! with { GrantId = redeemed.GrantId };
 
         await using var scope = _scopes.CreateAsyncScope();
         var holder = scope.ServiceProvider.GetRequiredService<AccessBackgroundContextHolder>();

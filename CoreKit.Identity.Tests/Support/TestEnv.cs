@@ -1,5 +1,6 @@
+global using CoreKit.Identity.Contracts;
+
 using CoreKit.Identity.Constants;
-using CoreKit.Identity.Contracts;
 using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Repositories;
 using CoreKit.Identity.Security;
@@ -12,6 +13,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Security.Claims;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace CoreKit.Identity.Tests.Support;
 
@@ -96,6 +98,8 @@ internal sealed class TestEnv : IDisposable
         Authorizer = new FakeIdentityAdminAuthorizer();
         Authorizer.AllowAll();
 
+        var riskGate = new FakeLoginRiskGate();
+
         UserRepository = new UserRepository(Db);
         RefreshTokenRepository = new RefreshTokenRepository(Db);
         AdministratorGuard = new AdministratorGuard(
@@ -115,6 +119,7 @@ internal sealed class TestEnv : IDisposable
             UserRepository, RefreshTokenRepository, Hasher,
             new FakeTokenService(), new FakeSessionIssuer(),
             CurrentUser, emailOptions, LockoutOptions, Time,
+            riskGate,
             NullLogger<AuthService>.Instance);
     }
 
@@ -134,7 +139,7 @@ internal sealed class TestEnv : IDisposable
 
     public IAdministratorGuard AdministratorGuard { get; }
 
-    public CoreKit.Identity.Contracts.IUserDeletionGuard UserDeletionGuard { get; }
+    public IUserDeletionGuard UserDeletionGuard { get; }
 
     public IIdentityEventPublisher EventPublisher { get; }
 
@@ -249,7 +254,7 @@ internal sealed class FakeSessionIssuer : ISessionIssuer
 }
 
 /// <summary>Minimal fake IUserDeletionGuard for tests: always allows deletion.</summary>
-internal sealed class FakeUserDeletionGuard : CoreKit.Identity.Contracts.IUserDeletionGuard
+internal sealed class FakeUserDeletionGuard : IUserDeletionGuard
 {
     public Task<bool> CanDeleteUserAsync(Guid userId, CancellationToken ct = default)
         => Task.FromResult(true);
@@ -261,4 +266,15 @@ internal sealed class FakeIdentityEventPublisher : IIdentityEventPublisher
     public Task PublishAsync<TEvent>(TEvent integrationEvent, CancellationToken ct = default)
         where TEvent : IIdentityIntegrationEvent
         => Task.CompletedTask;
+}
+
+/// <summary>Minimal fake ILoginRiskGate for tests: never requires captcha.</summary>
+internal sealed class FakeLoginRiskGate : ILoginRiskGate
+{
+    public Task<Common.IdentityResult> CheckAsync(string normalizedEmail, string? captchaToken, CancellationToken ct = default)
+        => Task.FromResult(Common.IdentityResult.Success());
+
+    public void RecordFailure(string normalizedEmail) { }
+
+    public void RecordSuccess(string normalizedEmail) { }
 }

@@ -18,17 +18,21 @@ public sealed class AccessAuditRecorder : IAccessAuditRecorder
     private readonly IAccessAuditRepository _audit;
     private readonly IAccessCurrentUser _actor;
     private readonly TimeProvider _time;
+    private readonly IAccessBackgroundContext? _background;
 
-    public AccessAuditRecorder(IAccessAuditRepository audit, IAccessCurrentUser actor, TimeProvider time)
+    public AccessAuditRecorder(
+        IAccessAuditRepository audit, IAccessCurrentUser actor, TimeProvider time,
+        IAccessBackgroundContext? background = null)
     {
         _audit = audit;
         _actor = actor;
         _time = time;
+        _background = background;
     }
 
     public void Record(AccessScope scope, string action, string? details = null)
     {
-        var (actorType, actorUserId, actorSource) = ResolveActor(_actor);
+        var (actorType, actorUserId, actorSource) = ResolveActor();
         AccessAuditEntry.ValidateActor(actorType, actorUserId, actorSource);
         _audit.Add(new AccessAuditEntry
         {
@@ -61,9 +65,16 @@ public sealed class AccessAuditRecorder : IAccessAuditRecorder
         });
     }
 
-    private static (string ActorType, Guid? ActorUserId, string? ActorSource) ResolveActor(IAccessCurrentUser actor)
+    private (string ActorType, Guid? ActorUserId, string? ActorSource) ResolveActor()
     {
-        if (actor.UserId is { } id && id != Guid.Empty && actor.IsAuthenticated)
+        if (_background?.Current is { ActorKind: AccessBackgroundActorKind.User, ActorUserId: { } delegator } exec
+            && delegator != Guid.Empty)
+        {
+            var source = $"job:{exec.JobKind}" + (exec.GrantId is { } grant ? $";grant:{grant:N}" : string.Empty);
+            return (AccessAuditEntry.ActorTypeDelegated, delegator, source.Length > 200 ? source[..200] : source);
+        }
+
+        if (_actor.UserId is { } id && id != Guid.Empty && _actor.IsAuthenticated)
             return (AccessAuditEntry.ActorTypeUser, id, null);
         return (AccessAuditEntry.ActorTypeUnknown, null, null);
     }

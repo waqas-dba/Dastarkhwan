@@ -104,7 +104,7 @@ namespace CoreKit.Access.Migrations
 
                     b.ToTable("ACCESS_AuditEntries", "access", t =>
                         {
-                            t.HasCheckConstraint("CK_ACCESS_AuditEntries_Actor", "(\"ActorType\" = 'User' AND \"ActorUserId\" IS NOT NULL AND CAST(\"ActorUserId\" AS VARCHAR(36)) <> '00000000-0000-0000-0000-000000000000' AND \"ActorSource\" IS NULL)\r\n    OR (\"ActorType\" = 'System' AND \"ActorUserId\" IS NULL AND \"ActorSource\" IS NOT NULL AND length(trim(\"ActorSource\", chr(9)||chr(10)||chr(13)||' ')) > 0)\r\n    OR (\"ActorType\" = 'Unknown' AND \"ActorUserId\" IS NULL AND \"ActorSource\" IS NULL)");
+                            t.HasCheckConstraint("CK_ACCESS_AuditEntries_Actor", "(\"ActorType\" = 'User' AND \"ActorUserId\" IS NOT NULL AND CAST(\"ActorUserId\" AS VARCHAR(36)) <> '00000000-0000-0000-0000-000000000000' AND \"ActorSource\" IS NULL)\r\n    OR (\"ActorType\" = 'System' AND \"ActorUserId\" IS NULL AND \"ActorSource\" IS NOT NULL AND length(trim(\"ActorSource\", chr(9)||chr(10)||chr(13)||' ')) > 0)\r\n    OR (\"ActorType\" = 'Unknown' AND \"ActorUserId\" IS NULL AND \"ActorSource\" IS NULL)\r\n    OR (\"ActorType\" = 'Delegated' AND \"ActorUserId\" IS NOT NULL AND \"ActorSource\" IS NOT NULL AND length(trim(\"ActorSource\", chr(9)||chr(10)||chr(13)||' ')) > 0)");
                         });
                 });
 

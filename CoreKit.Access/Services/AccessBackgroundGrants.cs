@@ -81,7 +81,8 @@ internal sealed class AccessBackgroundGrantProtector
                 payload.JobKind,
                 AccessBackgroundActorKind.User,
                 payload.ActorUserId,
-                tenantScope),
+                tenantScope,
+                AllowedPermissions: new[] { payload.RequiredPermission }),
             Failure: null,
             GrantId: payload.GrantId,
             ExpiresAt: payload.ExpiresAt);

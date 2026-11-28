@@ -29,10 +29,13 @@ public sealed class TenantAccessGuard
     /// <summary>For work on one tenant.</summary>
     public async Task<TenantError?> EnsureCanAccessAsync(Guid tenantId, CancellationToken ct = default)
     {
-        if (_currentTenant.IsResolved)
-            return _currentTenant.Id == tenantId ? null : TenantErrors.CrossTenantAccess;
-
-        return await _platform.IsGrantedAsync(ct) ? null : TenantErrors.PlatformOnly;
+        // Own tenant: always fine. Otherwise only platform administrators may reach another tenant -
+        // even when their token also carries a tenant claim (a platform admin who owns a shop).
+        if (_currentTenant.IsResolved && _currentTenant.Id == tenantId)
+            return null;
+        if (await _platform.IsGrantedAsync(ct))
+            return null;
+        return _currentTenant.IsResolved ? TenantErrors.CrossTenantAccess : TenantErrors.PlatformOnly;
     }
 
     /// <summary>For data about one user: the user themselves, or platform access.</summary>

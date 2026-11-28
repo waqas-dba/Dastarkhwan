@@ -1,6 +1,7 @@
 using CoreKit.Identity.Repositories;
 using CoreKit.Identity.Security;
 using CoreKit.Identity.Settings;
+using CoreKit.Identity.Tests.Support;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Npgsql;
@@ -124,12 +125,12 @@ public sealed class PostgresLoginTransitionTests
             {
                 Email = TestEmail,
                 Password = "wrong-password"
-            }, CancellationToken.None), IdentityErrorKind.Forbidden, "auth.account_locked");
+            }, CancellationToken.None), IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
 
             releaseTransition.SetResult();
 
             // The correct-password request loses the authoritative transition and is rejected with AccountLocked.
-            ResultAssert.Fails(await loginTask, IdentityErrorKind.Forbidden, "auth.account_locked");
+            ResultAssert.Fails(await loginTask, IdentityErrorKind.Unauthorized, "auth.invalid_credentials");
 
             await using var verify = CreateContext(scratch.ConnectionString);
             var user = await verify.Users.AsNoTracking().FirstAsync(u => u.Id == userId);
@@ -261,6 +262,7 @@ public sealed class PostgresLoginTransitionTests
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             Options.Create(new IdentityLockoutOptions { Threshold = 5, DurationMinutes = 15 }),
             new FixedTimeProvider(FixedNow),
+            new FakeLoginRiskGate(),
             NullLogger<AuthService>.Instance);
 
     private static IdentityDbContext CreateContext(string connectionString)

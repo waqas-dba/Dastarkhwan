@@ -30,7 +30,9 @@ public sealed record AccessBackgroundExecution(
     string JobKind,
     AccessBackgroundActorKind ActorKind,
     Guid? ActorUserId,
-    AccessScope? TenantScope);
+    AccessScope? TenantScope,
+    Guid? GrantId = null,
+    IReadOnlyCollection<string>? AllowedPermissions = null);
 
 /// <summary>
 /// Read-only view of the background context of the current DI scope. While no background context is active

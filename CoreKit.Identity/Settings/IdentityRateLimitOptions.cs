@@ -17,7 +17,7 @@ public sealed class IdentityRateLimitOptions
     public bool Enabled { get; set; } = true;
 
     /// <summary>How many login, refresh or password requests one IP address may make per window.</summary>
-    public int PermitLimit { get; set; } = 10;
+    public int PermitLimit { get; set; } = 30;
 
     public int WindowSeconds { get; set; } = 60;
 }

@@ -27,6 +27,7 @@ public sealed class AuthService : IAuthService
     private readonly IdentityEmailVerificationOptions _emailOptions;
     private readonly IdentityLockoutOptions _lockoutOptions;
     private readonly TimeProvider _time;
+    private readonly ILoginRiskGate _risk;
     private readonly ILogger<AuthService> _logger;
 
     public AuthService(
@@ -39,6 +40,7 @@ public sealed class AuthService : IAuthService
         IOptions<IdentityEmailVerificationOptions> emailOptions,
         IOptions<IdentityLockoutOptions> lockoutOptions,
         TimeProvider time,
+        ILoginRiskGate risk,
         ILogger<AuthService> logger)
     {
         _userRepository = userRepository;
@@ -50,10 +52,32 @@ public sealed class AuthService : IAuthService
         _emailOptions = emailOptions.Value;
         _lockoutOptions = lockoutOptions.Value;
         _time = time;
+        _risk = risk;
         _logger = logger;
     }
 
     public async Task<IdentityResult<LoginResponse>> LoginAsync(LoginRequest request, CancellationToken ct = default)
+    {
+        var rawEmail = request.Email?.Trim() ?? string.Empty;
+        if (rawEmail.Length == 0 || rawEmail.Length > MaxEmailLength)
+            return IdentityErrors.InvalidCredentials;
+
+        var key = IdentityNormalizer.NormalizeEmail(rawEmail);
+
+        // Captcha only when the attempt looks unusual (or always, if configured).
+        var gate = await _risk.CheckAsync(key, request.CaptchaToken, ct);
+        if (gate.IsFailure)
+            return gate.Error!;
+
+        var result = await LoginCoreAsync(request, ct);
+        if (result.IsSuccess)
+            _risk.RecordSuccess(key);
+        else if (result.Error!.Code == IdentityErrors.InvalidCredentials.Code)
+            _risk.RecordFailure(key);
+        return result;
+    }
+
+    private async Task<IdentityResult<LoginResponse>> LoginCoreAsync(LoginRequest request, CancellationToken ct)
     {
         var email = request.Email?.Trim() ?? string.Empty;
         var password = request.Password ?? string.Empty;

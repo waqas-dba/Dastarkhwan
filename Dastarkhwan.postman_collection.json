@@ -1,0 +1,1126 @@
+{
+  "info": {
+    "name": "Dastarkhwan API",
+    "description": "Complete API collection for Identity, Tenant, and Access modules",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "kilo",
+    "_postman_id": "dastarkhwan-api-collection"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /health/live",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/health/live",
+              "host": ["{{baseUrl}}"],
+              "path": ["health", "live"]
+            }
+          }
+        },
+        {
+          "name": "GET /health/ready",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/health/ready",
+              "host": ["{{baseUrl}}"],
+              "path": ["health", "ready"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Identity",
+      "item": [
+        {
+          "name": "Auth",
+          "item": [
+            {
+              "name": "POST /identity/auth/login",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/identity/auth/login",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["identity", "auth", "login"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{adminPassword}}\",\n  \"captchaToken\": \"{{captchaToken}}\"\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "  const json = pm.response.json();",
+                      "  if (json.accessToken) pm.collectionVariables.set('accessToken', json.accessToken);",
+                      "  if (json.refreshToken) pm.collectionVariables.set('refreshToken', json.refreshToken);",
+                      "  if (json.user?.id) pm.collectionVariables.set('userId', json.user.id);",
+                      "  if (json.user?.email) pm.collectionVariables.set('email', json.user.email);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /identity/auth/refresh",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/identity/auth/refresh",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["identity", "auth", "refresh"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+                }
+              }
+            },
+            {
+              "name": "POST /identity/auth/logout",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/identity/auth/logout",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["identity", "auth", "logout"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+                }
+              }
+            },
+            {
+              "name": "GET /identity/auth/me",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/identity/auth/me",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["identity", "auth", "me"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "POST /identity/auth/change-password",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/identity/auth/change-password",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["identity", "auth", "change-password"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"currentPassword\": \"old-password\",\n  \"newPassword\": \"NewSecurePass123!\"\n}"
+                }
+              }
+            },
+            {
+              "name": "POST /identity/auth/verify-email",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/identity/auth/verify-email",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["identity", "auth", "verify-email"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"token\": \"{{verificationToken}}\"\n}"
+                }
+              }
+            },
+            {
+              "name": "POST /identity/auth/send-verification",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/identity/auth/send-verification",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["identity", "auth", "send-verification"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "POST /identity/auth/resend-verification",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/identity/auth/resend-verification",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["identity", "auth", "resend-verification"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"user@example.com\"\n}"
+                }
+              }
+            },
+            {
+              "name": "POST /identity/auth/forgot-password",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/identity/auth/forgot-password",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["identity", "auth", "forgot-password"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"user@example.com\"\n}"
+                }
+              }
+            },
+            {
+              "name": "POST /identity/auth/reset-password",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/identity/auth/reset-password",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["identity", "auth", "reset-password"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"newPassword\": \"NewSecurePass123!\"\n}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Users",
+          "item": [
+            {
+              "name": "GET /identity/users",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/identity/users?page=1&pageSize=20&search=&isActive=",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["identity", "users"],
+                  "query": [
+                    { "key": "page", "value": "1" },
+                    { "key": "pageSize", "value": "20" },
+                    { "key": "search", "value": "" },
+                    { "key": "isActive", "value": "" }
+                  ]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "POST /identity/users",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/identity/users",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["identity", "users"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"newuser@example.com\",\n  \"password\": \"SecurePass123!\",\n  \"mobile\": \"+15551234567\",\n  \"displayName\": \"New User\",\n  \"isActive\": true\n}"
+                }
+              }
+            },
+            {
+              "name": "GET /identity/users/:id",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/identity/users/{{userId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["identity", "users", "{{userId}}"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "PUT /identity/users/:id",
+              "request": {
+                "method": "PUT",
+                "url": {
+                  "raw": "{{baseUrl}}/identity/users/{{userId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["identity", "users", "{{userId}}"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"mobile\": \"+15551234568\",\n  \"displayName\": \"Updated Name\",\n  \"isActive\": true,\n  \"password\": \"NewSecurePass123!\"\n}"
+                }
+              }
+            },
+            {
+              "name": "DELETE /identity/users/:id",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/identity/users/{{userId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["identity", "users", "{{userId}}"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tenants",
+      "item": [
+        {
+          "name": "Tenant CRUD",
+          "item": [
+            {
+              "name": "GET /tenants",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants?page=1&pageSize=20&search=&status=",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants"],
+                  "query": [
+                    { "key": "page", "value": "1" },
+                    { "key": "pageSize", "value": "20" },
+                    { "key": "search", "value": "" },
+                    { "key": "status", "value": "" }
+                  ]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "POST /tenants",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Acme Corp\",\n  \"slug\": \"acme-corp\",\n  \"activateImmediately\": true,\n  \"ownerUserId\": \"{{userId}}\"\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201 || pm.response.code === 200) {",
+                      "  const json = pm.response.json();",
+                      "  if (json.id) pm.collectionVariables.set('tenantId', json.id);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "GET /tenants/:id",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/{{tenantId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "{{tenantId}}"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "PUT /tenants/:id",
+              "request": {
+                "method": "PUT",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/{{tenantId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "{{tenantId}}"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Acme Corporation\",\n  \"slug\": \"acme-corporation\"\n}"
+                }
+              }
+            },
+            {
+              "name": "POST /tenants/:id/activate",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/{{tenantId}}/activate",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "{{tenantId}}", "activate"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "POST /tenants/:id/suspend",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/{{tenantId}}/suspend",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "{{tenantId}}", "suspend"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"Policy violation\"\n}"
+                }
+              }
+            },
+            {
+              "name": "POST /tenants/:id/archive",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/{{tenantId}}/archive",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "{{tenantId}}", "archive"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"reason\": \"End of contract\"\n}"
+                }
+              }
+            },
+            {
+              "name": "POST /tenants/:id/restore",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/{{tenantId}}/restore",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "{{tenantId}}", "restore"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "DELETE /tenants/:id",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/{{tenantId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "{{tenantId}}"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Current User Tenants",
+          "item": [
+            {
+              "name": "GET /tenants/current",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/current",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "current"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "GET /tenants/me",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/me",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "me"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "PUT /tenants/me/default/:tenantId",
+              "request": {
+                "method": "PUT",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/me/default/{{tenantId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "me", "default", "{{tenantId}}"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Settings",
+          "item": [
+            {
+              "name": "GET /tenants/:tenantId/settings",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/{{tenantId}}/settings",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "{{tenantId}}", "settings"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "GET /tenants/:tenantId/settings/:key",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/{{tenantId}}/settings/{{settingKey}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "{{tenantId}}", "settings", "{{settingKey}}"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "PUT /tenants/:tenantId/settings/:key",
+              "request": {
+                "method": "PUT",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/{{tenantId}}/settings/{{settingKey}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "{{tenantId}}", "settings", "{{settingKey}}"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"value\": \"setting-value\"\n}"
+                }
+              }
+            },
+            {
+              "name": "PUT /tenants/:tenantId/settings (bulk)",
+              "request": {
+                "method": "PUT",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/{{tenantId}}/settings",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "{{tenantId}}", "settings"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"values\": {\n    \"key1\": \"value1\",\n    \"key2\": \"value2\"\n  }\n}"
+                }
+              }
+            },
+            {
+              "name": "DELETE /tenants/:tenantId/settings/:key",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/{{tenantId}}/settings/{{settingKey}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "{{tenantId}}", "settings", "{{settingKey}}"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Members",
+          "item": [
+            {
+              "name": "GET /tenants/:tenantId/members",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/{{tenantId}}/members",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "{{tenantId}}", "members"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "POST /tenants/:tenantId/members",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/{{tenantId}}/members",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "{{tenantId}}", "members"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"isOwner\": false\n}"
+                }
+              }
+            },
+            {
+              "name": "DELETE /tenants/:tenantId/members/:userId",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/{{tenantId}}/members/{{userId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "{{tenantId}}", "members", "{{userId}}"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "PUT /tenants/:tenantId/members/:userId/owner",
+              "request": {
+                "method": "PUT",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/{{tenantId}}/members/{{userId}}/owner",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "{{tenantId}}", "members", "{{userId}}", "owner"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"isOwner\": true\n}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Audit",
+          "item": [
+            {
+              "name": "GET /tenants/:tenantId/audit",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/tenants/{{tenantId}}/audit?page=1&pageSize=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["tenants", "{{tenantId}}", "audit"],
+                  "query": [
+                    { "key": "page", "value": "1" },
+                    { "key": "pageSize", "value": "50" }
+                  ]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Access",
+      "item": [
+        {
+          "name": "My Access",
+          "item": [
+            {
+              "name": "GET /access/me",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/access/me",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["access", "me"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "GET /access/permissions",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/access/permissions",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["access", "permissions"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Roles",
+          "item": [
+            {
+              "name": "GET /access/roles",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/access/roles",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["access", "roles"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "GET /access/roles/:id",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/access/roles/{{roleId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["access", "roles", "{{roleId}}"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "  const json = pm.response.json();",
+                      "  if (json.concurrencyStamp) pm.collectionVariables.set('concurrencyStamp', json.concurrencyStamp);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "POST /access/roles",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/access/roles",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["access", "roles"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Manager\",\n  \"description\": \"Runs the shop day to day\",\n  \"permissions\": [\"sales.create\", \"sales.refund\", \"products.view\", \"products.manage\", \"access.roles.read\", \"access.assignments.read\", \"access.assignments.manage\"]\n}"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 201 || pm.response.code === 200) {",
+                      "  const json = pm.response.json();",
+                      "  if (json.id) pm.collectionVariables.set('roleId', json.id);",
+                      "  if (json.concurrencyStamp) pm.collectionVariables.set('concurrencyStamp', json.concurrencyStamp);",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ]
+            },
+            {
+              "name": "PUT /access/roles/:id",
+              "request": {
+                "method": "PUT",
+                "url": {
+                  "raw": "{{baseUrl}}/access/roles/{{roleId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["access", "roles", "{{roleId}}"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Senior Manager\",\n  \"description\": \"Updated description\",\n  \"concurrencyStamp\": \"{{concurrencyStamp}}\"\n}"
+                }
+              }
+            },
+            {
+              "name": "PUT /access/roles/:id/permissions",
+              "request": {
+                "method": "PUT",
+                "url": {
+                  "raw": "{{baseUrl}}/access/roles/{{roleId}}/permissions",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["access", "roles", "{{roleId}}", "permissions"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"permissions\": [\"sales.create\", \"products.view\"],\n  \"concurrencyStamp\": \"{{concurrencyStamp}}\"\n}"
+                }
+              }
+            },
+            {
+              "name": "DELETE /access/roles/:id",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/access/roles/{{roleId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["access", "roles", "{{roleId}}"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "User Role Assignments",
+          "item": [
+            {
+              "name": "GET /access/users/:userId/roles",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/access/users/{{userId}}/roles",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["access", "users", "{{userId}}", "roles"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "PUT /access/users/:userId/roles",
+              "request": {
+                "method": "PUT",
+                "url": {
+                  "raw": "{{baseUrl}}/access/users/{{userId}}/roles",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["access", "users", "{{userId}}", "roles"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"roleIds\": [\"{{roleId}}\"]\n}"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Audit",
+          "item": [
+            {
+              "name": "GET /access/audit",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/access/audit?page=1&pageSize=50",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["access", "audit"],
+                  "query": [
+                    { "key": "page", "value": "1" },
+                    { "key": "pageSize", "value": "50" }
+                  ]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Platform Members",
+          "item": [
+            {
+              "name": "POST /access/platform/members",
+              "request": {
+                "method": "POST",
+                "url": {
+                  "raw": "{{baseUrl}}/access/platform/members",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["access", "platform", "members"]
+                },
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"userId\": \"{{userId}}\"\n}"
+                }
+              }
+            },
+            {
+              "name": "GET /access/platform/members/:userId",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{baseUrl}}/access/platform/members/{{userId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["access", "platform", "members", "{{userId}}"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            },
+            {
+              "name": "DELETE /access/platform/members/:userId",
+              "request": {
+                "method": "DELETE",
+                "url": {
+                  "raw": "{{baseUrl}}/access/platform/members/{{userId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["access", "platform", "members", "{{userId}}"]
+                },
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Development (Dev Token Endpoints - requires Dev:EnableTokenEndpoints=true and loopback)",
+      "item": [
+        {
+          "name": "GET /dev/verification-token",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/dev/verification-token?email={{email}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["dev", "verification-token"],
+              "query": [
+                { "key": "email", "value": "{{email}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /dev/password-reset-token",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/dev/password-reset-token?email={{email}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["dev", "password-reset-token"],
+              "query": [
+                { "key": "email", "value": "{{email}}" }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://localhost:53584",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "tenantId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "roleId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "concurrencyStamp",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "email",
+      "value": "admin@example.com",
+      "type": "string"
+    },
+    {
+      "key": "verificationToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "resetToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "captchaToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "settingKey",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminPassword",
+      "value": "a-long-test-password",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  }
+}

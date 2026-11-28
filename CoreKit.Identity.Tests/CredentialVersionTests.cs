@@ -1,7 +1,10 @@
 using CoreKit.Access.Contracts;
+using CoreKit.Identity.Common;
+using CoreKit.Identity.Interfaces;
 using CoreKit.Identity.Repositories;
 using CoreKit.Identity.Security;
 using CoreKit.Identity.Settings;
+using CoreKit.Identity.Tests.Support;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
@@ -48,6 +51,7 @@ public sealed class CredentialVersionTests : IDisposable
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.LockoutOptions,
             _env.Time,
+            new FakeLoginRiskGate(),
             NullLogger<AuthService>.Instance);
     }
 
@@ -143,6 +147,7 @@ public sealed class CredentialVersionTests : IDisposable
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.LockoutOptions,
             _env.Time,
+            new FakeLoginRiskGate(),
             NullLogger<AuthService>.Instance);
     }
 
@@ -259,6 +264,7 @@ public sealed class CredentialVersionTests : IDisposable
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.LockoutOptions,
             _env.Time,
+            new FakeLoginRiskGate(),
             NullLogger<AuthService>.Instance);
 
         var loginTask = auth.LoginAsync(new LoginRequest { Email = StaffEmail, Password = StaffPassword }, CancellationToken.None);
@@ -299,6 +305,7 @@ public sealed class CredentialVersionTests : IDisposable
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.LockoutOptions,
             _env.Time,
+            new FakeLoginRiskGate(),
             NullLogger<AuthService>.Instance);
 
         var loginTask = auth.LoginAsync(new LoginRequest { Email = StaffEmail, Password = StaffPassword }, CancellationToken.None);
@@ -524,6 +531,7 @@ public sealed class CredentialVersionTests : IDisposable
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.LockoutOptions,
             _env.Time,
+            new FakeLoginRiskGate(),
             NullLogger<AuthService>.Instance);
 
         var loginTask = auth.LoginAsync(new LoginRequest { Email = StaffEmail, Password = "old" }, CancellationToken.None);
@@ -567,6 +575,7 @@ public sealed class CredentialVersionTests : IDisposable
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.LockoutOptions,
             _env.Time,
+            new FakeLoginRiskGate(),
             NullLogger<AuthService>.Instance);
 
         var refreshTask = auth.RefreshAsync(new RefreshTokenRequest { RefreshToken = "raw-token-1" });
@@ -607,6 +616,7 @@ public sealed class CredentialVersionTests : IDisposable
             Options.Create(new IdentityEmailVerificationOptions { RequireConfirmedEmail = false }),
             _env.LockoutOptions,
             _env.Time,
+            new FakeLoginRiskGate(),
             NullLogger<AuthService>.Instance);
 
         var refreshTask = auth.RefreshAsync(new RefreshTokenRequest { RefreshToken = "raw-token-1" });

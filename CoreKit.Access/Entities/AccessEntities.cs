@@ -82,6 +82,7 @@ public sealed class AccessAuditEntry
 
     /// <summary>The actor identity cannot be established (for example historical rows).</summary>
     public const string ActorTypeUnknown = "Unknown";
+    public const string ActorTypeDelegated = "Delegated";
 
     public Guid Id { get; set; }
 
@@ -131,6 +132,12 @@ public sealed class AccessAuditEntry
                     throw new ArgumentException("An Unknown actor must not carry an actor user id.", nameof(actorUserId));
                 if (actorSource is not null)
                     throw new ArgumentException("An Unknown actor must not carry an actor source.", nameof(actorSource));
+                break;
+            case ActorTypeDelegated:
+                if (actorUserId is null || actorUserId == Guid.Empty)
+                    throw new ArgumentException("A Delegated actor requires the delegating user id.", nameof(actorUserId));
+                if (string.IsNullOrWhiteSpace(actorSource))
+                    throw new ArgumentException("A Delegated actor requires a source (job / grant).", nameof(actorSource));
                 break;
             default:
                 throw new ArgumentException($"Unknown actor type '{actorType}'.", nameof(actorType));

@@ -136,6 +136,20 @@ public static class ServiceCollectionExtensions
                 "Identity:PasswordReset:TokenMinutes must be 5 to 1440.")
             .ValidateOnStart();
 
+        services.AddOptions<IdentityCaptchaOptions>()
+            .Bind(configuration.GetSection(IdentityCaptchaOptions.SectionName))
+            .Validate(o => o.EmailFailureThreshold >= 1 && o.IpFailureThreshold >= 1 && o.WindowMinutes >= 1
+                           && o.VerifyTimeoutSeconds is >= 1 and <= 30,
+                "Identity:Captcha thresholds / window must be >= 1 and VerifyTimeoutSeconds 1 to 30.")
+            .Validate(o => o.Mode == CaptchaMode.Off
+                           || (!string.IsNullOrWhiteSpace(o.SecretKey)
+                               && Uri.TryCreate(o.VerifyUrl, UriKind.Absolute, out var verifyUri)
+                               && verifyUri.Scheme == Uri.UriSchemeHttps),
+                "Identity:Captcha needs SecretKey and an https VerifyUrl when Mode is not Off.")
+            .ValidateOnStart();
+        services.AddHttpClient();
+        services.TryAddSingleton<ICaptchaVerifier, HttpCaptchaVerifier>();
+        services.TryAddScoped<ILoginRiskGate, LoginRiskGate>();
         services.AddHttpContextAccessor();
         services.AddMemoryCache();
 
@@ -256,7 +270,7 @@ public static class ServiceCollectionExtensions
                     return RateLimitPartition.GetNoLimiter("identity-unlimited");
 
                 // Behind a reverse proxy this is the proxy's address unless forwarded headers are configured.
-                var client = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var client = (httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown") + ":" + httpContext.Request.Path.Value;
 
                 return RateLimitPartition.GetFixedWindowLimiter(client, _ => new FixedWindowRateLimiterOptions
                 {

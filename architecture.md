@@ -39,8 +39,8 @@ A capability may remain inside a well-defined module until splitting provides re
 6. Keep endpoints thin and provider SDKs behind adapters.
 7. Do not add event sourcing, distributed messaging, or microservices without a concrete need.
 8. The module that owns a business rule owns its implementation and persistence.
-9. Tenant membership changes reach Access through the durable Tenant outbox and Access membership-event consumer + projection, not through a direct Tenant-to-Access runtime membership lookup.
-10. Access uses its own membership projection as the authoritative Tenant membership source. Missing, stale, quarantined or untrusted projection data fails closed (denies authorization).
+9. Tenant membership changes reach Access through direct Tenant-to-Access queries via `ITenantMembershipReader` (`CoreKit.Tenant.Contracts`, D-020); Tenant also stages membership changes in its outbox for external side effects only. Access does not maintain a membership projection.
+10. Access resolves tenant membership through `ITenantMembershipReader` (live Tenant data) and fails closed when Tenant is unavailable or the tenant is not found. There is no Access-owned membership projection as the authoritative source (D-019 outbox/projection superseded by D-020).
 
 ## 4. Identity and Access boundary
 - Identity authenticates a person/service and manages credentials, account state, sessions/tokens, lockout, and recovery.
@@ -59,41 +59,45 @@ A capability may remain inside a well-defined module until splitting provides re
 - Fail closed when tenant context is absent, invalid, inactive, or inconsistent with user membership.
 - Scope reads, writes, exports, reports, background jobs, webhooks, and platform/admin actions according to an explicit authorization policy.
 - Add tenant-safe unique constraints and indexes where required by the actual data model. Avoid assuming every table is tenant-owned.
+## 6. Tenant–Access integration (D-020 direct queries — implemented direction)
 
-## 6. Tenant–Access integration (Option B — approved target architecture)
+**Approved direction:** D-020 (2026-11-22) — Access queries Tenant membership directly through the `ITenantMembershipReader` contract in `CoreKit.Tenant.Contracts`, rather than maintaining a durable Access-owned membership projection. Tenant publishes membership changes through its outbox for external side effects only (emails, webhooks, accounting); Access does not maintain a separate projection cache. Access fails closed when Tenant is unavailable or the tenant is not found.
+
+D-019's Option B outbox/projection architecture (durable Tenant outbox → Access membership-event consumer → Access-owned `AccessMembershipProjection` as authoritative membership source) is **superseded by D-020** and is NOT implemented. The projection subsystem (~6,000 lines: event consumer, snapshot installer, freshness recorder, heartbeat, quarantine, stream cursors, processed events) was judged disproportionate complexity for a single-instance SaaS and is not part of the current target architecture.
+
 - **Dependency direction:** `Dastarkhwan.Integration` → `CoreKit.Identity`, `CoreKit.Access`, `CoreKit.Tenant`. No CoreKit module references another CoreKit module.
-- Tenant owns tenant lifecycle, membership, tenant context and tenant-specific business rules. Access owns roles, permissions, assignments and authorization decisions.
-- Tenant membership changes reach Access through the durable Tenant outbox (`TenantOutboxMessage` staged in the same `SaveChanges` as the membership change) and Access's `AccessMembershipEventConsumer`, which applies the event to `AccessMembershipProjection` and `AccessTenantState` atomically. There is no direct Tenant-to-Access runtime membership lookup.
-- Access uses its own membership projection (`AccessMembershipProjection`) as the authoritative Tenant membership source. Missing, stale, quarantined, unknown or inactive projection data fails closed (denies authorization).
-- `ITenantMembershipReader` lives in `CoreKit.Tenant.Abstractions` (module-owned, not SharedKernel).
+- `CoreKit.Tenant.csproj` references only `CoreKit.Tenant.Contracts` (no Identity, no Access) — D-015/D-019 direct-dependency requirement met at project-reference level.
+- `CoreKit.Access` references `CoreKit.Tenant.Contracts` (`ITenantMembershipReader`) and `CoreKit.Access.Contracts`; Access is a consumer of Tenant's public contract, not of Tenant's implementation.
+- `CoreKit.Identity` references `CoreKit.Identity.Contracts` and `CoreKit.Access.Contracts`.
+- **All three `*.Contracts` assemblies exist and are referenced:** `CoreKit.Identity.Contracts`, `CoreKit.Access.Contracts`, `CoreKit.Tenant.Contracts`. `CoreKit.Access.Contracts` is NOT removed (contrary to the D-021 statement); it exposes `IAccessService`, `IPermissionChecker`, `IAccessMembership`, and related contracts consumed by Identity, Access, and Integration.
+- Tenant membership changes reach Access through `ITenantMembershipReader` (live read) and, for external side effects, through the Tenant outbox staged in the same transaction as the membership change. There is no Access-owned membership projection, no membership-event consumer, and no projection freshness/heartbeat/quarantine machinery.
+- Access cache invalidation on member removal exists (`TenantMemberRemovedToAccessMaintenance` → `IAccessMaintenance.RemoveUserAsync` → `_cache.InvalidateUser`). **Owner promotion/demotion does NOT invalidate the Access cache** — a demoted tenant owner retains cached owner permissions until the cache TTL expires. This is a documented cache-invalidation gap (see `current-state.md`, risk register).
+- `ITenantMembershipReader` lives in `CoreKit.Tenant.Contracts` (module-owned, not SharedKernel). D-018's No SharedKernel principle remains in force; contracts live in module-owned `Contracts` assemblies.
 - Access must not reference Tenant's private services, repositories, `DbContext` or tables. Tenant must not reference Identity private internals.
 - Platform scope is distinct from tenant scope and needs an explicit authorization design.
-- `ITenantOutboxTransport` (Tenant-owned port) is implemented in `Dastarkhwan.Integration` and wires the outbox to the Access consumer. `ITenantProjectionGateway` (Access-owned port for snapshot installation/reconciliation) is implemented in `Dastarkhwan.Integration` using Access's public snapshot installer and projection reader.
-- Tenant owner-to-Access owner mapping must be explicitly validated because Access owner semantics may grant broad permissions. Tenant ownership does NOT imply Access ownership (`AccessMember(false)` is always returned for tenant scope).
-- Tenant permission enforcement across individual protected operations remains implementation work.
+- Tenant owner does NOT automatically become Access owner. `AccessMember(false)` is always returned for tenant scope; platform administration is granted via the "Administrator" role in Access's PlatformMembers table.
+- Tenant permission enforcement across individual protected operations remains implementation work (S4.4).
 
-**Implementation status clarification:** The approved target architecture is the D-019 outbox/projection design. The old direct membership adapter is not an accepted integration design. `Dastarkhwan.Integration` still registers `TenantAccessMembership` as an `IAccessMembershipAdapter`, which reads Tenant membership directly through `ITenantMembershipReader`; this conflicts with the projection-authoritative requirement and must be investigated and resolved separately.
+**Implementation status clarification (source baseline `fc4a089...`, 2026-11-28):**
+`CoreKit.Identity`, `CoreKit.Access` and `CoreKit.Tenant` are independently reusable modules. `Dastarkhwan.Integration` references the three modules plus all three `*.Contracts` assemblies and provides their composition.
 
-**Current evidence note (source baseline `e2ca8c1`, documentation snapshot `c4afe1e`, 2026-11-18):**
+`TenantActor` (`CoreKit.Tenant/Abstractions/TenantActor.cs`) consumes Tenant-owned `ITenantCurrentUser` and `ITenantPermissionChecker`. No `ICurrentUser` or `.Permissions` reference remains in `CoreKit.Tenant`.
 
-`CoreKit.Identity`, `CoreKit.Access` and `CoreKit.Tenant` are independently reusable modules. `CoreKit.Tenant.csproj` has no direct CoreKit project references. `Dastarkhwan.Integration` references the three modules and provides their composition.
+`Dastarkhwan.Integration/IntegrationServiceCollectionExtensions.cs` registers integration adapters (`TenantCreatedToAccessProvision`, `TenantMemberRemovedToAccessMaintenance`, `TenantDeletedToAccessCleanup`, `IdentityUserDeletedToTenantCleanup`, `IdentityUserDeletedToAccessCleanup`, `TenantClaimsContributor`, `PlatformAdminClaimsContributor`, `IPlatformAdministratorProvider`, `ITenantCurrentUser`/`ITenantPermissionChecker` bridges). It does NOT register `TenantAccessMembership`/`IAccessMembershipAdapter`; that registration was removed.
 
-`TenantActor` (`CoreKit.Tenant/Abstractions/TenantActor.cs`) consumes Tenant-owned `ITenantCurrentUser` and `ITenantPermissionChecker`. No `ICurrentUser` or `.Permissions` reference remains in `CoreKit.Tenant` at the inspected source baseline.
+Tenant owner-to-Access owner mapping must be explicitly validated because Access owner semantics may grant broad permissions. Tenant ownership does NOT imply Access ownership.
 
-Tenant membership events are designed to reach Access through the durable Tenant outbox and Access membership-event consumer. Access uses its own membership projection as the authoritative membership source.
+Platform authorization and per-operation Tenant permission enforcement remain separate implementation concerns.
 
-**Implementation discrepancy:** `Dastarkhwan.Integration/IntegrationServiceCollectionExtensions.cs` still registers `TenantAccessMembership` as an `IAccessMembershipAdapter`. This adapter reads Tenant membership directly through `ITenantMembershipReader`. Its registration must be investigated against D-019 before claiming that projection-only authorization is fully implemented.
-
-Tenant owner does not automatically become Access owner. Platform authorization and per-operation Tenant permission enforcement remain separate implementation concerns.
-
-The Access membership projection migration `20261116043029_AddAccessMembershipStreamAndFreshness` is committed. Its database application and runtime behavior are not established by source inspection alone.
+The Access migration `20261116043029_AddAccessMembershipStreamAndFreshness` (projection-substream schema) remains committed but is not part of the implemented direction; its database application and runtime behavior are not established by source inspection alone. `CoreKit.Access` still references `CoreKit.Access.Contracts` and `CoreKit.Tenant.Contracts`.
 
 Preserve the modular monolith architecture and existing approved module ownership boundaries.
-
 ## 7. Integration layer (`Dastarkhwan.Integration`)
-- References `CoreKit.Identity`, `CoreKit.Access` and `CoreKit.Tenant`; coordinates them through their public contracts.
-- Implements `ITenantOutboxTransport` (Tenant-owned port) — durable delivery of Tenant outbox messages to the Access membership-event consumer.
-- Implements `ITenantProjectionGateway` (Access-owned port) — snapshot installation and reconciliation through Access's public installer and reader.
+
+- References `CoreKit.Identity`, `CoreKit.Access` and `CoreKit.Tenant` plus all three `*.Contracts` assemblies; coordinates them through their public contracts.
+- Registers integration adapters: `TenantCreatedToAccessProvision` (provision default tenant roles in Access), `TenantMemberRemovedToAccessMaintenance` (invalidate Access cache on member removal), `TenantDeletedToAccessCleanup`, `IdentityUserDeletedToTenantCleanup`, `IdentityUserDeletedToAccessCleanup`, `TenantClaimsContributor`, `PlatformAdminClaimsContributor`, `IPlatformAdministratorProvider`, `ITenantCurrentUser`/`ITenantPermissionChecker` bridges.
+- Does NOT register `ITenantProjectionGateway` (no host-side adapter references both modules) and does NOT host an Access membership-event consumer — the D-019 outbox/projection integration is superseded by D-020 direct queries.
+- `ITenantOutboxTransport` (Tenant-owned port) is implemented by `IdentityOutboxTransport` for Identity account-deletion outbox delivery; Tenant membership outbox events are staged for external side effects, not consumed by Access for authorization.
 - Registers Tenant permission definitions in the Access catalog without Tenant referencing Access.
 - Composes module services into the application host without owning module business rules. The future web-related host is a separate application project. SampleHost is not required and is not part of the approved architecture, including during transition.
 - No SharedKernel. No cross-module adopter/plugin implementation pattern.
